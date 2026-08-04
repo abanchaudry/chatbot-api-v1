@@ -1,0 +1,174 @@
+import type { D1Database } from "@cloudflare/workers-types";
+
+import type { Env } from "../types/env";
+import {
+  retrieveVector,
+  type Piece,
+} from "./ask-helper";
+import type { QueryPlan } from "./query-planner";
+import { chunkDb } from "../services/db/chunk.db";
+
+type LocalChunkRow = {
+  chunk_id: string;
+  content: string;
+  topic?: string;
+  first_sentence?: string;
+  section_number?: string;
+  section?: string;
+  file_id?: string;
+  tags?: string[] | string | null;
+  matchMode?: string;
+};
+
+export type LocalRetrievalResult = {
+  vectorPieces: Piece[];
+  lexicalPieces: Piece[];
+  metadataPieces: Piece[];
+};
+
+function normalize(text: string): string {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s.]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseTags(tags: LocalChunkRow["tags"]): string[] {
+  if (Array.isArray(tags)) return tags.map((tag) => String(tag || "").trim()).filter(Boolean);
+  if (!tags) return [];
+  return String(tags)
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function buildLocalDbPiece(
+  row: LocalChunkRow,
+  plan: QueryPlan,
+  origin: "lexical" | "metadata"
+): Piece {
+  const tags = parseTags(row.tags);
+  const searchable = normalize(
+    [
+      String(row.section || ""),
+      String(row.section_number || ""),
+      String(row.topic || ""),
+      String(row.first_sentence || ""),
+      String(row.content || "").slice(0, 1200),
+      tags.join(" "),
+    ].join(" ")
+  );
+
+  const exactEntityMatch = plan.entities.some((entity) => searchable.includes(normalize(entity)));
+  const exactPhraseMatch = plan.exactPhrases.some((phrase) => searchable.includes(normalize(phrase)));
+  const exactSectionMatch = !!plan.sectionRef && searchable.includes(normalize(plan.sectionRef));
+  const keywordHits = plan.keywords.filter((keyword) => searchable.includes(keyword)).length;
+
+  let score = origin === "metadata" ? 58 : 42;
+  if (exactEntityMatch) score += 26;
+  if (exactPhraseMatch) score += 22;
+  if (exactSectionMatch) score += 24;
+  if (keywordHits >= 1) score += 10;
+  if (keywordHits >= 2) score += 8;
+  if (String(row.content || "").length < 80) score -= 12;
+  if (/page metadata|source url/.test(searchable)) score -= 18;
+
+  return {
+    sourceType: "vector",
+    sourceId: String(row.chunk_id || ""),
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    rawScore: Math.max(0.01, Math.min(1, score / 100)),
+    title: String(row.section || row.topic || row.first_sentence || "").trim(),
+    section: String(row.section_number || row.section || "").trim(),
+    text: String(row.content || "").trim(),
+    meta: {
+      fileId: row.file_id || null,
+      tags,
+      first_sentence: row.first_sentence || null,
+      section_number: row.section_number || null,
+      __origin: origin,
+      __matchMode: row.matchMode || null,
+      __exactEntityMatch: exactEntityMatch,
+      __exactPhraseMatch: exactPhraseMatch,
+      __exactSectionMatch: exactSectionMatch,
+    },
+  };
+}
+
+function enrichVectorPiece(piece: Piece, plan: QueryPlan): Piece {
+  const searchable = normalize(
+    [
+      String(piece.title || ""),
+      String(piece.section || ""),
+      String(piece.text || "").slice(0, 1200),
+      JSON.stringify(piece.meta?.tags || []),
+      String(piece.meta?.first_sentence || ""),
+    ].join(" ")
+  );
+
+  const exactEntityMatch = plan.entities.some((entity) => searchable.includes(normalize(entity)));
+  const exactPhraseMatch = plan.exactPhrases.some((phrase) => searchable.includes(normalize(phrase)));
+  const exactSectionMatch = !!plan.sectionRef && searchable.includes(normalize(plan.sectionRef));
+
+  return {
+    ...piece,
+    meta: {
+      ...(piece.meta || {}),
+      __origin: "vector",
+      __exactEntityMatch: exactEntityMatch,
+      __exactPhraseMatch: exactPhraseMatch,
+      __exactSectionMatch: exactSectionMatch,
+    },
+  };
+}
+
+export async function retrieveLocalCandidates(args: {
+  db: D1Database;
+  env: Env["Bindings"];
+  apiKey: string;
+  embedding: number[] | null;
+  question: string;
+  plan: QueryPlan;
+  vectorTopK: number;
+  lexicalTopK: number;
+  metadataTopK: number;
+}): Promise<LocalRetrievalResult> {
+  const {
+    db,
+    env,
+    apiKey,
+    embedding,
+    question,
+    plan,
+    vectorTopK,
+    lexicalTopK,
+    metadataTopK,
+  } = args;
+
+  const [vectorPieces, lexicalRows, metadataRows] = await Promise.all([
+    embedding?.length ? retrieveVector(env, apiKey, embedding, vectorTopK) : Promise.resolve([] as Piece[]),
+    chunkDb.lexicalSearch(db, {
+      query: plan.searchQuery || question,
+      terms: plan.keywords,
+      exactPhrases: plan.exactPhrases,
+      maxResults: lexicalTopK,
+    }),
+    chunkDb.metadataSearch(db, {
+      entities: plan.entities,
+      exactPhrases: plan.exactPhrases,
+      sectionRef: plan.sectionRef,
+      maxResults: metadataTopK,
+    }),
+  ]);
+
+  return {
+    vectorPieces: vectorPieces.map((piece) => enrichVectorPiece(piece, plan)),
+    lexicalPieces: (lexicalRows || []).map((row) =>
+      buildLocalDbPiece(row as LocalChunkRow, plan, "lexical")
+    ),
+    metadataPieces: (metadataRows || []).map((row) =>
+      buildLocalDbPiece(row as LocalChunkRow, plan, "metadata")
+    ),
+  };
+}

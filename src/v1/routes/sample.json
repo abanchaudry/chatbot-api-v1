@@ -1,0 +1,31 @@
+
+ℹ️ Thread already exists: l65psyc_2026-03-24_190943_Oh8yAM, skipping insert.
+{"step":"REQUEST_START","time":"2026-03-24T14:12:01.424Z","userId":"l65psyc","threadId":"l65psyc_2026-03-24_190943_Oh8yAM","message":"where is your office","language":"english","debug":false,"onlySearch":false}
+{"step":"HISTORY_LOADED","time":"2026-03-24T14:12:01.430Z","count":3}
+{"step":"HISTORY_PREVIEW","time":"2026-03-24T14:12:01.431Z","preview":"User: Hi Bot\nAssistant: Hello! How can I assist you with APOGEE or APOGEE Nevada today?\n\nUser: how are you\nAssistant: I'm doing well, thank you! How can I assist you with APOGEE or APOGEE Nevada today?\n\nUser: want to know about your services\nAssistant: APOGEE Nevada offers the following services:\n\n* **Complete Association Management**: They provide comprehensive management for associations.\n* **Homeowner Services**: Services include online access to account information for homeowners.\n* **Document Request Processing**: They handle document requests through a partnership with HomeWiseDocs.com.\n"}
+{"step":"PREFLIGHT_RESULT","time":"2026-03-24T14:12:04.055Z","route":"ANSWER_WITH_RAG","languageOk":true,"detectedLanguage":"english","hasGreeting":false,"isGreetingOnly":false,"isFollowUp":true,"rewrittenQuestion":"Where is the APOGEE Nevada office located?","reason":"User is asking for the location of the office, which requires domain knowledge."}
+{"step":"ROUTE_SELECTED","time":"2026-03-24T14:12:04.056Z","route":"ANSWER_WITH_RAG","reason":"User is asking for the location of the office, which requires domain knowledge.","rewritten":"Where is the APOGEE Nevada office located?"}
+{"step":"RAG_QUERY","time":"2026-03-24T14:12:04.056Z","original":"where is your office","finalQuery":"Where is the APOGEE Nevada office located?"}
+{"step":"EMBEDDING_READY","time":"2026-03-24T14:12:04.510Z","hasEmbedding":true,"usedRewrite":true}
+[info ] autorag:fetch_start {
+  rag: 'apogeenevada',
+  traceId: 'l65psyc_2026-03-24_190943_Oh8yAM:1774361521424:autorag',
+  topK: 10,
+  model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  rewrite_query: false
+}
+{"step":"VECTOR_RESULTS","time":"2026-03-24T14:12:05.298Z","count":0}
+[info ] autorag:fetch_ok_response_only {
+  rag: 'apogeenevada',
+  traceId: 'l65psyc_2026-03-24_190943_Oh8yAM:1774361521424:autorag',
+  ms: 9986,
+  chars: 575
+}
+{"step":"AUTORAG_RESULTS","time":"2026-03-24T14:12:14.498Z","count":1,"reason":"ok","sample":"The available documents do not explicitly state the location of the APOGEE Nevada office. However, according to the document \"https://apogeenevada.com/contact/\", the phone number is 702.462.9281, whic"}
+{"step":"RETRIEVAL_SUMMARY","time":"2026-03-24T14:12:14.499Z","vector":0,"autorag":1}
+{"step":"FINAL_EVIDENCE","time":"2026-03-24T14:12:14.499Z","count":1,"sources":["autorag_response"],"topScore":50}
+{"step":"CONTEXT_BUILT","time":"2026-03-24T14:12:14.499Z","chars":650,"preview":"TYPE=AUTORAG_RESPONSE | SCORE=50 | TITLE=AutoRAG Response | ORIGIN=autorag\nThe available documents do not explicitly state the location of the APOGEE Nevada office. However, according to the document \"https://apogeenevada.com/contact/\", the phone number is 702.462.9281, which is a Las Vegas area code, suggesting that the office may be located in Las Vegas, Nevada. Additionally, the document \"https://apogeenevada.com/frequently-asked-questions/\" mentions a payment address in Las Vegas, NV 89193, "}
+{"step":"ANSWER_GENERATED","time":"2026-03-24T14:12:15.521Z","answer":"I'm sorry — I don’t have enough information to answer that."}
+{"step":"FINAL_RESULT","time":"2026-03-24T14:12:15.521Z","fallback":false,"tokensUsed":178,"usedChunks":1}
+[wrangler:info] POST /v1/ask 200 OK (14102ms)
+ℹ️ Thread already exists: l65psyc_2026-03-24_190943_Oh8yAM, skipping insert.

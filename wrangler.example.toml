@@ -1,0 +1,98 @@
+# Copy this file to wrangler.toml, then fill every empty value.
+# Never add API keys or other secrets here; use .dev.vars and Wrangler secrets.
+
+name = "chatbot-api-dev"
+main = "src/index.ts"
+compatibility_date = "2024-11-12"
+compatibility_flags = ["nodejs_compat"]
+account_id = ""
+workers_dev = true
+
+[vars]
+APP_VERSION = "v1"
+ASSISTANT_NAME = "CHATBOT ASSISTANT"
+ASSISTANT_DOMAIN_HINT = "Customer support for your organization."
+FALLBACK_MESSAGE = "I’m sorry — I don’t have enough information to answer that."
+ALLOWED_ORIGINS = "http://localhost:3000"
+ENABLE_RERANK_LLM = "true"
+ENABLE_GATE_LLM = "false"
+ENABLE_GATE = "true"
+GATE_BLOCKING = "false"
+HYBRID_LEXICAL = "true"
+RRF_K = "60"
+ENABLE_AUTORAG_WEB = "true"
+CF_AUTORAG_NAME = ""
+AUTORAG_NAME = ""
+AUTORAG_WEB_TOPK = "10"
+AUTORAG_TOPK = "10"
+AUTORAG_ALWAYS_INCLUDE_K = "2"
+CF_AUTORAG_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+AUTORAG_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+CF_AUTORAG_RERANK_ENABLED = "true"
+AUTORAG_RERANK_ENABLED = "true"
+CF_AUTORAG_RERANK_MODEL = "@cf/baai/bge-reranker-base"
+AUTORAG_RERANK_MODEL = "@cf/baai/bge-reranker-base"
+CF_AUTORAG_SCORE_THRESHOLD = "0.3"
+AUTORAG_SCORE_THRESHOLD = "0.3"
+CF_AUTORAG_REWRITE_QUERY = "false"
+AUTORAG_REWRITE_QUERY = "false"
+PUBLIC_LOGS_ENABLED = "false"
+DEBUG_TRACE = "false"
+ENABLE_WEB_SEARCH = "true"
+ENABLE_PDF_SEARCH = "false"
+CF_ACCOUNT_ID = ""
+CF_AI_SEARCH_WEB_ID = ""
+CF_AI_SEARCH_PDFS_ID = ""
+OPENAI_CHAT_MODEL = "gpt-4o-mini"
+OPENAI_RERANK_MODEL = "gpt-4o-mini"
+OPENAI_GATE_MODEL = "gpt-4o-mini"
+MIN_VECTOR_SCORE = "40"
+MIN_WEB_SCORE = "40"
+DELTA_VECTOR = "12"
+DELTA_WEB = "12"
+ALLOW_DOMAINS = ""
+MAX_VEC_TOPK = "25"
+MAX_WEB_TOPK = "10"
+MAX_PDF_TOPK = "8"
+KEEP_VEC_PRE = "25"
+KEEP_WEB_PRE = "10"
+KEEP_PDF_PRE = "0"
+RERANK_MAX_ITEMS = "8"
+FINAL_EVIDENCE_MAX = "10"
+
+[[d1_databases]]
+binding = "DB"
+database_name = ""
+database_id = ""
+
+[[kv_namespaces]]
+binding = "CONFIG"
+id = ""
+preview_id = ""
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = ""
+preview_id = ""
+
+[[r2_buckets]]
+binding = "apogee_public"
+bucket_name = ""
+
+[[r2_buckets]]
+binding = "apogee_private"
+bucket_name = ""
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = ""
+
+[ai]
+binding = "AI"
+
+[observability]
+enabled = true
+
+[env.production]
+name = "chatbot-api-production"
+route = ""
