@@ -196,6 +196,11 @@ function trimContextToTokenBudget(args: {
     candidate = blocks.slice(0, keep).join(delimiter);
   }
 
+  const maxAllowedChars = Math.max(2000, args.maxContextTokens * 4);
+  if (candidate.length > maxAllowedChars) {
+    candidate = candidate.slice(0, maxAllowedChars) + "\n\n[...context truncated for length]";
+  }
+
   const afterValidation = validateTokenLimit(
     candidate.length,
     args.question.length,

@@ -65,14 +65,13 @@ function buildLocalDbPiece(
   const exactSectionMatch = !!plan.sectionRef && searchable.includes(normalize(plan.sectionRef));
   const keywordHits = plan.keywords.filter((keyword) => searchable.includes(keyword)).length;
 
-  let score = origin === "metadata" ? 58 : 42;
-  if (exactEntityMatch) score += 26;
-  if (exactPhraseMatch) score += 22;
-  if (exactSectionMatch) score += 24;
+  let score = origin === "metadata" ? 75 : 70;
+  if (exactEntityMatch) score += 20;
+  if (exactPhraseMatch) score += 15;
+  if (exactSectionMatch) score += 20;
   if (keywordHits >= 1) score += 10;
   if (keywordHits >= 2) score += 8;
   if (String(row.content || "").length < 80) score -= 12;
-  if (/page metadata|source url/.test(searchable)) score -= 18;
 
   return {
     sourceType: "vector",

@@ -409,7 +409,8 @@ export const chunkDb = {
       `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
        FROM chunks c
        WHERE (${whereSql})
-       ORDER BY LENGTH(c.content) DESC, c.chunk_id ASC
+         AND LENGTH(c.content) <= 8000
+       ORDER BY LENGTH(c.content) ASC, c.chunk_id ASC
        LIMIT ?`
     ).bind(...bindArgs).all();
 

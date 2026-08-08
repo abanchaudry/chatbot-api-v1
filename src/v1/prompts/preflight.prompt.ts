@@ -31,8 +31,8 @@ Return ONLY valid JSON (no markdown), with this exact schema:
 }}
 
 Rules:
-- SMALL_TALK: greetings, thanks, acknowledgements, goodbyes, pleasantries, questions about the user's name/identity ("whats my name", "who am I", "remember my name", "refer to me by my name"), or casual chat not requiring domain data.
-  Examples: "hi", "hello", "how are you", "my name is Hassan", "whats my name", "refer to me by my name", "thanks", "thank you", "ok", "got it", "bye".
+- SMALL_TALK: greetings, thanks, acknowledgements, goodbyes, pleasantries, general off-domain topics (e.g. coding concepts like linked lists, weather, general trivia not related to the organization's domain), or questions about the user's name/identity ("whats my name", "who am I", "remember my name").
+  Examples: "hi", "hello", "how are you", "my name is Hassan", "whats my name", "tell me about linkedlists", "thanks", "thank you", "ok", "bye".
 
 - LANGUAGE_MISMATCH: the message is mainly not in the preferred {language}.
 
