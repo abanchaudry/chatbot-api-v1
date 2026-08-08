@@ -1,0 +1,47 @@
+{
+  "name": "doc-intel-engine",
+  "version": "1.0.0",
+  "description": "Standalone Document Intelligence & Extraction Engine for Node.js & TypeScript",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "dev": "tsx test/verify-phase1.ts",
+    "test": "tsx test/verify-phase1.ts && tsx test/verify-phase2.ts && tsx test/verify-phase3-4.ts"
+  },
+  "keywords": [
+    "document-intelligence",
+    "pdf-parser",
+    "docx-parser",
+    "ocr",
+    "structured-data",
+    "standalone-library"
+  ],
+  "author": "HassanCpp",
+  "license": "MIT",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.66",
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^22.10.1",
+    "@types/pdf-parse": "^1.1.5",
+    "adm-zip": "^0.5.16",
+    "dotenv": "^17.4.2",
+    "mammoth": "^1.9.0",
+    "openai": "^6.49.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^4.10.38",
+    "tesseract.js": "^7.0.0",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1"
+  }
+}

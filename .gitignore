@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+chatbot-admin-v1/node_modules/
+scalable-rag/node_modules/
+
+# Environment and Secrets (CRITICAL: Do NOT commit)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+scalable-rag/.dev.vars
+scalable-rag/.dev.vars.*
+
+# Cloudflare Wrangler Build Outputs
+.wrangler/
+scalable-rag/.wrangler/
+
+# Build Outputs
+dist/
+chatbot-admin-v1/dist/
+
+# Scratch & Logs
+scratch/
+*.log
+
+# OS Metadata
+.DS_Store
+Thumbs.db

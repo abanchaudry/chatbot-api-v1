@@ -1,0 +1,64 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "scalable-rag",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-12-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Static frontend served alongside the Worker
+  "assets": {
+    "directory": "./frontend",
+    "binding": "ASSETS"
+  },
+
+  // Workers AI — used by offline pipeline (env.AI.toMarkdown)
+  "ai": {
+    "binding": "AI"
+  },
+
+  // D1 — document metadata + job tracking
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "scalable-rag-db",
+      "database_id": "0931b3af-335e-4925-b43d-7344a3c045dd"
+    }
+  ],
+
+  // R2 — raw file + extracted markdown storage
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS",
+      "bucket_name": "scalable-rag-docs"
+    }
+  ],
+
+  // Queues — async ingestion job dispatch
+  "queues": {
+    "producers": [
+      {
+        "binding": "INGESTION_QUEUE",
+        "queue": "scalable-rag-ingestion"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "scalable-rag-ingestion",
+        "max_batch_size": 5,
+        "max_batch_timeout": 30
+      }
+    ]
+  },
+
+  // Cloudflare Vectorize — 1536-dim vector search index
+  "vectorize": [
+    {
+      "binding": "VECTORIZE",
+      "index_name": "document-chunks",
+      "remote": true
+    }
+  ],
+
+  // Secrets (set via `wrangler secret put OPENAI_API_KEY`)
+  "vars": {}
+}

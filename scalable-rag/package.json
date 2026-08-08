@@ -1,0 +1,28 @@
+{
+  "name": "scalable-rag",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:migrate": "wrangler d1 execute scalable-rag-db --file=schema.sql",
+    "db:migrate:local": "wrangler d1 execute scalable-rag-db --file=schema.sql --local"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "hono": "^4.7.0",
+    "mammoth": "^1.12.0",
+    "openai": "^4.77.0",
+    "unpdf": "^1.8.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260730.1",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "workerd@1.20260730.1": true
+  }
+}

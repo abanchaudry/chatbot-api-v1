@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scalable RAG — Ingestion Admin</title>
+  <meta name="description" content="Document ingestion and text extraction admin panel for the Scalable RAG system.">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <header id="app-header">
+    <div class="header-left">
+      <h1>Scalable RAG</h1>
+      <span id="current-mode-tag" class="header-tag">Technical Mode</span>
+    </div>
+    <div class="header-right" style="display: flex; align-items: center; gap: 14px;">
+      <button id="mode-switch-btn" class="btn" style="background: #ffffff; border: 1px solid #cbd5e1; color: #0284c7; font-weight: 700; font-size: 0.82rem; padding: 6px 14px; border-radius: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s ease;">
+        ⚙️ Switch to Simplified Admin Mode
+      </button>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span id="health-indicator" class="health-dot" title="Checking..."></span>
+        <span id="health-label" class="health-label">Connecting...</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="app-main">
+    <!-- ========================================================= -->
+    <!-- 1. TECHNICAL DEVELOPER VIEW                               -->
+    <!-- ========================================================= -->
+    <div id="technical-view">
+      <!-- ─── Upload Panel ────────────────────────────────────── -->
+      <section id="upload-section" class="card">
+        <h2>Upload Documents</h2>
+        <p class="section-desc">Drop files to ingest into storage & trigger extraction pipeline.</p>
+
+        <div id="drop-zone" class="drop-zone" tabindex="0" role="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+            <path d="M12 16.5V3.75m0 0L7.5 8.25m4.5-4.5l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2.25 15a4.5 4.5 0 004.5 4.5h10.5a4.5 4.5 0 004.5-4.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="drop-text">Drag & drop files here, or <span class="browse-link">browse</span></p>
+          <p class="drop-sub">PDF, DOCX, PPTX, XLSX, CSV, PNG, JPG, TXT (up to 100 MB)</p>
+          <input type="file" id="file-input" multiple accept=".pdf,.docx,.pptx,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.txt" hidden>
+        </div>
+
+        <div id="file-list" class="file-list" hidden></div>
+
+        <div class="upload-controls">
+          <div class="mode-toggle">
+            <label class="radio-label">
+              <input type="radio" name="engineMode" value="offline" checked>
+              <span class="radio-text">Free Edge<span class="mode-hint"> — 0 LLM cost</span></span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="engineMode" value="hybrid">
+              <span class="radio-text">Hybrid AI<span class="mode-hint"> — text + screenshot vision</span></span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="engineMode" value="ai-full">
+              <span class="radio-text">100% AI Vision<span class="mode-hint"> — 300 DPI page vision</span></span>
+            </label>
+          </div>
+          <button id="upload-btn" class="btn btn-primary" disabled>Upload</button>
+        </div>
+      </section>
+
+      <!-- ─── Live Pipeline Tracker Section ───────────────────── -->
+      <section id="pipeline-status-section" class="card">
+        <div class="section-header">
+          <h2 id="tracker-title">Live Pipeline Status</h2>
+          <span id="tracker-badge" class="doc-count"></span>
+        </div>
+        <div id="pipeline-feedback-container" class="pipeline-container"></div>
+      </section>
+
+      <!-- ─── Documents Table ─────────────────────────────────── -->
+      <section id="documents-section" class="card">
+        <div class="section-header">
+          <h2>Documents</h2>
+          <div class="section-actions">
+            <span id="doc-count" class="doc-count"></span>
+            <button id="refresh-btn" class="btn btn-ghost" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                <path d="M1 4v6h6M23 20v-6h-6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div style="margin-top: 10px; margin-bottom: 12px;">
+          <input id="doc-search-input" type="text" placeholder="🔍 Search documents by filename..." style="width: 100%; padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem;" />
+        </div>
+
+        <div class="table-wrap">
+          <table id="documents-table">
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Mode</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th style="text-align:right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="documents-tbody">
+              <tr class="empty-row">
+                <td colspan="7">No documents yet. Upload one above.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="pagination" class="pagination" hidden></div>
+      </section>
+
+      <!-- ─── Classifier Audit & Gap Suggestions Section ────────── -->
+      <section id="classifier-records-section" class="card">
+        <div class="section-header">
+          <h2>Classifier Audit & Gap Suggestions</h2>
+          <span id="gap-count-badge" class="badge-gap">0 Flagged Gap(s)</span>
+        </div>
+
+        <p class="section-subtitle" style="margin-top: 4px; color: var(--text-secondary); font-size: 0.86rem;">
+          Self-improving feedback loop: Flagged documents where the AI suggested a new classification category or custom chunking strategy for admin review.
+        </p>
+
+        <div style="margin-top: 12px; margin-bottom: 14px;">
+          <input id="audit-search-input" type="text" placeholder="🔍 Search audits by filename, assigned category, or AI reasoning..." style="width: 100%; padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.88rem;" />
+        </div>
+
+        <div id="classifier-audits-list" class="audits-list" style="display: flex; flex-direction: column; gap: 12px;">
+          <div style="padding: 20px; text-align: center; color: var(--text-secondary);">No classification audit records available.</div>
+        </div>
+      </section>
+
+      <!-- ─── Content Preview & Live Markdown Editor ────────────── -->
+      <section id="preview-section" class="card" hidden>
+        <div class="section-header">
+          <h2 id="preview-title">Extracted Content</h2>
+          <div class="section-actions">
+            <button id="copy-markdown-btn" class="btn btn-ghost" title="Copy Markdown">Copy</button>
+            <button id="edit-content-btn" class="btn btn-ghost" title="Edit Markdown">✏️ Edit Markdown</button>
+            <button id="save-content-btn" class="btn btn-primary" hidden title="Save Changes">Save</button>
+            <button id="cancel-edit-btn" class="btn btn-ghost" hidden title="Cancel Editing">Cancel</button>
+          </div>
+        </div>
+        <div id="preview-meta" class="preview-meta"></div>
+        <div id="preview-content" class="preview-content"></div>
+        <textarea id="editor-content" class="editor-content" hidden></textarea>
+      </section>
+
+      <!-- ─── 3-Tier Chunk Tree Inspector Section ────────────────── -->
+      <section id="tree-inspector-section" class="card" hidden>
+        <div class="section-header">
+          <h2 id="tree-inspector-title">3-Tier Adaptive Chunk Tree</h2>
+          <button id="close-tree-btn" class="btn btn-ghost">✕ Close</button>
+        </div>
+
+        <div class="tree-inspector-panel">
+          <div class="tree-inspector-header">
+            <h3>Hierarchy Tier Breakdown</h3>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+            <input id="chunk-search-input" type="text" placeholder="🔍 Search chunks by keyword..." style="flex: 1; padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" />
+            <button id="clear-chunk-search-btn" class="btn btn-ghost" style="padding: 6px 12px;">Clear</button>
+          </div>
+
+          <div class="tier-selector-group">
+            <button class="tier-btn active" data-tier="all">All Tiers (<span id="count-all">0</span>)</button>
+            <button class="tier-btn" data-tier="large">Tier 1: Large ~1k tokens (<span id="count-large">0</span>)</button>
+            <button class="tier-btn" data-tier="medium">Tier 2: Medium ~400 tokens (<span id="count-medium">0</span>)</button>
+            <button class="tier-btn" data-tier="small">Tier 3: Small ~150 tokens (<span id="count-small">0</span>)</button>
+          </div>
+        </div>
+
+        <div id="tree-chunks-container" class="tree-chunks-grid"></div>
+      </section>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- 2. SIMPLIFIED NON-TECHNICAL ADMIN VIEW                    -->
+    <!-- ========================================================= -->
+    <div id="simplified-view" hidden>
+      <!-- ─── Simplified Document Ingestion Wizard ─────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Upload & Ingest Document</h2>
+          <span class="doc-count">Simplified Admin Wizard</span>
+        </div>
+        <p class="section-desc">Drop a document to ingest into storage and select your extraction & chunking strategy.</p>
+
+        <!-- Dropzone -->
+        <div id="simple-drop-zone" class="drop-zone" tabindex="0" role="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+            <path d="M12 16.5V3.75m0 0L7.5 8.25m4.5-4.5l4.5 4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2.25 15a4.5 4.5 0 004.5 4.5h10.5a4.5 4.5 0 004.5-4.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="drop-text">Drag & drop file here, or <span class="browse-link">browse</span></p>
+          <p id="simple-selected-file" class="drop-sub">PDF, DOCX, PPTX, XLSX, CSV, PNG, JPG, TXT (up to 100 MB)</p>
+          <input type="file" id="simple-file-input" accept=".pdf,.docx,.pptx,.xlsx,.csv,.png,.jpg,.jpeg,.webp,.txt" hidden>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 16px;">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;">
+            <div>
+              <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); display: block; margin-bottom: 6px;">1. Extraction Pipeline:</span>
+              <div class="mode-toggle">
+                <label class="radio-label">
+                  <input type="radio" name="simpleEngineMode" value="offline" checked>
+                  <span class="radio-text">Free Edge<span class="mode-hint"> — 0 LLM cost</span></span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="simpleEngineMode" value="hybrid">
+                  <span class="radio-text">Hybrid AI<span class="mode-hint"> — text + vision</span></span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="simpleEngineMode" value="ai-full">
+                  <span class="radio-text">100% AI Vision<span class="mode-hint"> — 300 DPI</span></span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <span style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); display: block; margin-bottom: 6px;">2. Chunking Strategy:</span>
+              <div class="mode-toggle">
+                <label class="radio-label">
+                  <input type="radio" name="simpleChunkMode" value="adaptive" checked>
+                  <span class="radio-text">⚡ Adaptive Rule Tree</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="simpleChunkMode" value="ai">
+                  <span class="radio-text" style="color: #0284c7; font-weight: 600;">🤖 100% AI LLM Chunker</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 10px;">
+            <button id="simple-start-btn" class="btn btn-primary" style="width: 100%; padding: 10px; font-size: 0.95rem; font-weight: 700;" disabled>
+              🚀 Upload & Process Document End-to-End
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── Rich Visual Progress Stepper Panel ──────────────── -->
+      <section id="simple-progress-section" class="card" hidden style="border-top: 4px solid #10b981;">
+        <div class="section-header">
+          <h2 id="simple-progress-title">Processing Status</h2>
+          <span id="simple-progress-badge" class="doc-count">In Progress</span>
+        </div>
+
+        <div id="simple-stepper-container" style="margin-top: 14px;">
+          <!-- 4 Visual Steps will render dynamically -->
+        </div>
+      </section>
+
+      <!-- ─── Read-Only Simplified Documents Table ────────────── -->
+      <section class="card">
+        <div class="section-header">
+          <h2>Uploaded Documents</h2>
+          <span id="simple-doc-count" class="doc-count">0 Documents</span>
+        </div>
+
+        <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Mode</th>
+                <th>Status</th>
+                <th>Uploaded Date</th>
+                <th style="text-align:right">Action</th>
+              </tr>
+            </thead>
+            <tbody id="simple-docs-tbody">
+              <tr class="empty-row">
+                <td colspan="5">No documents ingested yet. Upload one above.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ─── Read-Only Chunks Viewer Modal for Simplified Mode ─── -->
+    <div id="simple-chunks-modal" class="modal-backdrop" hidden>
+      <div class="modal-card" style="max-width: 900px; width: 90vw; max-height: 88vh; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 id="simple-chunks-title" style="font-size: 1.1rem; font-weight: 700; color: #1e293b;">3-Tier Chunk Tree (Read-Only)</h3>
+          <button class="btn btn-ghost" style="padding: 2px 8px; font-size: 1.1rem;" onclick="window.__closeSimpleChunksModal()">✕ Close</button>
+        </div>
+
+        <!-- Filter Controls Matching Technical Mode -->
+        <div class="tree-inspector-panel" style="margin-top: 0; padding-top: 0; border-top: none;">
+          <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
+            <input id="simple-chunk-search-input" type="text" placeholder="🔍 Search chunks by keyword..." style="flex: 1; padding: 8px 14px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" />
+            <button id="simple-clear-chunk-search-btn" class="btn btn-ghost" style="padding: 6px 12px;">Clear</button>
+          </div>
+
+          <div class="tier-selector-group" id="simple-tier-selector-group">
+            <button class="tier-btn active" data-tier="all">All Tiers (<span id="simple-count-all">0</span>)</button>
+            <button class="tier-btn" data-tier="large">Tier 1: Large ~1k tokens (<span id="simple-count-large">0</span>)</button>
+            <button class="tier-btn" data-tier="medium">Tier 2: Medium ~400 tokens (<span id="simple-count-medium">0</span>)</button>
+            <button class="tier-btn" data-tier="small">Tier 3: Small ~150 tokens (<span id="simple-count-small">0</span>)</button>
+          </div>
+        </div>
+
+        <div id="simple-chunks-body" class="tree-chunks-grid" style="flex: 1; overflow-y: auto; margin-top: 14px; padding-right: 4px;">
+          <div style="padding: 20px; text-align: center; color: var(--text-secondary);">Loading chunks...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Global 3-Dots Action Popover Dropdown ──────────── -->
+    <div id="global-doc-dropdown" class="dropdown-menu" hidden style="position: fixed; z-index: 10000;">
+      <button class="dropdown-item" id="menu-opt-view-content">👁️ View Content</button>
+      <button class="dropdown-item" id="menu-opt-view-chunks">🌳 View 3-Tier Chunks</button>
+      <button class="dropdown-item" id="menu-opt-index">⚡ Index Document</button>
+      <button class="dropdown-item" id="menu-opt-reindex">🔄 Re-Index Document</button>
+      <button class="dropdown-item danger" id="menu-opt-delete">🗑️ Delete Document</button>
+    </div>
+
+    <!-- ─── Chunking Strategy Modal ────────────────────────── -->
+    <div id="chunk-strategy-modal" class="modal-backdrop" hidden>
+      <div class="modal-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3 style="font-size: 1.1rem; font-weight: 700; color: #1e293b;">Select Chunking Strategy</h3>
+          <button class="btn btn-ghost" style="padding: 2px 8px; font-size: 1.1rem;" onclick="window.__closeChunkModal()">✕</button>
+        </div>
+        <p style="margin-top: 6px; font-size: 0.86rem; color: var(--text-secondary);">
+          Choose how your document content should be split into a 3-tier tree:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px; margin: 16px 0;">
+          <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; background: #ffffff;">
+            <input type="radio" name="chunkStrategyMode" value="adaptive" checked style="margin-top: 3px;" />
+            <div>
+              <strong style="display: block; font-size: 0.9rem; color: #1e293b;">⚡ Adaptive 3-Tier Rule Tree</strong>
+              <span style="font-size: 0.8rem; color: var(--text-secondary);">Fast structural chunking based on document taxonomy.</span>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: flex-start; gap: 12px; padding: 14px; border: 1px solid #bae6fd; border-radius: 8px; cursor: pointer; background: #f0f9ff;">
+            <input type="radio" name="chunkStrategyMode" value="ai" style="margin-top: 3px;" />
+            <div>
+              <strong style="display: block; font-size: 0.9rem; color: #0284c7;">🤖 100% AI Agentic LLM Chunker</strong>
+              <span style="font-size: 0.8rem; color: #0369a1;">Agentic boundary detection & contextual prefix enrichment via gpt-4o-mini.</span>
+            </div>
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px;">
+          <button class="btn btn-ghost" onclick="window.__closeChunkModal()">Cancel</button>
+          <button id="confirm-chunk-btn" class="btn btn-primary">Start Chunking</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Toast Notification Container ───────────────────── -->
+    <div id="toast-container" class="toast-container"></div>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
