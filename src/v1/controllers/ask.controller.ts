@@ -224,7 +224,7 @@ async function runSharedAskLogic(
   // Layer 2: Semantic Vectorize Similarity (>= 0.95 cosine)
   if (c.env.VECTORIZE_CACHE && c.env.CACHE && prep.embedding) {
     try {
-      const semHit = await getSemanticCacheHit(c.env.VECTORIZE_CACHE, prep.embedding, c.env.CACHE);
+      const semHit = await getSemanticCacheHit(c.env.VECTORIZE_CACHE, prep.embedding, c.env.CACHE, cacheQuery);
       if (semHit.hit && semHit.answer) {
         console.log(JSON.stringify({ level: "INFO", label: "cache_hit_L2_semantic", score: semHit.score, latencyMs: semHit.latencyMs, query: cacheQuery.slice(0, 80) }));
         traceStepEnd(prep.trace, "cache_hit", semHit.latencyMs || 0, { layer: "L2_SEMANTIC", score: semHit.score });
@@ -414,7 +414,7 @@ async function runStreamingPreparation(
 
   if (c.env.VECTORIZE_CACHE && c.env.CACHE && prep.embedding) {
     try {
-      const semHit = await getSemanticCacheHit(c.env.VECTORIZE_CACHE, prep.embedding, c.env.CACHE);
+      const semHit = await getSemanticCacheHit(c.env.VECTORIZE_CACHE, prep.embedding, c.env.CACHE, cacheQuery);
       if (semHit.hit && semHit.answer) {
         console.log(JSON.stringify({ level: "INFO", label: "stream_cache_hit_L2", score: semHit.score }));
         return { ok: true, prep, cachedAnswer: semHit.answer, cacheLayer: "L2_SEMANTIC" };

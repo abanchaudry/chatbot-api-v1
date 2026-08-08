@@ -56,10 +56,29 @@ export async function getCachedQueryResponse(
   return null;
 }
 
+export function extractNumbersAndIdentifiers(text: string): string[] {
+  const matches = String(text || "").match(/\b\d+(?:\.\d+)*\b|\b[a-z]{2,}\s*\d+(?:\.\d+)*\b/gi) || [];
+  return Array.from(new Set(matches.map(m => m.toLowerCase().replace(/\s+/g, ""))));
+}
+
+export function doIdentifiersMatch(query1: string, query2: string): boolean {
+  const ids1 = extractNumbersAndIdentifiers(query1);
+  const ids2 = extractNumbersAndIdentifiers(query2);
+
+  if (ids1.length > 0 || ids2.length > 0) {
+    if (ids1.length !== ids2.length) return false;
+    ids1.sort();
+    ids2.sort();
+    return ids1.every((val, idx) => val === ids2[idx]);
+  }
+
+  return true;
+}
+
 export async function saveQueryResponseToCache(
   cache: KVNamespace,
   question: string,
-  payload: { answer: string; context: string; sources: any[]; tokensUsed?: number }
+  payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string }
 ): Promise<boolean> {
   const normalized = normalizeQuery(question);
 
@@ -70,7 +89,8 @@ export async function saveQueryResponseToCache(
   try {
     const hash = await generateSha256Hash(normalized);
     const key = `qcache:${hash}`;
-    await cache.put(key, JSON.stringify(payload), { expirationTtl: 86400 });
+    const fullPayload = { ...payload, question };
+    await cache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
     return true;
   } catch (error) {
     return false;
@@ -80,7 +100,8 @@ export async function saveQueryResponseToCache(
 export async function getSemanticCacheHit(
   vectorizeCache: VectorizeIndex | undefined,
   embedding: number[] | null,
-  kvCache: KVNamespace
+  kvCache: KVNamespace,
+  incomingQuestion?: string
 ): Promise<{ hit: boolean; answer?: string; score?: number; latencyMs?: number }> {
   const start = performance.now();
 
@@ -95,9 +116,21 @@ export async function getSemanticCacheHit(
       if (match.score >= 0.95) {
         const queryHash = match.id;
         const key = `qcache:${queryHash}`;
-        const data = await kvCache.get<{ answer: string; context: string; sources: any[] }>(key, 'json');
+        const data = await kvCache.get<{ answer: string; context: string; sources: any[]; question?: string }>(key, 'json');
 
         if (data) {
+          // Safety Guard: If incoming question and cached question have differing section/law numbers, bypass semantic cache!
+          if (incomingQuestion && data.question && !doIdentifiersMatch(incomingQuestion, data.question)) {
+            console.log(JSON.stringify({
+              level: "INFO",
+              label: "semantic_cache_bypassed_identifier_mismatch",
+              incoming: incomingQuestion,
+              cached: data.question,
+              score: match.score,
+            }));
+            return { hit: false };
+          }
+
           return {
             hit: true,
             answer: data.answer,
@@ -119,7 +152,8 @@ export async function saveSemanticCacheEntry(
   kvCache: KVNamespace,
   queryHash: string,
   embedding: number[],
-  payload: { answer: string; context: string; sources: any[]; tokensUsed?: number }
+  payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string },
+  question?: string
 ): Promise<boolean> {
   if (!vectorizeCache || !embedding) {
     return false;
@@ -135,7 +169,8 @@ export async function saveSemanticCacheEntry(
     ]);
 
     const key = `qcache:${queryHash}`;
-    await kvCache.put(key, JSON.stringify(payload), { expirationTtl: 86400 });
+    const fullPayload = { ...payload, question: question || payload.question };
+    await cache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
 
     return true;
   } catch (error) {
