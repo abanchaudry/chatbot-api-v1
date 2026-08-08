@@ -634,6 +634,36 @@ export const askController = {
             position += chunk.length;
           }
 
+          // Asynchronously write back generated streaming answer to KV and Vectorize caches
+          if (c.env.CACHE && executed.answer && executed.outcome !== "final_fallback") {
+            const cachePayload = {
+              answer: executed.answer,
+              context: retrieve.context,
+              sources: retrieve.pieces,
+              tokensUsed: executed.tokensUsed,
+            };
+
+            const rawMsg = prep.message;
+            const rewrittenQuery = prep.query;
+
+            c.executionCtx.waitUntil(
+              (async () => {
+                await saveQueryResponseToCache(c.env.CACHE, rawMsg, cachePayload);
+
+                if (rewrittenQuery && rewrittenQuery.toLowerCase().trim() !== rawMsg.toLowerCase().trim()) {
+                  await saveQueryResponseToCache(c.env.CACHE, rewrittenQuery, cachePayload);
+                }
+
+                if (c.env.VECTORIZE_CACHE && prep.embedding) {
+                  const hash = await generateSha256Hash(normalizeQuery(rewrittenQuery || rawMsg));
+                  await saveSemanticCacheEntry(c.env.VECTORIZE_CACHE, c.env.CACHE, hash, prep.embedding, cachePayload, rawMsg);
+                }
+
+                console.log(JSON.stringify({ level: "INFO", label: "stream_cache_writeback_success", rawMsg, query: rewrittenQuery }));
+              })().catch((err) => logError("stream_cache_writeback_failed", err))
+            );
+          }
+
           yield formatSSEDoneEvent({
             threadId: prep.threadId,
             route: prep.route,
