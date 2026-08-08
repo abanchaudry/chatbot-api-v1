@@ -21,6 +21,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { Env } from "../types/env";
 import type { PreflightOut } from "../utils/preflight.parse";
 import type { TraceShape } from "../utils/trace";
+import { format } from "date-fns";
 
 import { buildPreflightChain } from "../utils/preflight-chain";
 import { parsePreflight } from "../utils/preflight.parse";
@@ -232,6 +233,8 @@ async function stageRunPreflight(
 ): Promise<PreflightOut> {
   const preflightChain = buildPreflightChain(apiKey);
 
+  const currentDate = format(new Date(), "EEEE, MMMM d, yyyy (HH:mm 'UTC')");
+
   try {
     const pfRaw = await timeout(
       preflightChain.invoke({
@@ -242,6 +245,7 @@ async function stageRunPreflight(
         domainHint,
         company: domainHint,
         brand: assistantName,
+        currentDate,
       } as any),
       6500,
       "preflight"
@@ -294,12 +298,14 @@ async function stageHandleDirectRoutes(
       trace,
       "smalltalk_answer",
       async () => {
+        const currentDate = format(new Date(), "EEEE, MMMM d, yyyy (HH:mm 'UTC')");
         return await chains.smallTalk.invoke({
           message,
           language,
           history: historyPreview,
           assistantName,
           domainHint,
+          currentDate,
         } as any);
       },
       undefined,

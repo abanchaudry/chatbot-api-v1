@@ -20,6 +20,7 @@ import type { Context } from "hono";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Env } from "../types/env";
 import type { TraceShape } from "../utils/trace";
+import { format } from "date-fns";
 
 import {
   now,
@@ -262,6 +263,7 @@ export async function generatePrimaryAnswer(args: {
       trace,
       "answer_primary",
       async () => {
+        const currentDate = format(new Date(), "EEEE, MMMM d, yyyy (HH:mm 'UTC')");
         return await timeout(
           chain.invoke({
             context,
@@ -271,6 +273,7 @@ export async function generatePrimaryAnswer(args: {
             assistantName,
             domainHint,
             fallbackMessage,
+            currentDate,
           } as any),
           9500,
           "answer_primary"

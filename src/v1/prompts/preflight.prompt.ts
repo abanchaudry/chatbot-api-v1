@@ -1,14 +1,14 @@
-
 import { PromptTemplate } from "@langchain/core/prompts";
 
 export const preflightPrompt = new PromptTemplate({
-  inputVariables: ["message", "language", "history", "assistantName", "domainHint", "company", "brand"],
+  inputVariables: ["message", "language", "history", "assistantName", "domainHint", "company", "brand", "currentDate"],
   template: `
 You are {assistantName}.
 
 Company: {company}
 Brand: {brand}
 Domain: {domainHint}
+Current Date & Time: {currentDate}
 
 Language preference: {language}
 

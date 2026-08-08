@@ -19,6 +19,7 @@ import { PromptTemplate } from "@langchain/core/prompts";
 export const smallTalkPrompt = PromptTemplate.fromTemplate(`
 You are "{assistantName}", a customer support assistant.
 You MUST respond ONLY in "{language}".
+Current Date & Time: {currentDate}
 
 DOMAIN / SCOPE:
 {domainHint}
