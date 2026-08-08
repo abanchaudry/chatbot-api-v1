@@ -1,170 +1,123 @@
-# Chatbot API
+# Chatbot API — Version 2 (Full-Stack RAG & Edge AI Platform)
 
-A production-oriented retrieval-augmented generation (RAG) API built on Cloudflare Workers. The service combines document ingestion, hybrid retrieval, conversational question answering, authentication, analytics, and request tracing in a single edge-native backend.
+A production-grade, full-stack Retrieval-Augmented Generation (RAG) platform built on Cloudflare Workers and Angular 19. The service features a **3-Layer Query Caching Engine**, multi-format document extraction microservice (PDF, DOCX, Vision OCR), real-time thread observability, and an Angular 19 admin control dashboard.
 
-## Technology stack
+---
 
-- **Runtime:** Cloudflare Workers
-- **API framework:** Hono
-- **Data:** Cloudflare D1 and KV
-- **File storage:** Cloudflare R2
-- **Search:** Cloudflare Vectorize and AI Search
-- **AI:** OpenAI, Workers AI, and LangChain
-- **Testing:** Vitest with the Cloudflare Workers pool
+## 🌟 Version 2 Key Features
 
-## Core capabilities
+- **🚀 3-Layer Query Cache Architecture**:
+  - **Layer 1 (KV Exact Match, < 10 ms)**: Deterministic SHA-256 Web Crypto hashing on normalized queries.
+  - **Layer 2 (Vectorize Semantic Cache, < 50 ms)**: Dedicated `VECTORIZE_CACHE` 1536-dim index checking cosine similarity (threshold ≥ 0.95).
+  - **Layer 3 (Full RAG Pipeline, Fallback)**: Multi-pass vector/D1 search, LLM reranking, and `gpt-4o-mini` generation with automatic cache writeback.
+- **📄 Scalable RAG Multi-Format Engine (`/scalable-rag`)**:
+  - Offline $0 edge extraction for TXT, DOCX, CSV, PPTX, XLSX.
+  - GPT-4o Vision & 300 DPI high-resolution OCR rendering for scanned PDFs and images.
+  - 3-Tier Hierarchical Chunking (📄 Overview, 📝 Context, 🔍 Detail) and auto-classification.
+- **🅰️ Integrated Admin Panel (`/chatbot-admin-v1`)**:
+  - Interactive Angular 19 dashboard for file uploads, extraction pipeline selection, preview table editing, and chunk review.
+  - Real-time step-by-step thread observability and pipeline trace inspection.
+- **🔄 Auto-Invalidation**: Automatic cache purging on document deletion to prevent stale answers.
 
-- Retrieval-augmented, streaming chatbot responses
-- File ingestion, chunking, enrichment, and indexing
-- Vector and AI Search retrieval pipelines
-- JWT-based authentication and rate limiting
-- Conversation threads and message history
-- QA workflows, analytics, and message tracing
-- Separate development and production configuration
+---
 
-## Prerequisites
+## 🏗️ Repository Architecture (Monorepo)
 
-Before starting, install or obtain:
+```text
+chatbot-api-v1/
+├── src/                                  # ⚡ Backend API (Cloudflare Worker + Hono)
+│   ├── index.ts                          # Main entry point & Hono application
+│   └── v1/
+│       ├── controllers/                  # HTTP controllers (ask, data, auth, logs, qa)
+│       ├── pipeline/                     # Modular RAG pipeline (prepare → retrieve → execute)
+│       ├── services/                     # 3-Layer Cache, D1 DB services, Vectorize integrations
+│       ├── prompts/                      # System prompts (router, answer generation, reranker)
+│       ├── routes/                       # API route definitions
+│       └── utils/                        # Tracing, token ledgers, and helper utilities
+│
+├── chatbot-admin-v1/                     # 🅰️ Admin Dashboard Frontend (Angular 19)
+│   └── src/app/modules/
+│       ├── admin-module/ai-knowledge-module/  # Multi-format upload & chunk review UI
+│       ├── admin-module/thread-observability/ # Real-time trace & execution logs
+│       └── shared/                       # API services & auth interceptors
+│
+├── scalable-rag/                         # 📑 Microservice Engine (Vision OCR & 3-Tier Chunks)
+│   ├── src/extraction/                   # unpdf, mammoth, & GPT-4o Vision engines
+│   └── src/chunking/                     # Adaptive category-aware tree chunker
+│
+├── migrations/                           # 🗄️ D1 SQLite Database Schema Files (11 migrations)
+├── wrangler.toml                         # ⚙️ Worker bindings (D1, KV CACHE/CONFIG, Vectorize)
+├── changes.md                            # 📜 Complete system changelog
+└── DEVELOPER_SETUP.md                    # 📖 Developer setup guide
+```
 
-- Node.js 20 or later (Node.js 22 LTS recommended)
+---
+
+## 🚀 Quick Start & Local Setup
+
+### 1. Prerequisites
+- Node.js 20 or later
 - npm
-- A Cloudflare account with access to Workers, D1, KV, R2, Vectorize, Workers AI, and AI Search
-- An OpenAI API key
+- Cloudflare CLI (`npx wrangler`)
+- OpenAI API Key
 
-## Getting started
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/abanchaudry/chatbot-api-v1.git
-cd chatbot-api-v1
-npm install
-```
-
-### 2. Authenticate with Cloudflare
-
-```bash
-npx wrangler login
-npx wrangler whoami
-```
-
-### 3. Configure Cloudflare resources
-
-Create your local Wrangler configuration from the provided template:
-
-```bash
-cp wrangler.example.toml wrangler.toml
-```
-
-Update `wrangler.toml` with the identifiers for your D1 database, KV namespaces, R2 buckets, Vectorize index, and AI Search resources. This file is ignored by Git and must not be committed.
-
-### 4. Configure local secrets
-
-Create `.dev.vars` in the project root:
-
+### 2. Configure Local Environment & Secrets
+Create `.dev.vars` in the root directory (automatically ignored by Git):
 ```dotenv
 OPENAI_API_KEY=your-openai-api-key
-CF_AI_SEARCH_TOKEN=your-cloudflare-api-token
-CF_SEARCH_AI_API_TOKEN=your-cloudflare-api-token
 ADMIN_API_KEY=your-admin-api-key
 JWT_SECRET=your-jwt-signing-secret
 ```
 
-Never commit `.dev.vars` or place secret values in `wrangler.toml`.
+### 3. Install Dependencies & Start Services
 
-### 5. Initialize the database
-
-Apply the SQL files in `migrations/` to your local D1 database. The complete migration order and resource provisioning instructions are documented in [DEVELOPER_SETUP.md](./DEVELOPER_SETUP.md).
-
-### 6. Start the development server
-
+#### Backend Worker API (Port 8787)
 ```bash
+npm install
 npm run dev
 ```
 
-The API is available by default at `http://localhost:8787`. Confirm it is running:
-
+#### Scalable RAG Microservice (Port 8787 / Subfolder)
 ```bash
-curl http://localhost:8787/healthz
+cd scalable-rag
+npm install
+npm run dev
 ```
 
-## API overview
-
-| Route group | Purpose |
-| --- | --- |
-| `GET /healthz` | Service health check |
-| `/auth` | Authentication and access management |
-| `/thread` | Conversation threads and messages |
-| `/data` | File ingestion and data operations |
-| `/ask` | RAG question-answering pipeline |
-| `/qa` | Quality-assurance operations |
-| `/analytics` | Chat and usage analytics |
-| `/message-traces` | Request and pipeline diagnostics |
-
-## Project structure
-
-```text
-.
-├── migrations/             # D1 database schema files
-├── src/
-│   ├── index.ts            # Worker entry point and Hono application
-│   └── v1/
-│       ├── controllers/    # HTTP request handlers
-│       ├── middleware/     # Authentication and rate limiting
-│       ├── pipeline/       # RAG preparation, retrieval, and execution
-│       ├── prompts/        # Model prompt templates
-│       ├── routes/         # API route definitions
-│       ├── services/       # AI, search, storage, and database services
-│       ├── types/          # Worker environment types
-│       └── utils/          # Retrieval and processing utilities
-├── test/                   # Worker integration tests
-└── wrangler.example.toml   # Shareable Cloudflare configuration template
-```
-
-## Available scripts
-
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start the local Worker development server |
-| `npm test` | Run tests in watch mode |
-| `npm test -- --run` | Run the test suite once |
-| `npm run cf-typegen` | Generate Cloudflare binding types |
-| `npm run deploy` | Deploy the default environment |
-| `npx wrangler deploy --env production` | Deploy the production environment |
-
-## Validation
-
-Run the following checks before opening a pull request or deploying:
-
+#### Angular Admin Dashboard (Port 4200)
 ```bash
-npm test -- --run
-npx tsc --noEmit
-npx wrangler deploy --dry-run
+cd chatbot-admin-v1
+npm install
+ng serve --port 4200
 ```
 
-## Deployment
+---
 
-Configure deployed secrets interactively so their values are never stored in source control:
+## 📊 API Route Overview
 
-```bash
-npx wrangler secret put OPENAI_API_KEY
-npx wrangler secret put CF_AI_SEARCH_TOKEN
-npx wrangler secret put CF_SEARCH_AI_API_TOKEN
-npx wrangler secret put ADMIN_API_KEY
-npx wrangler secret put JWT_SECRET
-npm run deploy
-```
+| Route | Method | Description |
+| --- | --- | --- |
+| `/ask` | `POST` | RAG Question Answering (with Layer 1 & 2 Cache Check) |
+| `/ask/stream` | `POST` | SSE Streaming RAG Question Answering |
+| `/data/preview-chunks` | `POST` | Multi-format extraction & preview chunking |
+| `/data/save-file-chunks` | `POST` | Finalize & index reviewed chunks into R2/D1/Vectorize |
+| `/data/delete-file/:id` | `DELETE` | Delete file, remove vectors, and purge query cache |
+| `/thread` | `GET/POST` | Conversation threads & message history |
+| `/auth` | `POST` | JWT Authentication & admin login |
+| `/message-traces` | `GET` | Execution step telemetry & observability traces |
 
-Append `--env production` to Wrangler commands when configuring or deploying the production environment.
+---
 
-## Security
+## 🔒 Security & Environment Safety
 
-- Keep `.dev.vars`, `wrangler.toml`, credentials, and resource tokens out of source control.
-- Use separate Cloudflare resources for development and production.
-- Grant service tokens and team members only the permissions they require.
-- Review allowed CORS origins before deployment.
-- Rotate secrets immediately if they are exposed.
+- `.dev.vars` and `scalable-rag/.dev.vars` are **strictly ignored** via `.gitignore`. Never commit secret keys.
+- Production environment bindings use Cloudflare Secrets (`npx wrangler secret put`).
+- Admin routes require valid JWT tokens or `ADMIN_API_KEY` header.
 
-## Documentation
+---
 
-See [DEVELOPER_SETUP.md](./DEVELOPER_SETUP.md) for complete Cloudflare resource provisioning, D1 migration order, environment configuration, troubleshooting, and deployment instructions.
+## 📜 Documentation
+
+- See [changes.md](./changes.md) for full architectural changelog.
+- See [DEVELOPER_SETUP.md](./DEVELOPER_SETUP.md) for database migration order and Cloudflare setup.
+
