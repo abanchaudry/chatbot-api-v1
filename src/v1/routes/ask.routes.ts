@@ -8,4 +8,5 @@ const askRoutes = new Hono<Env>();
 askRoutes.post("/preflight", askPreflightController.preflight);
 askRoutes.post("/", askController.ask);
 askRoutes.post("/stream", askController.askStream);
+askRoutes.post("/purge-cache", askController.purgeCache);
 export default askRoutes;

@@ -14,8 +14,12 @@ const SEARCH_STOP_WORDS = new Set([
   "do",
   "for",
   "find",
+  "get",
   "give",
   "help",
+  "how",
+  "hows",
+  "how's",
   "i",
   "in",
   "is",
@@ -23,6 +27,8 @@ const SEARCH_STOP_WORDS = new Set([
   "of",
   "please",
   "who",
+  "whos",
+  "who's",
   "share",
   "show",
   "statement",
@@ -30,7 +36,11 @@ const SEARCH_STOP_WORDS = new Set([
   "the",
   "to",
   "what",
+  "whats",
+  "what's",
   "where",
+  "wheres",
+  "where's",
   "with",
   "you",
 ]);
@@ -51,7 +61,7 @@ function canonicalizeSection(s: string): { withPrefix?: string; numberOnly: stri
 function normalizeSearchText(text: string): string {
   return String(text || "")
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/[^a-z0-9.\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -202,49 +212,20 @@ export const chunkDb = {
     if (rawSection) {
       const sec = canonicalizeSection(rawSection);
 
-      if (sec.withPrefix) {
-        const exactRes = await db
-          .prepare(
-            `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
-             FROM chunks c
-             WHERE c.section_number = ?
-             ORDER BY LENGTH(c.content) ASC
-             LIMIT ?`
-          )
-          .bind(sec.withPrefix, maxResults)
-          .all();
+      const secRes = await db
+        .prepare(
+          `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+           FROM chunks c
+           WHERE c.section_number = ?
+              OR c.section_number LIKE ?
+              OR c.content LIKE ?
+           ORDER BY LENGTH(c.content) ASC
+           LIMIT ?`
+        )
+        .bind(sec.withPrefix || sec.numberOnly, `%${sec.numberOnly}`, `%${sec.numberOnly}%`, maxResults)
+        .all();
 
-        exactMatches = exactRes.results || [];
-
-        if (exactMatches.length < maxResults) {
-          const likeRes = await db
-            .prepare(
-              `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
-               FROM chunks c
-               WHERE c.section_number LIKE ?
-               ORDER BY LENGTH(c.content) ASC
-               LIMIT ?`
-            )
-            .bind(`%${sec.numberOnly}`, maxResults)
-            .all();
-
-          const more = (likeRes.results || []).filter((r: any) => !exactMatches.some((e) => e.chunk_id === r.chunk_id));
-          exactMatches = [...exactMatches, ...more].slice(0, maxResults);
-        }
-      } else {
-        const likeRes = await db
-          .prepare(
-            `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
-             FROM chunks c
-             WHERE c.section_number LIKE ?
-             ORDER BY LENGTH(c.content) ASC
-             LIMIT ?`
-          )
-          .bind(`%${sec.numberOnly}`, maxResults)
-          .all();
-
-        exactMatches = likeRes.results || [];
-      }
+      exactMatches = secRes.results || [];
 
       if (exactMatches.length >= maxResults) {
         return { total: exactMatches.length, exactMatches, hybridMatches: [], all: exactMatches, used: "exact" };

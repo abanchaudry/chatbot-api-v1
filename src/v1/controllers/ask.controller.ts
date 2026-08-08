@@ -142,7 +142,7 @@ async function runSharedAskLogic(
   /* FAST-PATH CACHE CHECK: Layer 1 (KV Exact Match)                     */
   /* Executed BEFORE LLM Preflight & Embedding for sub-15ms response!   */
   /* ------------------------------------------------------------------ */
-  if (c.env.CACHE && rawMessage) {
+  if (c.env.CACHE && rawMessage && !payload?.bypassCache) {
     try {
       const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage);
       if (cached) {
@@ -302,7 +302,9 @@ async function runSharedAskLogic(
   /* CACHE WRITEBACK: Save to Layer 1 + Layer 2 on successful answer      */
   /* ------------------------------------------------------------------ */
 
-  if (executed.ok && executed.outcome !== "final_fallback" && c.env.CACHE && cacheQuery) {
+  const isFallbackAnswer = executed.answer.includes("I'm sorry, but I don't have specific information") || executed.answer.includes("I am unable to find");
+
+  if (executed.ok && executed.outcome !== "final_fallback" && !isFallbackAnswer && c.env.CACHE && cacheQuery) {
     c.executionCtx.waitUntil(
       (async () => {
         try {
@@ -371,7 +373,7 @@ async function runStreamingPreparation(
   const rawMessage = String(payload?.message || payload?.question || "").trim();
 
   // Fast-path Layer 1 KV Exact Cache check BEFORE LLM Preflight
-  if (c.env.CACHE && rawMessage) {
+  if (c.env.CACHE && rawMessage && !payload?.bypassCache) {
     try {
       const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage);
       if (cached) {
@@ -635,7 +637,9 @@ export const askController = {
           }
 
           // Asynchronously write back generated streaming answer to KV and Vectorize caches
-          if (c.env.CACHE && executed.answer && executed.outcome !== "final_fallback") {
+          const isStreamingFallback = executed.answer.includes("I'm sorry, but I don't have specific information") || executed.answer.includes("I am unable to find");
+
+          if (c.env.CACHE && executed.answer && executed.outcome !== "final_fallback" && !isStreamingFallback) {
             const cachePayload = {
               answer: executed.answer,
               context: retrieve.context,
@@ -693,6 +697,19 @@ export const askController = {
         },
         500 as StatusCode
       );
+    }
+  },
+
+  purgeCache: async (c: Context<Env>) => {
+    try {
+      if (c.env.CACHE) {
+        const { purgeAllQueryCache } = await import("../services/cache.service");
+        await purgeAllQueryCache(c.env.CACHE);
+        return c.json({ ok: true, message: "Purged query cache entries" });
+      }
+      return c.json({ ok: true, message: "No cache binding active" });
+    } catch (err: any) {
+      return c.json({ ok: false, error: err?.message || "Cache purge failed" }, 500 as StatusCode);
     }
   },
 };
