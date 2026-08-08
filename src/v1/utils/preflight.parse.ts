@@ -13,6 +13,7 @@ export type PreflightOut = {
   isGreetingOnly: boolean;
   isFollowUp: boolean;
   rewrittenQuestion: string;
+  subQueries: string[];
   reason: string;
 };
 
@@ -49,6 +50,9 @@ export function parsePreflight(raw: string): PreflightOut {
     else throw new Error("preflight_invalid_json");
   }
 
+  const rawSubQueries = Array.isArray(obj?.subQueries) ? obj.subQueries.map((s: any) => asStr(s).trim()).filter(Boolean) : [];
+  const rewritten = asStr(obj?.rewrittenQuestion || "");
+
   let out: PreflightOut = {
     route: normalizeRoute(obj?.route),
     languageOk: asBool(obj?.languageOk),
@@ -58,7 +62,8 @@ export function parsePreflight(raw: string): PreflightOut {
     isGreetingOnly: asBool(obj?.isGreetingOnly),
     isFollowUp: asBool(obj?.isFollowUp),
 
-    rewrittenQuestion: asStr(obj?.rewrittenQuestion || ""),
+    rewrittenQuestion: rewritten,
+    subQueries: rawSubQueries.length > 0 ? rawSubQueries : (rewritten ? [rewritten] : []),
     reason: asStr(obj?.reason || ""),
   };
 

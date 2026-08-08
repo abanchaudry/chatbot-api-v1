@@ -27,6 +27,7 @@ Return ONLY valid JSON (no markdown), with this exact schema:
   "isGreetingOnly": boolean,
   "isFollowUp": boolean,
   "rewrittenQuestion": string,
+  "subQueries": string[],
   "reason": string
 }}
 

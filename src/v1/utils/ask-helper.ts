@@ -806,6 +806,77 @@ export async function retrieveLocalHybrid(
   );
 }
 
+export function extractCrossReferences(text: string): string[] {
+  const references: string[] = [];
+  const source = String(text || "");
+
+  const lawMatches = source.match(/\b(?:NRS|NAC)\s+\d+(?:\.\d+)+\b/gi) || [];
+  references.push(...lawMatches);
+
+  const sectionMatches = source.match(/\bSection\s+\d+(?:\.\d+)*\b/gi) || [];
+  references.push(...sectionMatches);
+
+  const policyMatches = source.match(/\b(?:Policy|Ref|Doc|SKU)\s*#?\s*[A-Z0-9-]+/gi) || [];
+  references.push(...policyMatches);
+
+  return Array.from(new Set(references.map((r) => r.trim()))).slice(0, 5);
+}
+
+export async function expandCrossReferenceCitations(
+  db: D1Database,
+  pieces: Piece[],
+  maxExpansion = 3
+): Promise<Piece[]> {
+  if (!pieces || !pieces.length) return pieces;
+
+  const existingIds = new Set(pieces.map((p) => p.sourceId));
+  const crossRefs = new Set<string>();
+
+  for (const piece of pieces.slice(0, 4)) {
+    const refs = extractCrossReferences(piece.text);
+    for (const ref of refs) {
+      crossRefs.add(ref);
+    }
+  }
+
+  if (crossRefs.size === 0) return pieces;
+
+  const expandedPieces: Piece[] = [...pieces];
+  let added = 0;
+
+  for (const ref of Array.from(crossRefs)) {
+    if (added >= maxExpansion) break;
+    try {
+      const res = await chunkDb.lexicalSearch(db, {
+        query: ref,
+        terms: [ref],
+        exactPhrases: [ref],
+        maxResults: 2,
+      });
+
+      for (const row of res || []) {
+        if (!existingIds.has(row.chunk_id) && added < maxExpansion) {
+          existingIds.add(row.chunk_id);
+          expandedPieces.push({
+            sourceType: "vector",
+            sourceId: row.chunk_id,
+            score: 75,
+            rawScore: 0.75,
+            title: row.topic || row.first_sentence || ref,
+            url: "",
+            section: row.section || ref,
+            text: row.content,
+            meta: { __origin: "cross_reference_expansion", __referencedCode: ref },
+          });
+          added++;
+        }
+      }
+    } catch {}
+  }
+
+  return expandedPieces;
+}
+
 export function fuseLocalEvidence(args: {
   question: string;
   vectorPieces: Piece[];

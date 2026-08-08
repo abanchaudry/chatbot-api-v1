@@ -30,6 +30,7 @@ import {
   buildGroupedContextFromPieces,
   rerankPiecesWithLLM,
   dedupePiecesByKey,
+  expandCrossReferenceCitations,
   type Piece,
   type AskPolicy,
   type RuntimeLimits,
@@ -685,7 +686,8 @@ export async function retrievePipeline(
     Math.max(1, Number(limits.finalEvidenceMax || 1)),
     HARD_MAX_FINAL_CONTEXT_PIECES
   );
-  const finalPieces = mergedPieces.slice(0, finalMax);
+  const expandedPieces = await expandCrossReferenceCitations(c.env.DB as any, mergedPieces, 3);
+  const finalPieces = expandedPieces.slice(0, finalMax);
   const context = buildGroupedContextFromPieces(finalPieces);
   const localEvidence = decideLocalEvidence({
     plan: planQuery(question, historyPreview),
