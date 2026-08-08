@@ -436,13 +436,26 @@ export async function preparePipeline(
   const message = String(payload?.message || "").trim();
   const language = normalizeLanguage(payload?.language);
 
-  const assistantName = String(
-    payload?.assistantName || c.env.ASSISTANT_NAME || "Assistant"
-  ).trim();
+  // Load dynamic system settings from DB if not explicitly passed in request payload
+  let companyName = c.env.COMPANY_NAME || "Enterprise Assistant";
+  let assistantName = String(payload?.assistantName || c.env.ASSISTANT_NAME || "").trim();
+  let domainHint = String(payload?.domainHint || c.env.ASSISTANT_DOMAIN_HINT || "").trim();
 
-  const domainHint = String(
-    payload?.domainHint || c.env.ASSISTANT_DOMAIN_HINT || "Customer support."
-  ).trim();
+  if (!assistantName || !domainHint || domainHint === "Customer support.") {
+    try {
+      const db = c.env.DB as any;
+      const { SettingsDbService } = await import("../services/db/settings.db");
+      const settings = await new SettingsDbService().getSettings(db);
+      if (settings) {
+        if (!assistantName) assistantName = settings.assistant_name;
+        if (!domainHint || domainHint === "Customer support.") domainHint = settings.domain_hint;
+        companyName = settings.company_name;
+      }
+    } catch {}
+  }
+
+  if (!assistantName) assistantName = "C";
+  if (!domainHint) domainHint = "Official customer support and knowledge assistant.";
 
   const fallbackMessage = String(
     payload?.fallbackMessage || c.env.FALLBACK_MESSAGE || FALLBACK_MESSAGE_DEFAULT

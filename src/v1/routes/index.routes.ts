@@ -6,6 +6,7 @@ import messageTracesRoutes  from "./message-traces.routes";
 import qaRoutes from "./qa.routes";
 import authRoutes from "./auth.route";
 import threadRoutes from "./thread.route";
+import settingsRoutes from "./settings.routes";
 
 import type { Env } from "../types/env";
 
@@ -17,4 +18,5 @@ export const v1Routes = (app: Hono<Env>) => {
   app.route("/analytics", chatAnalyticsRoutes);
   app.route("/message-traces", messageTracesRoutes);
   app.route("/qa", qaRoutes);
+  app.route("/settings", settingsRoutes);
 };
