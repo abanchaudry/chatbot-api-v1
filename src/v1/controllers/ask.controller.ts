@@ -134,6 +134,46 @@ async function runSharedAskLogic(
   c: Context<Env>,
   payload: any
 ): Promise<SharedAskSuccess | SharedAskFailure> {
+  const startedAt = now();
+  const rawMessage = String(payload?.message || payload?.question || "").trim();
+  const userId = String(payload?.userId || "anonymous").trim();
+
+  /* ------------------------------------------------------------------ */
+  /* FAST-PATH CACHE CHECK: Layer 1 (KV Exact Match)                     */
+  /* Executed BEFORE LLM Preflight & Embedding for sub-15ms response!   */
+  /* ------------------------------------------------------------------ */
+  if (c.env.CACHE && rawMessage) {
+    try {
+      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage);
+      if (cached) {
+        const threadId = String(payload?.threadId || `${userId}_${new Date().toISOString().slice(0, 10)}_${Math.random().toString(36).slice(2, 8)}`).trim();
+        console.log(JSON.stringify({ level: "INFO", label: "fast_cache_hit_L1_exact", latencyMs: cached.latencyMs, query: rawMessage.slice(0, 80) }));
+
+        const db = c.env.DB as unknown as D1Database;
+        if (db) {
+          c.executionCtx.waitUntil(
+            persist(db, userId, threadId, rawMessage, cached.answer, cached.context || "", 0, true, "{}")
+              .catch((e) => logError("persist_fast_cache_hit_failed", e))
+          );
+        }
+
+        return {
+          ok: true,
+          threadId,
+          route: "ANSWER_WITH_RAG",
+          answer: cached.answer,
+          outcome: "local_rag_success",
+          tokensUsed: 0,
+          source: "cache_L1_exact",
+          startedAt,
+          meta: { cacheHit: true, cacheLayer: "L1_KV_EXACT", cacheLatencyMs: cached.latencyMs },
+        };
+      }
+    } catch (e: any) {
+      logError("fast_cache_L1_check_failed", e);
+    }
+  }
+
   const prep = await preparePipeline(c, payload);
 
   if (!prep.ok) {
@@ -176,42 +216,10 @@ async function runSharedAskLogic(
   }
 
   /* ------------------------------------------------------------------ */
-  /* CACHE CHECK: Layer 1 (KV Exact) + Layer 2 (Semantic Vectorize)      */
+  /* CACHE CHECK: Layer 2 (Semantic Vectorize Similarity >= 0.95)         */
   /* ------------------------------------------------------------------ */
 
   const cacheQuery = prep.query || prep.message;
-
-  // Layer 1: KV Exact Match
-  if (c.env.CACHE && cacheQuery) {
-    try {
-      const cached = await getCachedQueryResponse(c.env.CACHE, cacheQuery);
-      if (cached) {
-        console.log(JSON.stringify({ level: "INFO", label: "cache_hit_L1_exact", latencyMs: cached.latencyMs, query: cacheQuery.slice(0, 80) }));
-        traceStepEnd(prep.trace, "cache_hit", cached.latencyMs, { layer: "L1_KV_EXACT" });
-
-        // Persist the cached answer into conversation history
-        const db = c.env.DB as unknown as D1Database;
-        c.executionCtx.waitUntil(
-          persist(db, prep.userId, prep.threadId, prep.message, cached.answer, cached.context || "", 0, true, JSON.stringify(finalizeTrace(prep.trace, true)))
-            .catch((e) => logError("persist_cache_hit_failed", e))
-        );
-
-        return {
-          ok: true,
-          threadId: prep.threadId,
-          route: prep.route,
-          answer: cached.answer,
-          outcome: "local_rag_success",
-          tokensUsed: 0,
-          source: "cache_L1_exact",
-          startedAt: prep.startedAt,
-          meta: { cacheHit: true, cacheLayer: "L1_KV_EXACT", cacheLatencyMs: cached.latencyMs },
-        };
-      }
-    } catch (e: any) {
-      logError("cache_L1_check_failed", e);
-    }
-  }
 
   // Layer 2: Semantic Vectorize Similarity (>= 0.95 cosine)
   if (c.env.VECTORIZE_CACHE && c.env.CACHE && prep.embedding) {
@@ -294,7 +302,7 @@ async function runSharedAskLogic(
   /* CACHE WRITEBACK: Save to Layer 1 + Layer 2 on successful answer      */
   /* ------------------------------------------------------------------ */
 
-  if (executed.ok && executed.outcome === "local_rag_success" && c.env.CACHE && cacheQuery) {
+  if (executed.ok && executed.outcome !== "final_fallback" && c.env.CACHE && cacheQuery) {
     c.executionCtx.waitUntil(
       (async () => {
         try {
@@ -305,19 +313,24 @@ async function runSharedAskLogic(
             tokensUsed: executed.tokensUsed,
           };
 
-          // Writeback Layer 1: KV Exact
-          await saveQueryResponseToCache(c.env.CACHE, cacheQuery, cachePayload);
+          // Writeback Layer 1: KV Exact (save under raw message AND rewritten query)
+          if (prep.message) {
+            await saveQueryResponseToCache(c.env.CACHE, prep.message, cachePayload);
+          }
+          if (prep.query && prep.query !== prep.message) {
+            await saveQueryResponseToCache(c.env.CACHE, prep.query, cachePayload);
+          }
 
           // Writeback Layer 2: Semantic Vectorize
           if (c.env.VECTORIZE_CACHE && prep.embedding) {
-            const normalized = normalizeQuery(cacheQuery);
+            const normalized = normalizeQuery(prep.message || prep.query);
             if (normalized.length > 3) {
               const hash = await generateSha256Hash(normalized);
               await saveSemanticCacheEntry(c.env.VECTORIZE_CACHE, c.env.CACHE, hash, prep.embedding, cachePayload);
             }
           }
 
-          console.log(JSON.stringify({ level: "INFO", label: "cache_writeback_success", query: cacheQuery.slice(0, 80) }));
+          console.log(JSON.stringify({ level: "INFO", label: "cache_writeback_success", rawMsg: prep.message?.slice(0, 50), query: prep.query?.slice(0, 50) }));
         } catch (e: any) {
           console.warn(JSON.stringify({ level: "WARN", label: "cache_writeback_failed", error: e?.message }));
         }
@@ -355,6 +368,33 @@ async function runStreamingPreparation(
   c: Context<Env>,
   payload: any
 ): Promise<StreamingAskSuccess | StreamingAskFailure> {
+  const rawMessage = String(payload?.message || payload?.question || "").trim();
+
+  // Fast-path Layer 1 KV Exact Cache check BEFORE LLM Preflight
+  if (c.env.CACHE && rawMessage) {
+    try {
+      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage);
+      if (cached) {
+        console.log(JSON.stringify({ level: "INFO", label: "stream_fast_cache_hit_L1", latencyMs: cached.latencyMs }));
+        const userId = String(payload?.userId || "anonymous").trim();
+        const threadId = String(payload?.threadId || `${userId}_${new Date().toISOString().slice(0, 10)}_${Math.random().toString(36).slice(2, 8)}`).trim();
+        
+        const dummyPrep: any = {
+          ok: true,
+          userId,
+          threadId,
+          route: "ANSWER_WITH_RAG",
+          message: rawMessage,
+          startedAt: now(),
+          trace: {},
+        };
+        return { ok: true, prep: dummyPrep, cachedAnswer: cached.answer, cacheLayer: "L1_KV_EXACT" };
+      }
+    } catch (e: any) {
+      logError("stream_fast_cache_L1_failed", e);
+    }
+  }
+
   const prep = await preparePipeline(c, payload);
 
   if (!prep.ok) {
@@ -369,20 +409,8 @@ async function runStreamingPreparation(
     return { ok: true, prep };
   }
 
-  // Cache check for streaming: Layer 1 + Layer 2
+  // Layer 2: Semantic Vectorize Cache Check
   const cacheQuery = prep.query || prep.message;
-
-  if (c.env.CACHE && cacheQuery) {
-    try {
-      const cached = await getCachedQueryResponse(c.env.CACHE, cacheQuery);
-      if (cached) {
-        console.log(JSON.stringify({ level: "INFO", label: "stream_cache_hit_L1", latencyMs: cached.latencyMs }));
-        return { ok: true, prep, cachedAnswer: cached.answer, cacheLayer: "L1_KV_EXACT" };
-      }
-    } catch (e: any) {
-      logError("stream_cache_L1_failed", e);
-    }
-  }
 
   if (c.env.VECTORIZE_CACHE && c.env.CACHE && prep.embedding) {
     try {
