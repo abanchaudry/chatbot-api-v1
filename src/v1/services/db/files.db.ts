@@ -12,7 +12,7 @@ async function makeStableChunkId(fileId: string, chunkIndex: number, section?: s
 }
 
 const SECTION_RE =
-  /\b(?:NAC|NRS)?\s*624\.\d{1,5}(?:\([^)]+\))?(?:\s*[–-]\s*624\.\d{1,5})?\b/i;
+  /\b(?:NAC|NRS|SECTION)?\s*\d{1,4}\.\d{1,5}(?:\([^)]+\))?(?:\s*[–-]\s*\d{1,4}\.\d{1,5})?\b/i;
 
 const extractSection = (text?: string | null) =>
   (text?.match(SECTION_RE)?.[0] || null)?.toUpperCase().replace(/\s+/g, " ") ?? null;
@@ -170,7 +170,7 @@ export const fileDb = {
       content_hash?: string | null;
     }
   ) {
-    const sectionNumber = args.sectionNumber || extractSection(args.sectionTitle);
+    const sectionNumber = args.sectionNumber || extractSection(args.sectionTitle) || extractSection(args.content);
     const content_hash = args.content_hash || (await sha256Hex(args.content));
 
     await db.prepare(
@@ -243,6 +243,9 @@ export const fileDb = {
   },
 
   async deleteChunksByFileId(db: D1Database, fileId: string) {
+    try {
+      await db.prepare(`DELETE FROM chunks_fts WHERE rowid IN (SELECT chunk_id FROM chunks WHERE file_id = ?)`).bind(fileId).run();
+    } catch {}
     await db.prepare(`DELETE FROM chunks WHERE file_id = ?`).bind(fileId).run();
   },
 
@@ -279,7 +282,7 @@ export const fileDb = {
     for (const ch of args.chunks) {
       const chunk_id = await makeStableChunkId(args.fileId, ch.index, ch.section);
       const firstSentence = (ch.content.split(/[.!?]/)[0] || "").slice(0, 200);
-      const sectionNumber = extractSection(ch.section || "");
+      const sectionNumber = extractSection(ch.section || "") || extractSection(ch.content || "");
       const content_hash = await sha256Hex(ch.content);
 
       await db.prepare(

@@ -258,7 +258,6 @@ export async function generatePrimaryAnswer(args: {
   } = args;
 
   try {
-    console.log("--- FINAL CONTEXT SENT TO GPT-4O --- \n" + context);
     const answerResult = await traceSpan(
       trace,
       "answer_primary",

@@ -170,7 +170,7 @@ export async function saveSemanticCacheEntry(
 
     const key = `qcache:${queryHash}`;
     const fullPayload = { ...payload, question: question || payload.question };
-    await cache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
+    await kvCache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
 
     return true;
   } catch (error) {
