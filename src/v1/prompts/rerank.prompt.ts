@@ -1,4 +1,4 @@
-// src/v5/prompts/rerank.prompt.ts
+// src/v1/prompts/rerank.prompt.ts
 import { PromptTemplate } from "@langchain/core/prompts";
 
 export const rerankPrompt = PromptTemplate.fromTemplate(`

@@ -1,4 +1,4 @@
-// src/v5/utils/ask-helper.ts
+// src/v1/utils/ask-helper.ts
 
 import type { D1Database } from "@cloudflare/workers-types";
 import { nanoid } from "nanoid";

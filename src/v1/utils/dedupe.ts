@@ -1,4 +1,4 @@
-// src/v5/utils/dedupe.ts
+// src/v1/utils/dedupe.ts
 export type DedupeItem = {
   type: string; // "web" | "vector" | "pdf" etc
   id?: string;

@@ -1,4 +1,4 @@
-// src/v5/services/vector.service.ts
+// src/v1/services/vector.service.ts
 import { CloudflareVectorizeStore } from "@langchain/cloudflare";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import type { VectorizeIndex } from "@cloudflare/workers-types";

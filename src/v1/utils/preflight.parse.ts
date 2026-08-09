@@ -1,4 +1,4 @@
-// src/v5/utils/preflight.parse.ts
+// src/v1/utils/preflight.parse.ts
 export type PreflightRoute =
   | "SMALL_TALK"
   | "LANGUAGE_MISMATCH"

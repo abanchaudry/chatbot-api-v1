@@ -1,4 +1,4 @@
-// src/v5/prompts/language.prompt.ts
+// src/v1/prompts/language.prompt.ts
 import { PromptTemplate } from "@langchain/core/prompts";
 
 export const languageMismatchPrompt = PromptTemplate.fromTemplate(`

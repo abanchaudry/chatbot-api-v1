@@ -1,4 +1,4 @@
-// src/v5/types/env.ts
+// src/v1/types/env.ts
 import type {
   D1Database,
   KVNamespace,

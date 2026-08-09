@@ -1,4 +1,4 @@
-// src/v5/controllers/qa.controller.ts
+// src/v1/controllers/qa.controller.ts
 import type { Context } from "hono";
 import type { Env } from "../types/env";
 import { ChatOpenAI } from "@langchain/openai";
