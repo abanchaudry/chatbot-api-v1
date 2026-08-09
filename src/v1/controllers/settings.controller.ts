@@ -37,6 +37,13 @@ export const settingsController = {
       const db = c.env.DB;
       const body = await c.req.json();
       const settings = await new SettingsDbService().saveSettings(db as any, body);
+
+      // Auto-purge all query cache entries when business settings change so old responses are never served
+      if (c.env.CACHE) {
+        const { purgeAllQueryCache } = await import("../services/cache.service");
+        await purgeAllQueryCache(c.env.CACHE).catch(() => {});
+      }
+
       return c.json({ ok: true, settings });
     } catch (err: any) {
       return c.json({ ok: false, error: err?.message || "Failed to save settings" }, 500);

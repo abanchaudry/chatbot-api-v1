@@ -438,24 +438,26 @@ export async function preparePipeline(
 
   // Load dynamic system settings from DB if not explicitly passed in request payload
   let companyName = c.env.COMPANY_NAME || "Enterprise Assistant";
-  let assistantName = String(payload?.assistantName || c.env.ASSISTANT_NAME || "").trim();
-  let domainHint = String(payload?.domainHint || c.env.ASSISTANT_DOMAIN_HINT || "").trim();
+  let assistantName = String(payload?.assistantName || "").trim();
+  let domainHint = String(payload?.domainHint || "").trim();
 
-  if (!assistantName || !domainHint || domainHint === "Customer support.") {
-    try {
-      const db = c.env.DB as any;
+  // D1 System Settings take FIRST priority over wrangler.toml defaults
+  try {
+    const db = c.env.DB as any;
+    if (db) {
       const { SettingsDbService } = await import("../services/db/settings.db");
       const settings = await new SettingsDbService().getSettings(db);
-      if (settings) {
-        if (!assistantName) assistantName = settings.assistant_name;
-        if (!domainHint || domainHint === "Customer support.") domainHint = settings.domain_hint;
+      if (settings && settings.company_name) {
         companyName = settings.company_name;
+        if (!assistantName) assistantName = settings.assistant_name;
+        if (!domainHint) domainHint = settings.domain_hint;
       }
-    } catch {}
-  }
+    }
+  } catch {}
 
-  if (!assistantName) assistantName = "C";
-  if (!domainHint) domainHint = "Official customer support and knowledge assistant.";
+  // Fallback to env vars if D1 settings not found
+  if (!assistantName) assistantName = c.env.ASSISTANT_NAME || "C";
+  if (!domainHint) domainHint = c.env.ASSISTANT_DOMAIN_HINT || "Official customer support and knowledge assistant.";
 
   const fallbackMessage = String(
     payload?.fallbackMessage || c.env.FALLBACK_MESSAGE || FALLBACK_MESSAGE_DEFAULT
