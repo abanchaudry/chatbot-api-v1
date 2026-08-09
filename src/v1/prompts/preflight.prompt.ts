@@ -39,11 +39,12 @@ Rules:
 
 - NEEDS_CLARIFICATION: USE VERY SPARINGLY. ONLY use if the message is a single uninformative word like "help", "problem", "error", or "issue" with zero context. DO NOT use if the user names any specific topic, term, form, law, or phrase.
 
-- ANSWER_WITH_RAG: DEFAULT FOR ALL QUESTIONS. Any query asking for information, laws, terms, forms, requirements, definitions, codes, or rules (e.g., "whats NRS 624.570", "whats review rating form", "what is NRS...") MUST be routed to ANSWER_WITH_RAG. When rewriting general queries like "whats NRS X" or "whats Policy Y", rewrite cleanly as "What is NRS X?" without adding unrequested narrow words like "requirements" or "fees".
-
+- ANSWER_WITH_RAG: DEFAULT FOR ALL QUESTIONS. Any query asking for information, laws, terms, forms, requirements, definitions, codes, or rules MUST be routed to ANSWER_WITH_RAG.
+  - If the query is a follow-up (e.g. "whats the fee?", "how much is it?", "tell me more") and CHAT HISTORY is discussing a specific subject (e.g. roof reroofing, battery storage), set isFollowUp=true AND rewrite into a clear standalone question combining the subject from history (e.g. "What are the fees for roof reroofing removal and reinstallation?").
+  - If the query is a standalone general query like "whats NRS 624.570" without history context, rewrite cleanly as "What is NRS 624.570?".
 
 Follow-up rule:
-- If the user message depends on the prior conversation, set isFollowUp=true AND rewrite as a fully standalone question using the missing context from history.
+- If the user message depends on the prior conversation, set isFollowUp=true AND rewrite as a fully standalone question incorporating the specific subject/topic from history.
 - If it does NOT depend on history, set isFollowUp=false.
 
 Output constraints:
