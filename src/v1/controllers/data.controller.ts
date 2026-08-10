@@ -220,13 +220,23 @@ export const DataController = {
             // Determine chunking strategy: map fervent-curie strategies to scalable-rag strategies
             const scalableStrategy = (strategy === "ai" || strategy === "agentic") ? "ai" : "adaptive";
 
-            if (uploadId) await pt.step(uploadId, `Processing with ${engineMode} extraction engine...`);
+            const isTextFile = /\.(txt|csv|md|json|log|sql|xml|yaml|yml)$/i.test(fileName);
+            const effectiveEngineMode = isTextFile ? "offline" : (engineMode as any);
+
+            if (uploadId) {
+              await pt.step(
+                uploadId,
+                isTextFile && engineMode !== "offline"
+                  ? "Text file detected: Rerouted to Free Edge extraction..."
+                  : `Processing with ${engineMode} extraction engine...`
+              );
+            }
 
             const pageImages = String(form.get("pageImages") || "");
 
             const scalableResult = await client.processDocument(
               file,
-              engineMode as any,
+              effectiveEngineMode,
               scalableStrategy as any,
               pageImages || undefined
             );
@@ -241,8 +251,8 @@ export const DataController = {
               await pt.step(uploadId, `Extracted ${scalableResult.counts.total} chunks (${scalableResult.classification.category})`);
             }
           } catch (err: any) {
-            const errorMsg = `Scalable RAG processing failed: ${err.message}`;
-            console.error(errorMsg);
+            const errorMsg = err.message;
+            console.error("Ingestion error:", err);
             if (uploadId) await pt.fail(uploadId, errorMsg);
             results.push({ file: fileName, error: errorMsg });
             continue;

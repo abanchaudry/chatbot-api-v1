@@ -40,6 +40,11 @@ app.post("/upload", async (c) => {
     return c.json({ error: detection.error ?? "Unsupported file format." }, 400);
   }
 
+  // Plain text & CSV files do not require 300 DPI Vision rendering — reroute to Free Edge offline
+  if (detection.type === "text" || detection.type === "csv") {
+    engineMode = "offline";
+  }
+
   // Generate IDs
   const documentId = crypto.randomUUID();
   const jobId = crypto.randomUUID();
@@ -550,6 +555,11 @@ app.post("/process-sync", async (c) => {
       return c.json({ error: detection.error ?? "Unsupported file format." }, 400);
     }
 
+    // Plain text & CSV files do not require 300 DPI Vision rendering — reroute to Free Edge offline
+    if (detection.type === "text" || detection.type === "csv") {
+      engineMode = "offline";
+    }
+
     const documentId = crypto.randomUUID();
     let markdown = "";
     const warnings: string[] = [];
@@ -619,7 +629,25 @@ app.post("/process-sync", async (c) => {
     });
   } catch (err: any) {
     console.error("Sync processing error:", err);
-    return c.json({ error: "Processing failed", details: err.message }, 500);
+    let userFriendlyMessage = err.message || "Processing failed";
+    
+    // Detect OpenAI quota/billing/credits errors
+    const isQuotaError = 
+      err?.status === 429 || 
+      err?.code === "credit_balance_exhausted" ||
+      err?.type === "insufficient_quota" ||
+      (typeof err?.message === "string" && (
+        err.message.includes("insufficient_quota") ||
+        err.message.includes("credits remaining") ||
+        err.message.includes("credit_balance_exhausted") ||
+        err.message.includes("billing")
+      ));
+
+    if (isQuotaError) {
+      userFriendlyMessage = "OpenAI API quota exhausted. Please add credits to your OpenAI account (https://platform.openai.com/settings/organization/billing) or update your OPENAI_API_KEY in .dev.vars.";
+    }
+
+    return c.json({ error: userFriendlyMessage, details: err.message }, 500);
   }
 });
 

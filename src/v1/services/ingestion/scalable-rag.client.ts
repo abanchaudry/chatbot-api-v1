@@ -302,7 +302,8 @@ export class ScalableRagClient {
 
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(`Scalable RAG processing failed: ${(errBody as any).error || res.statusText}`);
+      const msg = (errBody as any).error || (errBody as any).details || res.statusText;
+      throw new Error(msg);
     }
 
     return res.json() as Promise<ScalableRagResult>;
