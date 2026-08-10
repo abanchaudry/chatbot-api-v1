@@ -170,6 +170,18 @@ export const fallbackDb = {
    */
   async getQueriesForCluster(db: D1Database, clusterId: string) {
     try {
+      // 1. Fetch cluster sample queries for fallback matching
+      const clusterRow = await db
+        .prepare(`SELECT sample_queries FROM fallback_clusters WHERE id = ?`)
+        .bind(clusterId)
+        .first<{ sample_queries: string }>();
+
+      let sampleQueries: string[] = [];
+      if (clusterRow?.sample_queries) {
+        try { sampleQueries = JSON.parse(clusterRow.sample_queries); } catch {}
+      }
+
+      // 2. Fetch queries explicitly assigned to cluster_id
       const { results } = await db
         .prepare(
           `SELECT id, thread_id, user_id, query_text, reason, created_at
@@ -180,7 +192,45 @@ export const fallbackDb = {
         .bind(clusterId)
         .all();
 
-      return (results || []) as unknown as FallbackQueryRecord[];
+      let queries = (results || []) as unknown as FallbackQueryRecord[];
+
+      // 3. Fallback: If queries count is smaller than sample queries, search by query_text
+      if (sampleQueries.length > 0) {
+        const existingTexts = new Set(queries.map(q => q.query_text.trim().toLowerCase()));
+        
+        for (const sampleText of sampleQueries) {
+          if (!sampleText || !sampleText.trim()) continue;
+          if (!existingTexts.has(sampleText.trim().toLowerCase())) {
+            const matchRow = await db
+              .prepare(
+                `SELECT id, thread_id, user_id, query_text, reason, created_at
+                 FROM fallback_queries
+                 WHERE LOWER(query_text) = LOWER(?)
+                 ORDER BY created_at DESC LIMIT 1`
+              )
+              .bind(sampleText.trim())
+              .first<FallbackQueryRecord>();
+
+            if (matchRow) {
+              queries.push(matchRow);
+              existingTexts.add(matchRow.query_text.trim().toLowerCase());
+            } else {
+              // Synthesize record if sample query was logged directly inside cluster JSON
+              queries.push({
+                id: nanoid(),
+                thread_id: null,
+                user_id: "system_sample",
+                query_text: sampleText,
+                reason: "sample_fallback",
+                created_at: new Date().toISOString(),
+              });
+              existingTexts.add(sampleText.trim().toLowerCase());
+            }
+          }
+        }
+      }
+
+      return queries;
     } catch (err) {
       console.error("Failed to fetch queries for cluster:", err);
       return [];
