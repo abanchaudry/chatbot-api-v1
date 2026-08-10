@@ -270,6 +270,7 @@ async function stageRunPreflight(
       isGreetingOnly: false,
       isFollowUp: false,
       rewrittenQuestion: "",
+      subQueries: [],
       reason: "preflight_failed",
     };
 
