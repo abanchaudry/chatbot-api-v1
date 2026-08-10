@@ -23,6 +23,7 @@ import { executePipeline } from "../pipeline/ask.execute";
 import { createSSEResponse, formatSSEDoneEvent, formatSSEErrorEvent, formatSSEMetaEvent, formatSSETokenEvent } from "../utils/sse-stream";
 import { now, persist } from "../utils/ask-helper";
 import { traceStepEnd, finalizeTrace, traceLogFinalContextDetail } from "../utils/trace";
+import { fallbackDb } from "../services/db/fallback.db";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import {
@@ -203,6 +204,23 @@ async function runSharedAskLogic(
       trace: prep.trace,
     });
 
+    const isDirectFallback =
+      prep.route === "OUT_OF_SCOPE" ||
+      prep.directRoute.answer.includes("I'm sorry") ||
+      prep.directRoute.answer.includes("I’m sorry") ||
+      prep.directRoute.answer.includes("can't assist") ||
+      prep.directRoute.answer.includes("can’t assist") ||
+      prep.directRoute.answer.includes("don't have");
+
+    if (isDirectFallback) {
+      await fallbackDb.logFallbackQuery(c.env.DB, {
+        query: prep.message || prep.query || "",
+        threadId: prep.threadId,
+        userId: prep.userId,
+        reason: prep.route || "direct_out_of_scope"
+      });
+    }
+
     return {
       ok: true,
       threadId: prep.threadId,
@@ -302,7 +320,22 @@ async function runSharedAskLogic(
   /* CACHE WRITEBACK: Save to Layer 1 + Layer 2 on successful answer      */
   /* ------------------------------------------------------------------ */
 
-  const isFallbackAnswer = executed.answer.includes("I'm sorry, but I don't have specific information") || executed.answer.includes("I am unable to find");
+  const isFallbackAnswer =
+    executed.outcome === "final_fallback" ||
+    executed.answer.includes("don't have enough information") ||
+    executed.answer.includes("don't have specific information") ||
+    executed.answer.includes("unable to find") ||
+    executed.answer.includes("I’m sorry") ||
+    executed.answer.includes("I'm sorry");
+
+  if (isFallbackAnswer) {
+    await fallbackDb.logFallbackQuery(c.env.DB, {
+      query: prep.message || prep.query || "",
+      threadId: prep.threadId,
+      userId: prep.userId,
+      reason: executed.outcome || "final_fallback"
+    });
+  }
 
   if (executed.ok && executed.outcome !== "final_fallback" && !isFallbackAnswer && c.env.CACHE && cacheQuery) {
     c.executionCtx.waitUntil(
@@ -638,6 +671,15 @@ export const askController = {
 
           // Asynchronously write back generated streaming answer to KV and Vectorize caches
           const isStreamingFallback = executed.answer.includes("I'm sorry, but I don't have specific information") || executed.answer.includes("I am unable to find");
+
+          if (executed.outcome === "final_fallback" || isStreamingFallback) {
+            await fallbackDb.logFallbackQuery(c.env.DB, {
+              query: prep.message || prep.query || "",
+              threadId: prep.threadId,
+              userId: prep.userId,
+              reason: executed.outcome || "final_fallback"
+            });
+          }
 
           if (c.env.CACHE && executed.answer && executed.outcome !== "final_fallback" && !isStreamingFallback) {
             const cachePayload = {
