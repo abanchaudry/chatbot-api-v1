@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "../types/env";
 import { ChatAnalyticsController } from "../controllers/analytics.controller";
 
-import { getFallbackClustersHandler, triggerFallbackClusteringHandler } from "../controllers/fallback-analytics.controller";
+import { getFallbackClustersHandler, triggerFallbackClusteringHandler, getClusterQueriesHandler } from "../controllers/fallback-analytics.controller";
 
 const chatAnalyticsRoutes = new Hono<Env>();
 
@@ -13,6 +13,7 @@ chatAnalyticsRoutes.get("/threads/:threadId/messages", ChatAnalyticsController.t
 
 // Fallback Intelligence & Clustering endpoints
 chatAnalyticsRoutes.get("/fallback-clusters", getFallbackClustersHandler as any);
+chatAnalyticsRoutes.get("/fallback-clusters/:clusterId/queries", getClusterQueriesHandler as any);
 chatAnalyticsRoutes.post("/run-clustering", triggerFallbackClusteringHandler as any);
 
 export default chatAnalyticsRoutes;

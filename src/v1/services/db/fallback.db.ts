@@ -166,6 +166,28 @@ export const fallbackDb = {
   },
 
   /**
+   * Fetch all raw fallback queries belonging to a specific cluster ID.
+   */
+  async getQueriesForCluster(db: D1Database, clusterId: string) {
+    try {
+      const { results } = await db
+        .prepare(
+          `SELECT id, thread_id, user_id, query_text, reason, created_at
+           FROM fallback_queries
+           WHERE cluster_id = ?
+           ORDER BY created_at DESC`
+        )
+        .bind(clusterId)
+        .all();
+
+      return (results || []) as unknown as FallbackQueryRecord[];
+    } catch (err) {
+      console.error("Failed to fetch queries for cluster:", err);
+      return [];
+    }
+  },
+
+  /**
    * Get total count of unclustered fallback queries.
    */
   async getUnclusteredCount(db: D1Database) {

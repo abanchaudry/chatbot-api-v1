@@ -44,3 +44,22 @@ export async function triggerFallbackClusteringHandler(c: Context<{ Bindings: En
     return c.json({ ok: false, error: err.message }, 500);
   }
 }
+
+export async function getClusterQueriesHandler(c: Context<{ Bindings: Env }>) {
+  try {
+    const clusterId = c.req.param("clusterId");
+    if (!clusterId) {
+      return c.json({ ok: false, error: "clusterId parameter is required" }, 400);
+    }
+    const queries = await fallbackDb.getQueriesForCluster(c.env.DB, clusterId);
+    return c.json({
+      ok: true,
+      clusterId,
+      total: queries.length,
+      queries,
+    });
+  } catch (err: any) {
+    console.error("getClusterQueriesHandler error:", err);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+}
