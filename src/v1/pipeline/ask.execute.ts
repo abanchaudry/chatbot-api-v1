@@ -538,6 +538,36 @@ export async function executePipeline(args: {
     localEvidence,
   } = args;
 
+  // ==== Zero Evidence Guard: If no context or insufficient local evidence, immediately fallback ====
+  if (!context || !context.trim() || !localEvidence.sufficient) {
+    traceStepEnd(trace, "execute_zero_evidence_fallback", 0, {
+      reason: "insufficient_local_evidence",
+    });
+
+    const db = c.env.DB as unknown as D1Database;
+    c.executionCtx.waitUntil(
+      persist(
+        db,
+        userId,
+        threadId,
+        question,
+        fallbackMessage,
+        "",
+        0,
+        "degraded",
+        JSON.stringify(finalizeTrace(trace, true))
+      ).catch((e) => logError("persist_zero_evidence_fallback_failed", e))
+    );
+
+    return {
+      ok: true,
+      answer: fallbackMessage,
+      tokensUsed: 0,
+      outcome: "final_fallback",
+      source: "fallback",
+    };
+  }
+
   // ==== Enforce token budget (deterministic, by dropping lowest-ranked blocks) ====
   const budget = 6000;
   const trimmed = trimContextToTokenBudget({
