@@ -74,6 +74,120 @@ export const fallbackDb = {
   },
 
   /**
+   * Fetch fallback queries by date range and clustering status.
+   */
+  async getFallbackQueriesByFilter(
+    db: D1Database,
+    filter: { startDate?: string; endDate?: string; unclusteredOnly?: boolean; limit?: number }
+  ) {
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+
+      if (filter.unclusteredOnly !== false) {
+        conditions.push("cluster_id IS NULL");
+      }
+      if (filter.startDate) {
+        conditions.push("created_at >= ?");
+        params.push(filter.startDate);
+      }
+      if (filter.endDate) {
+        conditions.push("created_at <= ?");
+        params.push(filter.endDate);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const limitVal = filter.limit || 2000;
+
+      const query = `
+        SELECT id, thread_id, user_id, query_text, reason, cluster_id, created_at
+        FROM fallback_queries
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT ${limitVal}
+      `;
+
+      const stmt = db.prepare(query);
+      const { results } = params.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
+      return (results || []) as unknown as FallbackQueryRecord[];
+    } catch (err) {
+      console.error("Failed to fetch fallback queries by filter:", err);
+      return [];
+    }
+  },
+
+  /**
+   * Reset cluster_id assignments for a date range (for re-clustering).
+   */
+  async resetClusterIdsForDateRange(
+    db: D1Database,
+    filter: { startDate?: string; endDate?: string }
+  ) {
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+
+      if (filter.startDate) {
+        conditions.push("created_at >= ?");
+        params.push(filter.startDate);
+      }
+      if (filter.endDate) {
+        conditions.push("created_at <= ?");
+        params.push(filter.endDate);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const query = `UPDATE fallback_queries SET cluster_id = NULL ${whereClause}`;
+
+      const stmt = db.prepare(query);
+      if (params.length > 0) {
+        await stmt.bind(...params).run();
+      } else {
+        await stmt.run();
+      }
+      return true;
+    } catch (err) {
+      console.error("Failed to reset cluster ids for date range:", err);
+      return false;
+    }
+  },
+
+  /**
+   * Get total query count matching custom filters.
+   */
+  async getFallbackQueryCount(
+    db: D1Database,
+    filter: { startDate?: string; endDate?: string; unclusteredOnly?: boolean }
+  ) {
+    try {
+      const conditions: string[] = [];
+      const params: any[] = [];
+
+      if (filter.unclusteredOnly !== false) {
+        conditions.push("cluster_id IS NULL");
+      }
+      if (filter.startDate) {
+        conditions.push("created_at >= ?");
+        params.push(filter.startDate);
+      }
+      if (filter.endDate) {
+        conditions.push("created_at <= ?");
+        params.push(filter.endDate);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      const query = `SELECT COUNT(*) as cnt FROM fallback_queries ${whereClause}`;
+
+      const stmt = db.prepare(query);
+      const row: any = params.length > 0 ? await stmt.bind(...params).first() : await stmt.first();
+      return Number(row?.cnt || 0);
+    } catch (err) {
+      console.error("Failed to count fallback queries:", err);
+      return 0;
+    }
+  },
+
+  /**
    * Save generated LLM clusters and update linked query IDs.
    */
   async saveCluster(

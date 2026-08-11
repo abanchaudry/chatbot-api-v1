@@ -15,27 +15,48 @@ export interface ClusterOutput {
   frequencyPeriod: "daily" | "weekly" | "monthly" | "manual";
 }
 
+export interface ClusteringOptions {
+  period?: "daily" | "weekly" | "monthly" | "manual";
+  startDate?: string;
+  endDate?: string;
+  recluster?: boolean;
+  unclusteredOnly?: boolean;
+}
+
 export async function runFallbackClustering(
   env: Env,
-  period: "daily" | "weekly" | "monthly" | "manual" = "weekly"
+  opts: ClusteringOptions | "daily" | "weekly" | "monthly" | "manual" = "weekly"
 ): Promise<{ success: boolean; message: string; clustersCount: number; queriesProcessed: number }> {
+  const options: ClusteringOptions = typeof opts === "string" ? { period: opts } : opts || {};
+  const period = options.period || "manual";
+
   const apiKey = (env as any).OPENAI_API_KEY || (typeof process !== "undefined" ? process.env.OPENAI_API_KEY : "");
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not configured.");
   }
 
-  const periodDays = period === "daily" ? 1 : period === "monthly" ? 30 : 7;
+  // 0. If recluster is true, reset cluster_id for the specified date range first
+  if (options.recluster) {
+    await fallbackDb.resetClusterIdsForDateRange(env.DB, {
+      startDate: options.startDate,
+      endDate: options.endDate,
+    });
+  }
 
-  // 1. Fetch unclustered fallback queries & existing categories
+  // 1. Fetch fallback queries by filter & existing categories
   const [unclustered, existingClusters] = await Promise.all([
-    fallbackDb.getUnclusteredQueries(env.DB, periodDays),
+    fallbackDb.getFallbackQueriesByFilter(env.DB, {
+      startDate: options.startDate,
+      endDate: options.endDate,
+      unclusteredOnly: options.recluster ? false : (options.unclusteredOnly !== false),
+    }),
     fallbackDb.getLatestClusters(env.DB, 50).catch(() => [])
   ]);
 
   if (unclustered.length === 0) {
     return {
       success: true,
-      message: `No new fallback queries to cluster for ${period} period.`,
+      message: `No matching fallback queries found for clustering.`,
       clustersCount: 0,
       queriesProcessed: 0,
     };

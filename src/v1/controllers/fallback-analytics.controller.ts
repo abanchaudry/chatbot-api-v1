@@ -30,10 +30,15 @@ export async function getFallbackClustersHandler(c: Context<{ Bindings: Env }>) 
 
 export async function triggerFallbackClusteringHandler(c: Context<{ Bindings: Env }>) {
   try {
-    const body = (await c.req.json().catch(() => ({}))) as { period?: "daily" | "weekly" | "monthly" | "manual" };
-    const period = body.period || "manual";
+    const body = (await c.req.json().catch(() => ({}))) as {
+      period?: "daily" | "weekly" | "monthly" | "manual";
+      startDate?: string;
+      endDate?: string;
+      recluster?: boolean;
+      unclusteredOnly?: boolean;
+    };
 
-    const result = await runFallbackClustering(c.env, period);
+    const result = await runFallbackClustering(c.env, body);
 
     return c.json({
       ok: true,
@@ -41,6 +46,26 @@ export async function triggerFallbackClusteringHandler(c: Context<{ Bindings: En
     });
   } catch (err: any) {
     console.error("triggerFallbackClusteringHandler error:", err);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+}
+
+export async function getFallbackQueryCountHandler(c: Context<{ Bindings: Env }>) {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      startDate?: string;
+      endDate?: string;
+      unclusteredOnly?: boolean;
+    };
+
+    const count = await fallbackDb.getFallbackQueryCount(c.env.DB, body);
+
+    return c.json({
+      ok: true,
+      count,
+    });
+  } catch (err: any) {
+    console.error("getFallbackQueryCountHandler error:", err);
     return c.json({ ok: false, error: err.message }, 500);
   }
 }
