@@ -1300,5 +1300,121 @@ getAllChunks: async (c: Context) => {
 
     return c.json({ ok: true, events: res.results || [] });
   },
+
+  updateChunk: async (c: Context) => {
+    try {
+      const chunkId = c.req.param("chunkId");
+      if (!chunkId) {
+        return c.json({ ok: false, message: "Missing chunkId parameter" }, 400);
+      }
+
+      const body = await c.req.json().catch(() => ({}));
+      const { content, topic, section, tags } = body;
+
+      if (!content || typeof content !== "string" || !content.trim()) {
+        return c.json({ ok: false, message: "Chunk content cannot be empty" }, 400);
+      }
+
+      // 1. Update D1 database
+      const updated = await chunkDb.updateChunk(c.env.DB, chunkId, {
+        content: content.trim(),
+        topic: topic !== undefined ? String(topic).trim() : undefined,
+        section: section !== undefined ? String(section).trim() : undefined,
+        tags: tags !== undefined ? tags : undefined,
+      });
+
+      if (!updated) {
+        return c.json({ ok: false, message: "Chunk not found in database" }, 404);
+      }
+
+      // 2. Re-embed content and update Vectorize index
+      const key = (c.env.OPENAI_API_KEY || (await c.env.CONFIG.get("OPENAI_API_KEY")))?.trim();
+      let vectorUpdated = false;
+
+      if (c.env.VECTORIZE && key) {
+        try {
+          let parsedTags: string[] = [];
+          if (typeof updated.tags === "string") {
+            try { parsedTags = JSON.parse(updated.tags); } catch { parsedTags = updated.tags.split(",").map((t: string) => t.trim()).filter(Boolean); }
+          } else if (Array.isArray(updated.tags)) {
+            parsedTags = updated.tags;
+          }
+
+          await vectorService.storeChunks(
+            [{
+              id: chunkId,
+              content: updated.content,
+              index: 0,
+              topic: updated.topic || "general",
+              section: updated.section || "",
+              tags: parsedTags,
+              firstSentence: updated.first_sentence,
+            }],
+            key,
+            c.env.VECTORIZE
+          );
+          vectorUpdated = true;
+        } catch (vecErr: any) {
+          console.warn("Vectorize re-indexing warning:", vecErr?.message || vecErr);
+        }
+      }
+
+      // 3. Purge RAG response cache so future user queries immediately retrieve updated knowledge
+      if (c.env.CACHE) {
+        try { await purgeAllQueryCache(c.env.CACHE); } catch {}
+      }
+
+      return c.json({
+        ok: true,
+        message: "Chunk updated & vector re-indexed successfully",
+        chunk: updated,
+        vectorUpdated,
+      });
+    } catch (err: any) {
+      console.error("updateChunk failed:", err);
+      return c.json({ ok: false, message: "Failed to update chunk", error: err.message }, 500);
+    }
+  },
+
+  deleteChunk: async (c: Context) => {
+    try {
+      const chunkId = c.req.param("chunkId");
+      if (!chunkId) {
+        return c.json({ ok: false, message: "Missing chunkId parameter" }, 400);
+      }
+
+      // 1. Delete from Cloudflare Vectorize Index
+      let vectorDeleted = false;
+      if (c.env.VECTORIZE) {
+        try {
+          await vectorService.deleteByIds([chunkId], c.env.VECTORIZE);
+          vectorDeleted = true;
+        } catch (vErr: any) {
+          console.warn("Vectorize chunk delete warning:", vErr.message);
+        }
+      }
+
+      // 2. Delete from D1 Database
+      const deleted = await chunkDb.deleteChunk(c.env.DB, chunkId);
+      if (!deleted) {
+        return c.json({ ok: false, message: "Chunk not found" }, 404);
+      }
+
+      // 3. Invalidate RAG Cache
+      if (c.env.CACHE) {
+        try { await purgeAllQueryCache(c.env.CACHE); } catch {}
+      }
+
+      return c.json({
+        ok: true,
+        message: "Chunk deleted successfully",
+        chunkId,
+        vectorDeleted,
+      });
+    } catch (err: any) {
+      console.error("deleteChunk failed:", err);
+      return c.json({ ok: false, message: "Failed to delete chunk", error: err.message }, 500);
+    }
+  },
 };
 

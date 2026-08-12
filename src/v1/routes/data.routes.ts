@@ -43,6 +43,8 @@ router.post("/ingest/job/finish", requireApiKey, DataController.finishIngestJob)
 router.get("/list", requireApiKey, noStore, DataController.listFilesWithChunkCount);
 router.get("/chunks-all", requireApiKey, noStore, DataController.getAllChunks);
 router.get("/chunks", requireApiKey, noStore, DataController.getChunksByFileId);
+router.patch("/chunks/:chunkId", requireApiKey, noStore, DataController.updateChunk);
+router.delete("/chunks/:chunkId", requireApiKey, noStore, DataController.deleteChunk);
 router.get("/stats", requireApiKey, noStore, DataController.getDashboardStats);
 
 router.post("/files/:fileId", requireApiKey, noStore, DataController.deleteFile);

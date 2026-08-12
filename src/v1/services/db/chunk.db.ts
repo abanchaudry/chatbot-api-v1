@@ -560,4 +560,57 @@ export const chunkDb = {
 
     return likeRes.results || [];
   },
+
+  async getChunkById(db: D1Database, chunkId: string) {
+    return await db
+      .prepare(`SELECT * FROM chunks WHERE chunk_id = ?`)
+      .bind(chunkId)
+      .first();
+  },
+
+  async updateChunk(
+    db: D1Database,
+    chunkId: string,
+    updates: { content?: string; topic?: string; section?: string; tags?: string[] | string }
+  ) {
+    const existing: any = await this.getChunkById(db, chunkId);
+    if (!existing) return null;
+
+    const content = updates.content !== undefined ? updates.content : existing.content;
+    const topic = updates.topic !== undefined ? updates.topic : existing.topic;
+    const section = updates.section !== undefined ? updates.section : existing.section;
+
+    let tagsStr = existing.tags;
+    if (updates.tags !== undefined) {
+      tagsStr = Array.isArray(updates.tags) ? JSON.stringify(updates.tags) : String(updates.tags);
+    }
+
+    const firstSentence = (content.split(/[.!?]/)[0] || "").slice(0, 200);
+
+    await db
+      .prepare(
+        `UPDATE chunks
+         SET content = ?,
+             topic = ?,
+             section = ?,
+             tags = ?,
+             first_sentence = ?
+         WHERE chunk_id = ?`
+      )
+      .bind(content, topic, section, tagsStr, firstSentence, chunkId)
+      .run();
+
+    return { chunk_id: chunkId, file_id: existing.file_id, content, topic, section, tags: tagsStr, first_sentence: firstSentence };
+  },
+
+  async deleteChunk(db: D1Database, chunkId: string) {
+    const existing: any = await this.getChunkById(db, chunkId);
+    if (!existing) return false;
+
+    await db.prepare(`DELETE FROM chunks WHERE chunk_id = ?`).bind(chunkId).run();
+    if (existing.file_id) {
+      await db.prepare(`UPDATE files SET chunk_count = MAX(0, chunk_count - 1) WHERE file_id = ?`).bind(existing.file_id).run();
+    }
+    return true;
+  },
 };
