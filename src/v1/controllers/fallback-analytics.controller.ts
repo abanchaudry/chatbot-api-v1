@@ -7,17 +7,26 @@ import { SettingsDbService } from "../services/db/settings.db";
 
 export async function getFallbackClustersHandler(c: Context<{ Bindings: Env }>) {
   try {
-    const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") || "50", 10)), 100);
-    const clusters = await fallbackDb.getLatestClusters(c.env.DB, limit);
-    const unclusteredCount = await fallbackDb.getUnclusteredCount(c.env.DB);
-    const settings = await new SettingsDbService().getSettings(c.env.DB);
+    const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
+    const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") || "6", 10)), 100);
 
+    const [clusters, totalClusters, unclusteredCount, settings] = await Promise.all([
+      fallbackDb.getLatestClusters(c.env.DB, limit, page),
+      fallbackDb.getActiveClustersCount(c.env.DB),
+      fallbackDb.getUnclusteredCount(c.env.DB),
+      new SettingsDbService().getSettings(c.env.DB),
+    ]);
+
+    const totalPages = Math.ceil(totalClusters / limit) || 1;
     const newCategoryClusters = clusters.filter((cl) => cl.is_new_category);
 
     return c.json({
       ok: true,
       unclusteredCount,
-      totalClusters: clusters.length,
+      totalClusters,
+      totalPages,
+      currentPage: page,
+      limit,
       newCategorySuggestionsCount: newCategoryClusters.length,
       schedule: (settings as any)?.fallback_schedule || "weekly",
       clusters,

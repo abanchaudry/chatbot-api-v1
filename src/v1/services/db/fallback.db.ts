@@ -245,10 +245,10 @@ export const fallbackDb = {
   },
 
   /**
-   * Fetch saved clusters for display on the Admin UI.
+   * Fetch saved clusters for display on the Admin UI with pagination support.
    * Filters out orphaned historical clusters and computes exact active query counts.
    */
-  async getLatestClusters(db: D1Database, limit: number = 30) {
+  async getLatestClusters(db: D1Database, limit: number = 6, page: number = 1) {
     try {
       // 1. Clean up orphaned clusters from past re-clustering runs
       await db
@@ -259,7 +259,9 @@ export const fallbackDb = {
         .run()
         .catch(() => {});
 
-      // 2. Query active clusters linked to current fallback_queries
+      const offset = (page - 1) * limit;
+
+      // 2. Query active clusters linked to current fallback_queries with pagination
       const { results } = await db
         .prepare(
           `SELECT c.id, c.cluster_name, c.summary, 
@@ -272,9 +274,9 @@ export const fallbackDb = {
            GROUP BY c.id
            HAVING COUNT(q.id) > 0
            ORDER BY c.created_at DESC
-           LIMIT ?`
+           LIMIT ? OFFSET ?`
         )
-        .bind(limit)
+        .bind(limit, offset)
         .all();
 
       return (results || []).map((row: any) => ({
@@ -292,6 +294,24 @@ export const fallbackDb = {
     } catch (err) {
       console.error("Failed to fetch fallback clusters:", err);
       return [];
+    }
+  },
+
+  /**
+   * Get total count of active clusters currently linked to queries.
+   */
+  async getActiveClustersCount(db: D1Database) {
+    try {
+      const row: any = await db
+        .prepare(
+          `SELECT COUNT(DISTINCT c.id) as cnt
+           FROM fallback_clusters c
+           INNER JOIN fallback_queries q ON q.cluster_id = c.id`
+        )
+        .first();
+      return Number(row?.cnt || 0);
+    } catch (err) {
+      return 0;
     }
   },
 
