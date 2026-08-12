@@ -67,10 +67,10 @@ export const fileDb = {
          f.file_status,
          f.created_at,
          f.file_path,
-         COALESCE(f.chunk_count, COUNT(c.chunk_id)) AS chunk_count
+         COUNT(c.chunk_id) AS chunk_count
        FROM files f
        LEFT JOIN chunks c ON c.file_id = f.file_id
-       GROUP BY f.file_id
+       GROUP BY f.file_id, f.file_name, f.file_size, f.file_status, f.created_at, f.file_path
        ORDER BY f.created_at DESC`
     ).all();
     return result.results || [];
