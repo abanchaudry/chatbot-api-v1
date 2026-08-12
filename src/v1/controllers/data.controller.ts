@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { fileDb } from "../services/db/files.db";
+import { chunkDb } from "../services/db/chunk.db";
 import { ingestDb } from "../services/db/ingest.db";
 import { vectorService } from "../services/vector.service";
 import { ChunkingServiceV2 } from "../services/chunkingv2.service";
