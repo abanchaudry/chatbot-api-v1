@@ -156,3 +156,59 @@ This document maintains a complete, chronological record of all architectural up
   - **Multi-Turn Pronoun Tracking**: 100% (Tracked *"the bigger one"*, *"it"*, *"that one"* across 11 turns).
   - **Zero-Hallucination Guardrails**: 100% (Refused non-existent 40-year warranties, 0% financing, state rebates).
   - **Prompt Injection Defense**: 100% (Immune to instruction overwrites and price manipulation).
+
+---
+
+## 13. Fallback Intelligence & Business Persona Visual Alignment
+
+- **Separate Fallback Analytics Route**:
+  - Created standalone `FallbackAnalyticsComponent` under route `/dashboard/chat-analytics/fallback-analytics`.
+  - Added complete date range filter, search filter, fallback cluster table, and query breakdown modal.
+- **1:1 Visual Theme Matching**:
+  - Aligned Fallback Analytics UI 1:1 with Chat Analytics visual style (curated blue gradients `#3167f3`, corner image KPI cards, border-dashed icon wrappers, pulse green live badge, custom pagination).
+
+---
+
+## 14. Admin In-Place Chunk Editor, Live Search & Vector Re-Indexing
+
+- **In-Place Chunk Editing & Tag Management (`all-chunks.component.ts`)**:
+  - Added in-place editing for chunk content, topic, section, and tags on `/dashboard/chunks/view-all`.
+- **Chunk Deletion & Vector Re-Indexing**:
+  - Deleting a chunk updates Cloudflare D1 database and automatically deletes/re-embeds vector embeddings in Cloudflare Vectorize.
+- **Backend Global Debounced Live Search**:
+  - Integrated 300ms debounced RxJS backend search (`GET /data/chunks-all?search=...`) searching across all 1400+ chunks in D1.
+- **Total Chunk Formatting Fix**:
+  - Wrapped `file.chunk_count` in `Math.round(Number(...))` to eliminate `.0` floating point suffixes in UI.
+
+---
+
+## 15. Solution 3: Linked Parent-Child Multi-Tier Knowledge Chunk Editor
+
+- **Multi-Tier Tabbed Editor**:
+  - Clicking ✏️ **Edit** on any chunk opens a 960px tabbed modal displaying **Small Tier (300t)**, **Medium Tier (1200t)**, and **Large Tier (3000t)** side-by-side.
+- **Backend Multi-Tier API (`GET /data/chunks/:chunkId/related` & `POST /data/chunks/:chunkId`)**:
+  - Queries D1 to retrieve sibling parent/child tiers using section and content overlap matching.
+  - Bulk updates D1 chunk rows and re-indexes 1536-dimensional vector embeddings in Cloudflare Vectorize in a single bulk transaction.
+- **500 Error Fix in `getRelatedTiers`**:
+  - Resolved `D1_ERROR: no such column: file_name` by selecting valid `chunks` table columns ordered by `rowid`.
+- **Executive 960px Modal Layout**:
+  - Expanded modal dialog width to `960px` with single-line tier pill tabs and single-line action buttons.
+
+---
+
+## 16. Admin-Only Cited Knowledge Documents Feature
+
+- **RAG Citation Pipeline (`ask.controller.ts`)**:
+  - Both `/ask` and `/ask/stream` responses format and return RAG retrieval sources (`section`, `fileName`, `score`, `snippet`).
+- **Admin Chatbot Citation Badges (`footer.component.html` & `.scss`)**:
+  - Renders a **📚 Cited Knowledge Documents** section under every bot query response in the Admin portal with relevance match percentages (e.g. `87% match`).
+- **Interactive Passage Snippet Modal**:
+  - Clicking any cited document pill opens a popup preview modal displaying the exact document name, topic, match percentage, and passage snippet used by the RAG engine.
+
+---
+
+## 17. Dynamic 1:1 Count Synchronization
+
+- **Live Chunk Count Query (`files.db.ts`)**:
+  - Updated `getAllFilesWithChunkCount` SQL query to count live chunk rows directly from `chunks` (`COUNT(c.chunk_id)`) instead of stale `f.chunk_count`.
+  - Both Top KPI Card (`1,461`) and Pagination Stat (`1,461`) now match 1:1 down to the exact digit.
