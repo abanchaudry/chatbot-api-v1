@@ -35,6 +35,40 @@ import {
   normalizeQuery,
 } from "../services/cache.service";
 
+function formatRetrievedSources(pieces: any[]) {
+  if (!Array.isArray(pieces) || !pieces.length) return [];
+
+  const docMap = new Map<string, any>();
+
+  for (const p of pieces) {
+    const fileName =
+      p.file_name ||
+      p.meta?.file_name ||
+      (typeof p.meta?.file_path === "string" ? p.meta.file_path.split("/").pop() : null) ||
+      p.file_id ||
+      p.title ||
+      "Knowledge Document";
+
+    let rawScore = typeof p.score === "number" ? p.score : 0;
+    let scoreInt = rawScore > 1 ? Math.round(rawScore) : Math.round(rawScore * 100);
+    if (scoreInt > 100) scoreInt = 100;
+
+    const section = p.section || p.meta?.section || p.meta?.section_number || "";
+    const topic = p.topic || p.meta?.topic || "";
+
+    if (!docMap.has(fileName) || scoreInt > (docMap.get(fileName).score || 0)) {
+      docMap.set(fileName, {
+        fileName,
+        section,
+        topic,
+        score: scoreInt > 0 ? scoreInt : null,
+      });
+    }
+  }
+
+  return Array.from(docMap.values());
+}
+
 function buildFinalResponse(args: {
   ok: boolean;
   threadId: string;
@@ -376,14 +410,6 @@ async function runSharedAskLogic(
     );
   }
 
-  const formattedSources = (retrieve?.pieces || []).map((p: any) => ({
-    section: p.section || p.section_number || "Knowledge Base",
-    topic: p.topic || "",
-    fileName: p.file_name || p.file_id || "Document",
-    score: typeof p.score === "number" ? Math.round(p.score * 100) : null,
-    snippet: (p.content || "").slice(0, 200),
-  }));
-
   return {
     ok: true,
     threadId: prep.threadId,
@@ -393,7 +419,7 @@ async function runSharedAskLogic(
     tokensUsed: executed.tokensUsed,
     source: executed.source,
     startedAt: prep.startedAt,
-    sources: formattedSources,
+    sources: formatRetrievedSources(retrieve?.pieces),
   };
 }
 
@@ -722,14 +748,6 @@ export const askController = {
             );
           }
 
-          const formattedSources = (retrieve?.pieces || []).map((p: any) => ({
-            section: p.section || p.section_number || "Knowledge Base",
-            topic: p.topic || "",
-            fileName: p.file_name || p.file_id || "Document",
-            score: typeof p.score === "number" ? Math.round(p.score * 100) : null,
-            snippet: (p.content || "").slice(0, 200),
-          }));
-
           yield formatSSEDoneEvent({
             threadId: prep.threadId,
             route: prep.route,
@@ -737,7 +755,7 @@ export const askController = {
             ok: true,
             tokensUsed: executed.tokensUsed,
             timing: { ms: now() - prep.startedAt },
-            sources: formattedSources,
+            sources: formatRetrievedSources(retrieve?.pieces),
           });
         } catch (streamError: any) {
           logError("stream_generation_error", streamError);
