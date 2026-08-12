@@ -24,77 +24,72 @@ export interface ClusteringOptions {
 }
 
 /**
- * Fast in-memory N-Gram & Jaccard keyword similarity pre-clusterer.
- * Groups 10,000 to 500,000+ raw query records into 15 to 30 compact pre-clusters in < 100ms.
+ * Pass 1 (Mapper Phase): Parallel LLM Micro-Clustering
+ * Slices raw queries into chunks of ~40 queries and extracts semantically pure micro-topics using gpt-4o-mini.
  */
-function preClusterQueries(records: any[]): Array<{
-  bucketId: string;
-  totalCount: number;
-  sampleQueries: string[];
-  queryIds: string[];
-}> {
-  if (records.length <= 25) {
-    return [{
-      bucketId: "b_1",
-      totalCount: records.length,
-      sampleQueries: records.map(r => r.query_text),
-      queryIds: records.map(r => r.id),
-    }];
+async function runMapperPhase(
+  openai: OpenAI,
+  records: any[]
+): Promise<Array<{ microTopic: string; sampleQueries: string[]; queryIds: string[] }>> {
+  const chunkSize = 40;
+  const chunks: any[][] = [];
+  for (let i = 0; i < records.length; i += chunkSize) {
+    chunks.push(records.slice(i, i + chunkSize));
   }
 
-  const buckets: Array<{
-    keywords: Set<string>;
-    queryIds: string[];
-    sampleQueries: string[];
-  }> = [];
+  const mapperPrompt = `You are an expert Mapper AI for an Enterprise RAG Fallback System.
+Analyze the provided batch of raw user fallback queries and group them into semantically pure micro-topics based on underlying user intent.
 
-  const stopWords = new Set(["the", "a", "an", "is", "are", "how", "what", "where", "do", "i", "to", "for", "in", "of", "and", "or", "my", "you", "can", "with", "this", "that", "from"]);
+For each micro-topic output:
+1. "microTopic": A concise 2-4 word topic title (e.g. "EV Charging Cables", "Deep Sea Mining Fees").
+2. "sampleQueries": 2-4 representative user query strings.
+3. "linkedIds": An array of raw ID strings from the prompt input list matching this topic.
 
-  for (const rec of records) {
-    const text = String(rec.query_text || "").toLowerCase().replace(/[^a-z0-9\s]/g, "");
-    const words = text.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
-    const wordSet = new Set(words);
-
-    let bestBucketIdx = -1;
-    let bestSimilarity = 0;
-
-    for (let i = 0; i < buckets.length; i++) {
-      const b = buckets[i];
-      let intersection = 0;
-      for (const w of wordSet) {
-        if (b.keywords.has(w)) intersection++;
-      }
-      const union = b.keywords.size + wordSet.size - intersection;
-      const sim = union > 0 ? intersection / union : 0;
-
-      if (sim >= 0.20 && sim > bestSimilarity) {
-        bestSimilarity = sim;
-        bestBucketIdx = i;
-      }
+Respond ONLY with raw JSON matching:
+{
+  "microTopics": [
+    {
+      "microTopic": "string",
+      "sampleQueries": ["string"],
+      "linkedIds": ["string"]
     }
+  ]
+}`;
 
-    if (bestBucketIdx >= 0) {
-      const b = buckets[bestBucketIdx];
-      b.queryIds.push(rec.id);
-      if (b.sampleQueries.length < 5 && !b.sampleQueries.includes(rec.query_text)) {
-        b.sampleQueries.push(rec.query_text);
-      }
-      for (const w of wordSet) b.keywords.add(w);
-    } else {
-      buckets.push({
-        keywords: wordSet,
-        queryIds: [rec.id],
-        sampleQueries: [rec.query_text],
+  const mapperPromises = chunks.map(async (chunk) => {
+    const textList = chunk.map((q, idx) => `[ID: ${q.id}] "${q.query_text}"`).join("\n");
+    try {
+      const res = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: mapperPrompt },
+          { role: "user", content: `Raw user queries batch:\n\n${textList}` }
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+      });
+      const parsed = JSON.parse(res.choices[0]?.message?.content || "{}");
+      return parsed.microTopics || [];
+    } catch (e) {
+      console.error("Mapper chunk failed:", e);
+      return [];
+    }
+  });
+
+  const mapperResults = await Promise.all(mapperPromises);
+  const allMicroTopics: Array<{ microTopic: string; sampleQueries: string[]; queryIds: string[] }> = [];
+
+  for (const list of mapperResults) {
+    for (const item of list) {
+      allMicroTopics.push({
+        microTopic: item.microTopic || "General Knowledge Gap",
+        sampleQueries: Array.isArray(item.sampleQueries) ? item.sampleQueries : [],
+        queryIds: Array.isArray(item.linkedIds) ? item.linkedIds : [],
       });
     }
   }
 
-  return buckets.slice(0, 30).map((b, idx) => ({
-    bucketId: `bucket_${idx + 1}`,
-    totalCount: b.queryIds.length,
-    sampleQueries: b.sampleQueries,
-    queryIds: b.queryIds,
-  }));
+  return allMicroTopics;
 }
 
 export async function runFallbackClustering(
@@ -150,17 +145,19 @@ export async function runFallbackClustering(
     ? `Existing System Categories: [${existingCategoryNames.join(", ")}]`
     : `Existing System Categories: [Legal_Regulatory, Financial_Tabular, FAQ_Knowledgebase, Code_Technical]`;
 
-  // 2. High-Scale Map-Reduce Pre-Clustering (Handles 100,000+ queries in < 100ms)
-  const preBuckets = preClusterQueries(unclustered);
-
-  const bucketPromptText = preBuckets
-    .map((b) => `[BucketID: ${b.bucketId}] Total Volume: ${b.totalCount} queries\nSample Queries:\n` + b.sampleQueries.map(s => ` - "${s}"`).join("\n"))
-    .join("\n\n---\n\n");
-
   const openai = new OpenAI({ apiKey });
 
-  const systemPrompt = `You are an expert AI Observability & Knowledge Gap Analyst for an Enterprise RAG system.
-Your task is to analyze pre-clustered buckets of raw fallback queries (representing high-volume user questions where local context was missing) and group them into 5 to 15 meaningful semantic topic categories.
+  let rawClusters: any[] = [];
+  const bucketToQueryIdsMap = new Map<string, string[]>();
+
+  if (unclustered.length <= 30) {
+    // Single-Pass Direct LLM Clustering for Small Batches (< 30 queries)
+    const queryListText = unclustered
+      .map((q, idx) => `[ID: ${q.id}] Query #${idx + 1}: "${q.query_text}"`)
+      .join("\n");
+
+    const singlePassPrompt = `You are an expert AI Observability & Knowledge Gap Analyst for an Enterprise RAG system.
+Analyze raw user queries that resulted in FALLBACK answers and cluster them into 5 to 15 meaningful semantic topic categories.
 
 ${existingCategoriesContext}
 
@@ -171,9 +168,9 @@ For each output topic category, return a JSON object containing:
 4. "suggestedAction": A specific recommendation for the Knowledge Base administrator (e.g., "Upload policy document covering Chapter 624 renewal fees and deadline rules").
 5. "isNewCategory": true if this cluster represents a brand-new domain topic NOT covered by the ${existingCategoriesContext}, otherwise false.
 6. "suggestedCategoryName": If isNewCategory is true, a clean PascalCase or snake_case category identifier (e.g. "Solar_Warranty_Policy"). If it matches an existing category from ${existingCategoriesContext}, provide that exact existing category name.
-7. "linkedBucketIds": An array of raw BucketID strings from the prompt input list matching this cluster (e.g. ["bucket_1", "bucket_3"]).
+7. "linkedQueryIds": An array of raw ID strings from the prompt input list matching this cluster.
 
-Respond ONLY with raw JSON matching this schema:
+Respond ONLY with raw JSON matching:
 {
   "clusters": [
     {
@@ -183,70 +180,126 @@ Respond ONLY with raw JSON matching this schema:
       "suggestedAction": "string",
       "isNewCategory": boolean,
       "suggestedCategoryName": "string" | null,
-      "linkedBucketIds": ["string"]
+      "linkedQueryIds": ["string"]
     }
   ]
 }`;
 
-  try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Here are the pre-clustered fallback query buckets to analyze and categorize:\n\n${bucketPromptText}` },
+        { role: "system", content: singlePassPrompt },
+        { role: "user", content: `Here is the list of fallback user queries to analyze and cluster:\n\n${queryListText}` },
       ],
       response_format: { type: "json_object" },
       temperature: 0.2,
     });
 
-    const content = completion.choices[0]?.message?.content || "{}";
-    const parsed = JSON.parse(content);
-    const rawClusters = parsed.clusters || [];
+    const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+    rawClusters = parsed.clusters || [];
 
-    let savedCount = 0;
+    for (const q of unclustered) {
+      bucketToQueryIdsMap.set(q.id, [q.id]);
+    }
+  } else {
+    // 2-Pass Method B: Parallel Mapper LLM + Reducer LLM Pipeline (High Scale 100k+)
+    console.log(`Executing Method B: Parallel 2-Pass Map-Reduce LLM Pipeline on ${unclustered.length} queries...`);
 
-    // Create a map from bucketId to queryIds
-    const bucketToQueryIdsMap = new Map<string, string[]>();
-    for (const b of preBuckets) {
-      bucketToQueryIdsMap.set(b.bucketId, b.queryIds);
+    // Pass 1: Parallel Mapper LLM Micro-Clustering
+    const microTopics = await runMapperPhase(openai, unclustered);
+
+    // Format Micro-Topics for Reducer Phase
+    const microTopicListText = microTopics
+      .map((mt, idx) => `[TopicIndex: ${idx}] Topic: "${mt.microTopic}" (Volume: ${mt.queryIds.length})\nSamples:\n` + mt.sampleQueries.map(s => ` - "${s}"`).join("\n"))
+      .join("\n\n---\n\n");
+
+    for (let idx = 0; idx < microTopics.length; idx++) {
+      bucketToQueryIdsMap.set(String(idx), microTopics[idx].queryIds);
     }
 
-    for (const cl of rawClusters) {
-      const bucketIds = Array.isArray(cl.linkedBucketIds) ? cl.linkedBucketIds : [];
-      let linkedQueryIds: string[] = [];
+    // Pass 2: Reducer LLM Consolidator
+    const reducerPrompt = `You are an expert Reducer AI for an Enterprise RAG Fallback System.
+Review the intermediate micro-topics generated by the Mapper phase and consolidate them into 5 to 15 final topic categories.
 
-      for (const bId of bucketIds) {
-        const qIds = bucketToQueryIdsMap.get(bId) || [];
+${existingCategoriesContext}
+
+For each final output topic category, return a JSON object containing:
+1. "name": A concise, professional topic category title.
+2. "summary": A 1-2 sentence explanation of what users were looking for in this topic.
+3. "sampleQueries": A list of 3 to 5 representative user query strings.
+4. "suggestedAction": A specific recommendation for the Knowledge Base administrator.
+5. "isNewCategory": true if this cluster represents a brand-new domain topic NOT covered by ${existingCategoriesContext}, otherwise false.
+6. "suggestedCategoryName": If isNewCategory is true, a clean PascalCase or snake_case category identifier. If it matches an existing category from ${existingCategoriesContext}, provide that exact existing category name.
+7. "linkedTopicIndexes": An array of TopicIndex numbers from the prompt input list matching this cluster (e.g. [0, 2, 4]).
+
+Respond ONLY with raw JSON matching:
+{
+  "clusters": [
+    {
+      "name": "string",
+      "summary": "string",
+      "sampleQueries": ["string"],
+      "suggestedAction": "string",
+      "isNewCategory": boolean,
+      "suggestedCategoryName": "string" | null,
+      "linkedTopicIndexes": [number]
+    }
+  ]
+}`;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: reducerPrompt },
+        { role: "user", content: `Intermediate Micro-Topics to consolidate:\n\n${microTopicListText}` },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    });
+
+    const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+    rawClusters = parsed.clusters || [];
+  }
+
+  let savedCount = 0;
+
+  for (const cl of rawClusters) {
+    const topicIndexes = Array.isArray(cl.linkedTopicIndexes) ? cl.linkedTopicIndexes : [];
+    const directQueryIds = Array.isArray(cl.linkedQueryIds) ? cl.linkedQueryIds : [];
+
+    let linkedQueryIds: string[] = [];
+
+    if (directQueryIds.length > 0) {
+      linkedQueryIds = directQueryIds;
+    } else if (topicIndexes.length > 0) {
+      for (const idx of topicIndexes) {
+        const qIds = bucketToQueryIdsMap.get(String(idx)) || [];
         linkedQueryIds.push(...qIds);
       }
-
-      if (linkedQueryIds.length === 0) {
-        // Fallback: assign remaining unclustered IDs
-        linkedQueryIds = unclustered.map(u => u.id);
-      }
-
-      await fallbackDb.saveCluster(env.DB, {
-        name: cl.name || "General Knowledge Gap",
-        summary: cl.summary || "Unresolved user queries requiring knowledgebase updates.",
-        queryCount: linkedQueryIds.length,
-        sampleQueries: cl.sampleQueries || [],
-        suggestedAction: cl.suggestedAction || "Review user queries and add relevant policy documents.",
-        isNewCategory: Boolean(cl.isNewCategory),
-        suggestedCategoryName: cl.suggestedCategoryName || undefined,
-        frequencyPeriod: period,
-        linkedQueryIds: linkedQueryIds,
-      });
-      savedCount++;
     }
 
-    return {
-      success: true,
-      message: `Successfully clustered ${unclustered.length} fallback queries into ${savedCount} high-scale topic groups.`,
-      clustersCount: savedCount,
-      queriesProcessed: unclustered.length,
-    };
-  } catch (err: any) {
-    console.error("Fallback clustering error:", err);
-    throw new Error(`LLM Clustering failed: ${err.message}`);
+    if (linkedQueryIds.length === 0) {
+      linkedQueryIds = unclustered.map(u => u.id);
+    }
+
+    await fallbackDb.saveCluster(env.DB, {
+      name: cl.name || "General Knowledge Gap",
+      summary: cl.summary || "Unresolved user queries requiring knowledgebase updates.",
+      queryCount: linkedQueryIds.length,
+      sampleQueries: cl.sampleQueries || [],
+      suggestedAction: cl.suggestedAction || "Review user queries and add relevant policy documents.",
+      isNewCategory: Boolean(cl.isNewCategory),
+      suggestedCategoryName: cl.suggestedCategoryName || undefined,
+      frequencyPeriod: period,
+      linkedQueryIds: linkedQueryIds,
+    });
+    savedCount++;
   }
+
+  return {
+    success: true,
+    message: `Successfully clustered ${unclustered.length} fallback queries into ${savedCount} topic groups via Method B (Parallel Map-Reduce LLM).`,
+    clustersCount: savedCount,
+    queriesProcessed: unclustered.length,
+  };
 }
