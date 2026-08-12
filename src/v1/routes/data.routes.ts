@@ -43,6 +43,7 @@ router.post("/ingest/job/finish", requireApiKey, DataController.finishIngestJob)
 router.get("/list", requireApiKey, noStore, DataController.listFilesWithChunkCount);
 router.get("/chunks-all", requireApiKey, noStore, DataController.getAllChunks);
 router.get("/chunks", requireApiKey, noStore, DataController.getChunksByFileId);
+router.get("/chunks/:chunkId/related", requireApiKey, noStore, DataController.getRelatedTiers);
 router.patch("/chunks/:chunkId", requireApiKey, noStore, DataController.updateChunk);
 router.post("/chunks/:chunkId", requireApiKey, noStore, DataController.updateChunk);
 router.post("/chunks/:chunkId/update", requireApiKey, noStore, DataController.updateChunk);

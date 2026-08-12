@@ -1277,6 +1277,20 @@ getAllChunks: async (c: Context) => {
     return c.json({ ok: true, events: res.results || [] });
   },
 
+  getRelatedTiers: async (c: Context) => {
+    try {
+      const chunkId = c.req.param("chunkId");
+      if (!chunkId) return c.json({ ok: false, message: "Missing chunkId" }, 400);
+
+      const tiers = await chunkDb.getRelatedTiers(c.env.DB, chunkId);
+      if (!tiers) return c.json({ ok: false, message: "Chunk not found" }, 404);
+
+      return c.json({ ok: true, ...tiers });
+    } catch (err: any) {
+      return c.json({ ok: false, message: "Failed to fetch related tiers", error: err.message }, 500);
+    }
+  },
+
   updateChunk: async (c: Context) => {
     try {
       const chunkId = c.req.param("chunkId");
@@ -1285,13 +1299,13 @@ getAllChunks: async (c: Context) => {
       }
 
       const body = await c.req.json().catch(() => ({}));
-      const { content, topic, section, tags } = body;
+      const { content, topic, section, tags, relatedTiers } = body;
 
       if (!content || typeof content !== "string" || !content.trim()) {
         return c.json({ ok: false, message: "Chunk content cannot be empty" }, 400);
       }
 
-      // 1. Update D1 database
+      // 1. Update primary D1 database chunk
       const updated = await chunkDb.updateChunk(c.env.DB, chunkId, {
         content: content.trim(),
         topic: topic !== undefined ? String(topic).trim() : undefined,
@@ -1303,9 +1317,10 @@ getAllChunks: async (c: Context) => {
         return c.json({ ok: false, message: "Chunk not found in database" }, 404);
       }
 
-      // 2. Re-embed content and update Vectorize index
+      // 2. Re-embed primary chunk and update Vectorize index
       const key = (c.env.OPENAI_API_KEY || (await c.env.CONFIG.get("OPENAI_API_KEY")))?.trim();
       let vectorUpdated = false;
+      let extraUpdatedCount = 0;
 
       if (c.env.VECTORIZE && key) {
         try {
@@ -1335,16 +1350,55 @@ getAllChunks: async (c: Context) => {
         }
       }
 
-      // 3. Purge RAG response cache so future user queries immediately retrieve updated knowledge
+      // 3. Process related tiers if provided (Solution 3 Multi-Tier Edit)
+      if (Array.isArray(relatedTiers) && relatedTiers.length > 0) {
+        for (const rel of relatedTiers) {
+          if (!rel || !rel.chunk_id || rel.chunk_id === chunkId || !rel.content) continue;
+
+          const relUpdated = await chunkDb.updateChunk(c.env.DB, rel.chunk_id, {
+            content: String(rel.content).trim(),
+            topic: rel.topic !== undefined ? String(rel.topic).trim() : undefined,
+            section: rel.section !== undefined ? String(rel.section).trim() : undefined,
+            tags: rel.tags !== undefined ? rel.tags : undefined,
+          });
+
+          if (relUpdated) {
+            extraUpdatedCount++;
+            if (c.env.VECTORIZE && key) {
+              try {
+                let relTags: string[] = [];
+                if (typeof relUpdated.tags === "string") {
+                  try { relTags = JSON.parse(relUpdated.tags); } catch { relTags = relUpdated.tags.split(",").map((t: string) => t.trim()).filter(Boolean); }
+                } else if (Array.isArray(relUpdated.tags)) { relTags = relUpdated.tags; }
+
+                await vectorService.storeChunks([{
+                  id: rel.chunk_id,
+                  content: relUpdated.content,
+                  index: 0,
+                  topic: relUpdated.topic || "general",
+                  section: relUpdated.section || "",
+                  tags: relTags,
+                  firstSentence: relUpdated.first_sentence,
+                }], key, c.env.VECTORIZE);
+              } catch {}
+            }
+          }
+        }
+      }
+
+      // 4. Purge RAG response cache so future user queries immediately retrieve updated knowledge
       if (c.env.CACHE) {
         try { await purgeAllQueryCache(c.env.CACHE); } catch {}
       }
 
       return c.json({
         ok: true,
-        message: "Chunk updated & vector re-indexed successfully",
+        message: extraUpdatedCount > 0
+          ? `Primary chunk and ${extraUpdatedCount} related tier(s) updated & re-indexed`
+          : "Chunk updated & vector re-indexed successfully",
         chunk: updated,
         vectorUpdated,
+        extraUpdatedCount,
       });
     } catch (err: any) {
       console.error("updateChunk failed:", err);

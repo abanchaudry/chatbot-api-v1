@@ -628,4 +628,61 @@ export const chunkDb = {
     }
     return true;
   },
+
+  async getRelatedTiers(db: D1Database, chunkId: string) {
+    const target: any = await this.getChunkById(db, chunkId);
+    if (!target) return null;
+
+    if (!target.file_id) {
+      return {
+        targetChunkId: chunkId,
+        small: target,
+        medium: null,
+        large: null,
+      };
+    }
+
+    const res = await db
+      .prepare(
+        `SELECT chunk_id, file_id, file_name, section, section_number, topic, first_sentence, content, tags, chunk_index, created_at
+         FROM chunks
+         WHERE file_id = ?
+         ORDER BY chunk_index ASC`
+      )
+      .bind(target.file_id)
+      .all();
+
+    const fileChunks = (res.results || []) as any[];
+
+    let smallChunk: any = null;
+    let mediumChunk: any = null;
+    let largeChunk: any = null;
+
+    for (const ch of fileChunks) {
+      const sec = (ch.section || "").toLowerCase();
+      if (sec.includes("large chunk") || sec.includes("large")) {
+        largeChunk = ch;
+      } else if (sec.includes("medium chunk") || sec.includes("medium")) {
+        mediumChunk = ch;
+      } else {
+        if (!smallChunk || ch.chunk_id === target.chunk_id) {
+          smallChunk = ch;
+        }
+      }
+    }
+
+    if (!largeChunk || !mediumChunk || !smallChunk) {
+      const sortedByLen = [...fileChunks].sort((a, b) => b.content.length - a.content.length);
+      if (!largeChunk && sortedByLen.length >= 1) largeChunk = sortedByLen[0];
+      if (!mediumChunk && sortedByLen.length >= 2) mediumChunk = sortedByLen[1];
+      if (!smallChunk && sortedByLen.length >= 3) smallChunk = sortedByLen[sortedByLen.length - 1];
+    }
+
+    return {
+      targetChunkId: chunkId,
+      small: smallChunk || target,
+      medium: mediumChunk,
+      large: largeChunk,
+    };
+  },
 };
