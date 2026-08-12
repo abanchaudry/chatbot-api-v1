@@ -644,38 +644,51 @@ export const chunkDb = {
 
     const res = await db
       .prepare(
-        `SELECT chunk_id, file_id, file_name, section, section_number, topic, first_sentence, content, tags, chunk_index, created_at
+        `SELECT chunk_id, file_id, section, section_number, topic, first_sentence, content, tags, created_at
          FROM chunks
          WHERE file_id = ?
-         ORDER BY chunk_index ASC`
+         ORDER BY rowid ASC`
       )
       .bind(target.file_id)
       .all();
 
     const fileChunks = (res.results || []) as any[];
 
-    let smallChunk: any = null;
+    // Identify target title or section key (e.g. "1.3" or "Estate Premium Tier")
+    const targetFirstLine = (target.content || "").split("\n")[0]?.trim() || "";
+    const headerMatch = targetFirstLine.match(/^(?:\d+\.\d+\s+)?[^(:\n]+/i);
+    const searchKey = headerMatch ? headerMatch[0].trim() : targetFirstLine.slice(0, 20).trim();
+
+    let smallChunk: any = target;
     let mediumChunk: any = null;
     let largeChunk: any = null;
 
     for (const ch of fileChunks) {
+      if (ch.chunk_id === target.chunk_id) continue;
+
       const sec = (ch.section || "").toLowerCase();
+      const content = String(ch.content || "");
+      const matchesSearch = searchKey.length >= 3 && content.toLowerCase().includes(searchKey.toLowerCase());
+
       if (sec.includes("large chunk") || sec.includes("large")) {
-        largeChunk = ch;
+        if (!largeChunk || matchesSearch) largeChunk = ch;
       } else if (sec.includes("medium chunk") || sec.includes("medium")) {
-        mediumChunk = ch;
+        if (!mediumChunk || matchesSearch) mediumChunk = ch;
       } else {
-        if (!smallChunk || ch.chunk_id === target.chunk_id) {
-          smallChunk = ch;
-        }
+        if (!smallChunk) smallChunk = ch;
       }
     }
 
-    if (!largeChunk || !mediumChunk || !smallChunk) {
-      const sortedByLen = [...fileChunks].sort((a, b) => b.content.length - a.content.length);
+    if (!largeChunk || !mediumChunk) {
+      const matchingSiblings = fileChunks.filter(
+        (ch) =>
+          ch.chunk_id !== target.chunk_id &&
+          (!searchKey || String(ch.content || "").toLowerCase().includes(searchKey.toLowerCase()))
+      );
+      const sortedByLen = [...matchingSiblings].sort((a, b) => b.content.length - a.content.length);
+
       if (!largeChunk && sortedByLen.length >= 1) largeChunk = sortedByLen[0];
       if (!mediumChunk && sortedByLen.length >= 2) mediumChunk = sortedByLen[1];
-      if (!smallChunk && sortedByLen.length >= 3) smallChunk = sortedByLen[sortedByLen.length - 1];
     }
 
     return {
