@@ -984,51 +984,25 @@ finalizeChunksOnly: async (c: Context) => {
 
 
 getAllChunks: async (c: Context) => {
-  try {
-    const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
-    const perPage = Math.min(Math.max(parseInt(c.req.query("perPage") || "50", 10), 1), 500);
-    const offset = (page - 1) * perPage;
+    try {
+      const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
+      const perPage = Math.min(Math.max(parseInt(c.req.query("perPage") || "50", 10), 1), 500);
+      const search = (c.req.query("search") || "").trim();
 
-    const totalRow: any = await c.env.DB.prepare(`SELECT COUNT(1) as total FROM chunks`).first();
-    const total = Number(totalRow?.total || 0);
+      const { results, total } = await chunkDb.getAllChunksPaged(c.env.DB, page, perPage, search);
 
-    const res = await c.env.DB
-      .prepare(
-        `
-        SELECT
-          c.chunk_id,
-          c.file_id,
-          f.file_name AS file_name,
-          c.chunk_index,
-          c.section,
-          c.topic,
-          c.tags,
-          c.content,
-          c.created_at
-        FROM chunks c
-        LEFT JOIN files f
-          ON f.file_id = c.file_id
-        ORDER BY c.created_at DESC
-        LIMIT ? OFFSET ?
-        `
-      )
-      .bind(String(perPage), String(offset))
-      .all();
-
-    return c.json({
-      ok: true,
-      page,
-      perPage,
-      total,
-      totalPages: Math.ceil(total / perPage),
-      chunks: res.results || [],
-    });
-  } catch (err: any) {
-    return c.json({ ok: false, message: "Failed to fetch all chunks", error: err.message }, 500);
-  }
-},
-
-
+      return c.json({
+        ok: true,
+        page,
+        perPage,
+        total,
+        totalPages: Math.ceil(total / perPage),
+        chunks: results,
+      });
+    } catch (err: any) {
+      return c.json({ ok: false, message: "Failed to fetch all chunks", error: err.message }, 500);
+    }
+  },
 
   /**
    * LIST FILES
@@ -1050,9 +1024,10 @@ getAllChunks: async (c: Context) => {
       const fileId = c.req.query("fileId");
       const page = parseInt(c.req.query("page") || "1", 10);
       const perPage = parseInt(c.req.query("perPage") || "50", 10);
+      const search = (c.req.query("search") || "").trim();
       if (!fileId) return c.json({ ok: false, message: "fileId query param is required." }, 400);
 
-      const { results, total } = await fileDb.getChunksByFileId(c.env.DB, fileId, page, perPage);
+      const { results, total } = await chunkDb.getChunksByFileId(c.env.DB, fileId, page, perPage, search);
       return c.json({
         ok: true,
         message: "Chunks fetched successfully.",

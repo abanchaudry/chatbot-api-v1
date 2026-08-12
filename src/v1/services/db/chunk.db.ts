@@ -113,10 +113,25 @@ type SearchChunkRow = {
 };
 
 export const chunkDb = {
-  async getChunksByFileId(db: D1Database, fileId: string, page = 1, perPage = 50) {
+  async getChunksByFileId(db: D1Database, fileId: string, page = 1, perPage = 50, search = "") {
     const safePage = Number.isFinite(page) && page > 0 ? page : 1;
     const safePerPage = Number.isFinite(perPage) ? Math.min(Math.max(perPage, 1), 200) : 50;
     const offset = (safePage - 1) * safePerPage;
+
+    const q = (search || "").trim();
+    const hasSearch = q.length > 0;
+
+    const searchClause = hasSearch
+      ? `AND (
+          LOWER(c.content) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(c.section) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(c.topic) LIKE '%' || LOWER(?) || '%'
+          OR LOWER(c.section_number) LIKE '%' || LOWER(?) || '%'
+        )`
+      : "";
+
+    const countArgs = hasSearch ? [fileId, q, q, q, q] : [fileId];
+    const dataArgs = hasSearch ? [fileId, q, q, q, q, String(safePerPage), String(offset)] : [fileId, String(safePerPage), String(offset)];
 
     const data = await db
       .prepare(
@@ -134,16 +149,16 @@ export const chunkDb = {
            c.created_at
          FROM chunks c
          LEFT JOIN files f ON f.file_id = c.file_id
-         WHERE c.file_id = ?
+         WHERE c.file_id = ? ${searchClause}
          ORDER BY c.chunk_index ASC
          LIMIT ? OFFSET ?`
       )
-      .bind(fileId, String(safePerPage), String(offset))
+      .bind(...dataArgs)
       .all();
 
     const totalRow: any = await db
-      .prepare(`SELECT COUNT(*) AS total FROM chunks WHERE file_id = ?`)
-      .bind(fileId)
+      .prepare(`SELECT COUNT(*) AS total FROM chunks c WHERE c.file_id = ? ${searchClause}`)
+      .bind(...countArgs)
       .first();
 
     const total = Number(totalRow?.total || 0);
