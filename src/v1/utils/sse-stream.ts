@@ -50,6 +50,7 @@ export type SSEDoneEvent = {
   answer: string;
   ok: boolean;
   tokensUsed?: number;
+  sources?: any[];
   timing?: {
     ms: number;
   };

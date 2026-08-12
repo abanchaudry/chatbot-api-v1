@@ -44,6 +44,7 @@ function buildFinalResponse(args: {
   tokensUsed: number;
   source: string;
   meta?: Record<string, any>;
+  sources?: any[];
 }) {
   return {
     ok: args.ok,
@@ -55,6 +56,7 @@ function buildFinalResponse(args: {
       tokensUsed: args.tokensUsed,
     },
     meta: args.meta || {},
+    sources: args.sources || [],
   };
 }
 
@@ -79,6 +81,7 @@ type SharedAskSuccess = {
   tokensUsed: number;
   source: string;
   meta?: Record<string, any>;
+  sources?: any[];
   startedAt: number;
 };
 
@@ -373,6 +376,14 @@ async function runSharedAskLogic(
     );
   }
 
+  const formattedSources = (retrieve?.pieces || []).map((p: any) => ({
+    section: p.section || p.section_number || "Knowledge Base",
+    topic: p.topic || "",
+    fileName: p.file_name || p.file_id || "Document",
+    score: typeof p.score === "number" ? Math.round(p.score * 100) : null,
+    snippet: (p.content || "").slice(0, 200),
+  }));
+
   return {
     ok: true,
     threadId: prep.threadId,
@@ -382,6 +393,7 @@ async function runSharedAskLogic(
     tokensUsed: executed.tokensUsed,
     source: executed.source,
     startedAt: prep.startedAt,
+    sources: formattedSources,
   };
 }
 
@@ -710,6 +722,14 @@ export const askController = {
             );
           }
 
+          const formattedSources = (retrieve?.pieces || []).map((p: any) => ({
+            section: p.section || p.section_number || "Knowledge Base",
+            topic: p.topic || "",
+            fileName: p.file_name || p.file_id || "Document",
+            score: typeof p.score === "number" ? Math.round(p.score * 100) : null,
+            snippet: (p.content || "").slice(0, 200),
+          }));
+
           yield formatSSEDoneEvent({
             threadId: prep.threadId,
             route: prep.route,
@@ -717,6 +737,7 @@ export const askController = {
             ok: true,
             tokensUsed: executed.tokensUsed,
             timing: { ms: now() - prep.startedAt },
+            sources: formattedSources,
           });
         } catch (streamError: any) {
           logError("stream_generation_error", streamError);
