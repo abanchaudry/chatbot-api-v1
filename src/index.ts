@@ -10,7 +10,7 @@ app.use(
 
     origin: "*",
     allowHeaders: ["*"],
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     maxAge: 86400,
   })
 );

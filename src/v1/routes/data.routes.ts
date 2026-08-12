@@ -44,6 +44,8 @@ router.get("/list", requireApiKey, noStore, DataController.listFilesWithChunkCou
 router.get("/chunks-all", requireApiKey, noStore, DataController.getAllChunks);
 router.get("/chunks", requireApiKey, noStore, DataController.getChunksByFileId);
 router.patch("/chunks/:chunkId", requireApiKey, noStore, DataController.updateChunk);
+router.post("/chunks/:chunkId", requireApiKey, noStore, DataController.updateChunk);
+router.post("/chunks/:chunkId/update", requireApiKey, noStore, DataController.updateChunk);
 router.delete("/chunks/:chunkId", requireApiKey, noStore, DataController.deleteChunk);
 router.get("/stats", requireApiKey, noStore, DataController.getDashboardStats);
 
