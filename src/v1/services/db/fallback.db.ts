@@ -246,16 +246,32 @@ export const fallbackDb = {
 
   /**
    * Fetch saved clusters for display on the Admin UI.
+   * Filters out orphaned historical clusters and computes exact active query counts.
    */
   async getLatestClusters(db: D1Database, limit: number = 30) {
     try {
+      // 1. Clean up orphaned clusters from past re-clustering runs
+      await db
+        .prepare(
+          `DELETE FROM fallback_clusters 
+           WHERE id NOT IN (SELECT DISTINCT cluster_id FROM fallback_queries WHERE cluster_id IS NOT NULL)`
+        )
+        .run()
+        .catch(() => {});
+
+      // 2. Query active clusters linked to current fallback_queries
       const { results } = await db
         .prepare(
-          `SELECT id, cluster_name, summary, query_count, sample_queries,
-                  suggested_action, is_new_category, suggested_category_name,
-                  frequency_period, created_at
-           FROM fallback_clusters
-           ORDER BY created_at DESC
+          `SELECT c.id, c.cluster_name, c.summary, 
+                  COUNT(q.id) as query_count, 
+                  c.sample_queries, c.suggested_action, 
+                  c.is_new_category, c.suggested_category_name, 
+                  c.frequency_period, c.created_at
+           FROM fallback_clusters c
+           INNER JOIN fallback_queries q ON q.cluster_id = c.id
+           GROUP BY c.id
+           HAVING COUNT(q.id) > 0
+           ORDER BY c.created_at DESC
            LIMIT ?`
         )
         .bind(limit)
@@ -265,7 +281,7 @@ export const fallbackDb = {
         id: row.id,
         cluster_name: row.cluster_name,
         summary: row.summary,
-        query_count: row.query_count,
+        query_count: Number(row.query_count || 0),
         sample_queries: JSON.parse(row.sample_queries || "[]"),
         suggested_action: row.suggested_action,
         is_new_category: Boolean(row.is_new_category),
