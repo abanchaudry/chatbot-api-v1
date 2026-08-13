@@ -108,6 +108,7 @@ type SearchChunkRow = {
   section_number?: string;
   section?: string;
   file_id?: string;
+  file_name?: string;
   tags?: string[] | string | null;
   matchMode?: string;
 };
@@ -229,8 +230,9 @@ export const chunkDb = {
 
       const secRes = await db
         .prepare(
-          `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+          `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
            FROM chunks c
+           LEFT JOIN files f ON f.file_id = c.file_id
            WHERE c.section_number = ?
               OR c.section_number LIKE ?
               OR c.content LIKE ?
@@ -266,9 +268,10 @@ export const chunkDb = {
       const ftsQuery = Array.from(new Set(ftsPieces)).join(" OR ");
 
       const ftsSql = `
-        SELECT ch.chunk_id, ch.content, ch.topic, ch.first_sentence, ch.section_number, ch.section, ch.file_id, ch.tags, rank
+        SELECT ch.chunk_id, ch.content, ch.topic, ch.first_sentence, ch.section_number, ch.section, ch.file_id, f.file_name, ch.tags, rank
         FROM chunks_fts
         JOIN chunks ch ON ch.rowid = chunks_fts.rowid
+        LEFT JOIN files f ON f.file_id = ch.file_id
         WHERE chunks_fts MATCH ?
         ORDER BY rank
         LIMIT ?
@@ -301,8 +304,9 @@ export const chunkDb = {
       .join(" OR ");
     const searchBlob = `${searchColumns.join(" || ' ' || ")}`;
     const sql = `
-      SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+      SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
       FROM chunks c
+      LEFT JOIN files f ON f.file_id = c.file_id
       WHERE (${likeClause})
         AND LENGTH(c.content) <= 5000
       ORDER BY
@@ -361,9 +365,10 @@ export const chunkDb = {
       if (ftsQuery) {
         try {
           const res = await db.prepare(
-            `SELECT ch.chunk_id, ch.content, ch.topic, ch.first_sentence, ch.section_number, ch.section, ch.file_id, ch.tags
+            `SELECT ch.chunk_id, ch.content, ch.topic, ch.first_sentence, ch.section_number, ch.section, ch.file_id, f.file_name, ch.tags
              FROM chunks_fts
              JOIN chunks ch ON ch.rowid = chunks_fts.rowid
+             LEFT JOIN files f ON f.file_id = ch.file_id
              WHERE chunks_fts MATCH ?
              ORDER BY rank
              LIMIT ?`
@@ -402,8 +407,9 @@ export const chunkDb = {
     ];
 
     const res = await db.prepare(
-      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
        FROM chunks c
+       LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereSql})
          AND LENGTH(c.content) <= 8000
        ORDER BY LENGTH(c.content) ASC, c.chunk_id ASC
@@ -484,8 +490,9 @@ export const chunkDb = {
     }
 
     const res = await db.prepare(
-      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
        FROM chunks c
+       LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereClauses.join(" OR ")})
        ORDER BY
          CASE WHEN ? != '' AND LOWER(COALESCE(c.section_number, '')) = ? THEN 4 ELSE 0 END DESC,
@@ -549,8 +556,9 @@ export const chunkDb = {
     if (sec.withPrefix) {
       const res = await db
         .prepare(
-          `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+          `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
            FROM chunks c
+           LEFT JOIN files f ON f.file_id = c.file_id
            WHERE c.section_number = ?
            ORDER BY LENGTH(c.content) ASC
            LIMIT ?`
@@ -564,8 +572,9 @@ export const chunkDb = {
 
     const likeRes = await db
       .prepare(
-        `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.tags
+        `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
          FROM chunks c
+         LEFT JOIN files f ON f.file_id = c.file_id
          WHERE c.section_number LIKE ?
          ORDER BY LENGTH(c.content) ASC
          LIMIT ?`

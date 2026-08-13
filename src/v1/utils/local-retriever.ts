@@ -16,6 +16,7 @@ type LocalChunkRow = {
   section_number?: string;
   section?: string;
   file_id?: string;
+  file_name?: string;
   tags?: string[] | string | null;
   matchMode?: string;
 };
@@ -78,11 +79,12 @@ function buildLocalDbPiece(
     sourceId: String(row.chunk_id || ""),
     score: Math.max(0, Math.min(100, Math.round(score))),
     rawScore: Math.max(0.01, Math.min(1, score / 100)),
-    title: String(row.section || row.topic || row.first_sentence || "").trim(),
+    title: String(row.file_name || row.section || row.topic || row.first_sentence || "").trim(),
     section: String(row.section_number || row.section || "").trim(),
     text: String(row.content || "").trim(),
     meta: {
       fileId: row.file_id || null,
+      file_name: row.file_name || null,
       tags,
       first_sentence: row.first_sentence || null,
       section_number: row.section_number || null,

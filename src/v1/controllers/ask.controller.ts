@@ -41,13 +41,15 @@ function formatRetrievedSources(pieces: any[]) {
   const docMap = new Map<string, any>();
 
   for (const p of pieces) {
-    const fileName =
+    const rawFileName =
       p.file_name ||
       p.meta?.file_name ||
+      p.fileName ||
+      p.meta?.fileName ||
       (typeof p.meta?.file_path === "string" ? p.meta.file_path.split("/").pop() : null) ||
-      p.file_id ||
-      p.title ||
-      "Knowledge Document";
+      (typeof p.file_path === "string" ? p.file_path.split("/").pop() : null);
+
+    const fileName = rawFileName ? String(rawFileName).trim() : "Knowledge Document";
 
     let rawScore = typeof p.score === "number" ? p.score : 0;
     let scoreInt = rawScore > 1 ? Math.round(rawScore) : Math.round(rawScore * 100);
