@@ -36,6 +36,7 @@ export const CrawlerController = {
       // 3. Parse request body
       const body = await c.req.json().catch(() => ({}));
       const rawUrl = String(body.url || "").trim();
+      const crawlSchedule = String(body.crawlSchedule || "manual").toLowerCase();
 
       if (!rawUrl) {
         return c.json({ ok: false, message: "URL is required" }, 400);
@@ -46,8 +47,21 @@ export const CrawlerController = {
         targetUrl = `https://${targetUrl}`;
       }
 
+      let nextCrawlAt: string | null = null;
+      const now = new Date();
+      if (crawlSchedule === "daily") {
+        now.setDate(now.getDate() + 1);
+        nextCrawlAt = now.toISOString();
+      } else if (crawlSchedule === "weekly") {
+        now.setDate(now.getDate() + 7);
+        nextCrawlAt = now.toISOString();
+      } else if (crawlSchedule === "monthly") {
+        now.setDate(now.getDate() + 30);
+        nextCrawlAt = now.toISOString();
+      }
+
       // 4. Crawl Web Page via Cloudflare Browser Run or Edge Fetch
-      console.log(`[Crawler] Starting crawl for: ${targetUrl}`);
+      console.log(`[Crawler] Starting crawl for: ${targetUrl} (Schedule: ${crawlSchedule})`);
       const crawlResult = await crawlWebPage(c.env, targetUrl);
 
       const fileName = crawlResult.title || targetUrl.replace(/^https?:\/\//, "");
@@ -160,6 +174,8 @@ export const CrawlerController = {
         fileId,
         fileName,
         targetUrl,
+        crawlSchedule,
+        nextCrawlAt,
         crawlMethod: crawlResult.method,
         chunkCounts: scalableResult?.counts || { total: formattedChunks.length },
         vectorsUpserted,
