@@ -28,8 +28,9 @@ export const CrawlerController = {
       }
 
       // 2. Auth check (requires admin key)
-      const adminKey = c.req.header("x-admin-key");
-      if (adminKey !== c.env.ADMIN_API_KEY) {
+      const adminKey = c.req.header("x-api-key") || c.req.header("x-admin-key");
+      const expectedKey = c.env.ADMIN_API_KEY || (c.env.CONFIG ? await c.env.CONFIG.get("ADMIN_API_KEY") : null);
+      if (!adminKey || (expectedKey && adminKey !== expectedKey)) {
         return c.json({ ok: false, message: "Unauthorized: Invalid admin key" }, 401);
       }
 
