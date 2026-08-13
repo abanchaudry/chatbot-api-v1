@@ -70,13 +70,14 @@ export const CrawlerController = {
       const markdownText = crawlResult.markdown;
 
       // 5. Create File Record in D1 SQLite
-      const fileObj = await fileDb.createFileRecord(c.env.DB, {
-        file_id: fileId,
-        file_name: fileName,
-        file_size: markdownText.length,
-        file_status: "processing",
-        file_path: targetUrl,
-      });
+      await fileDb.saveFile(
+        c.env.DB,
+        fileName,
+        markdownText.length,
+        "processing",
+        fileId,
+        targetUrl
+      );
 
       // 6. Process Markdown into 3-Tier Agentic AI Chunks via Scalable RAG
       const client = new ScalableRagClient();
@@ -107,7 +108,25 @@ export const CrawlerController = {
         parentId: ch.parentId,
       }));
 
-      await chunkDb.insertChunksBatch(c.env.DB, formattedChunks);
+      for (const ch of formattedChunks) {
+        try {
+          await fileDb.insertChunk(c.env.DB, {
+            chunkId: ch.chunk_id,
+            fileId: fileId,
+            source: "web",
+            content: ch.content,
+            version: "v1",
+            tags: ch.tags,
+            topic: ch.topic,
+            firstSentence: ch.first_sentence,
+            sectionTitle: ch.section,
+            chunkIndex: ch.chunk_index,
+            sectionNumber: null,
+          });
+        } catch (chErr: any) {
+          console.warn("[Crawler] insertChunk warning:", chErr.message);
+        }
+      }
 
       // Also insert into document_chunks for 3-tier linked editor lookup
       for (const ch of formattedChunks) {

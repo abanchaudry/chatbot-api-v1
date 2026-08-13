@@ -338,6 +338,24 @@ export const fileDb = {
     return result.results || [];
   },
 
+  /**
+   * Update file_status and optional chunk_count for a file
+   */
+  async updateFileStatus(db: D1Database, fileId: string, status: string, chunkCount?: number) {
+    await this.ensureFilesSchema(db);
+    if (chunkCount !== undefined) {
+      await db
+        .prepare(`UPDATE files SET file_status = ?, chunk_count = ?, updated_at = datetime() WHERE file_id = ?`)
+        .bind(status, chunkCount, fileId)
+        .run();
+    } else {
+      await db
+        .prepare(`UPDATE files SET file_status = ?, updated_at = datetime() WHERE file_id = ?`)
+        .bind(status, fileId)
+        .run();
+    }
+  },
+
   makeStableChunkId,
   contentHash: sha256Hex,
   extractSection,

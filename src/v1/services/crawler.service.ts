@@ -98,19 +98,57 @@ export async function crawlWebPage(
   }
 
   // Edge Fetcher fallback
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    },
-  });
+  let html = "";
 
-  if (!res.ok) {
-    throw new Error(`Failed to fetch web page (${res.status} ${res.statusText})`);
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+
+    if (res.ok) {
+      html = await res.text();
+    } else {
+      console.warn(`Direct fetch returned status ${res.status}, trying Jina reader proxy...`);
+    }
+  } catch (err: any) {
+    console.warn("Direct fetch failed, trying Jina reader proxy...", err.message);
   }
 
-  const html = await res.text();
+  // If direct fetch was blocked (e.g. 403 Akamai/Cloudflare anti-bot), try Jina Reader Proxy
+  if (!html || html.includes("Access Denied") || html.includes("errors.edgesuite.net")) {
+    try {
+      const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
+        headers: {
+          Accept: "text/html, application/json",
+          "X-No-Cache": "true",
+        },
+      });
+      if (jinaRes.ok) {
+        const jinaText = await jinaRes.text();
+        if (jinaText && jinaText.length > 50 && !jinaText.includes("Access Denied")) {
+          const { title, markdown } = htmlToCleanMarkdown(jinaText, url);
+          return {
+            url,
+            title: title || url,
+            markdown: `# ${title || url}\n\n${markdown}`,
+            method: "edge_fetch",
+          };
+        }
+      }
+    } catch (jinaErr: any) {
+      console.warn("Jina proxy fetch failed:", jinaErr.message);
+    }
+  }
+
+  if (!html) {
+    throw new Error(`Failed to fetch web page. The target website blocks automated crawlers.`);
+  }
+
   const { title, markdown } = htmlToCleanMarkdown(html, url);
 
   return {
