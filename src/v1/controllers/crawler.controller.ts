@@ -108,25 +108,24 @@ export const CrawlerController = {
         parentId: ch.parentId,
       }));
 
-      for (const ch of formattedChunks) {
-        try {
-          await fileDb.insertChunk(c.env.DB, {
-            chunkId: ch.chunk_id,
-            fileId: fileId,
-            source: "web",
-            content: ch.content,
-            version: "v1",
-            tags: ch.tags,
-            topic: ch.topic,
-            firstSentence: ch.first_sentence,
-            sectionTitle: ch.section,
-            chunkIndex: ch.chunk_index,
-            sectionNumber: null,
-          });
-        } catch (chErr: any) {
-          console.warn("[Crawler] insertChunk warning:", chErr.message);
-        }
-      }
+      // 7. Save 3-Tier Chunks into D1 SQLite `chunks` and `document_chunks`
+      await fileDb.saveChunksBatch(c.env.DB, {
+        fileId: fileId,
+        fileName: fileName,
+        version: "v1",
+        chunks: formattedChunks.map((ch) => ({
+          index: ch.chunk_index,
+          content: ch.content,
+          section: ch.section,
+          tags: ch.tags,
+          topic: ch.topic,
+          tier: ch.tier,
+          parentId: ch.parentId,
+        })),
+        embeddingModel: "text-embedding-3-small",
+        chunkMethod: "ai",
+        source: "web",
+      });
 
       // Also insert into document_chunks for 3-tier linked editor lookup
       for (const ch of formattedChunks) {
