@@ -57,7 +57,10 @@ function formatRetrievedSources(pieces: any[]): Array<{ fileName: string; sectio
       p.file_path?.startsWith("http") ||
       p.meta?.file_path?.startsWith("http") ||
       p.url?.startsWith("http") ||
-      p.meta?.url?.startsWith("http")
+      p.meta?.url?.startsWith("http") ||
+      p.source === "web" ||
+      p.meta?.source === "web" ||
+      !p.file_name?.includes(".")
     );
 
     const url = p.file_path?.startsWith("http")
