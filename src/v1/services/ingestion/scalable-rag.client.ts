@@ -282,13 +282,18 @@ export class ScalableRagClient {
    * Returns 3-tier hierarchical chunks.
    */
   async processDocument(
-    file: File,
+    file: File | Blob,
     engineMode: EngineMode = "offline",
     strategy: ChunkStrategy = "adaptive",
-    pageImages?: string
+    pageImages?: string,
+    fileName: string = "document.txt"
   ): Promise<ScalableRagResult> {
     const formData = new FormData();
-    formData.append("file", file);
+    if (file instanceof Blob && typeof (file as any).name !== "string") {
+      formData.append("file", file, fileName);
+    } else {
+      formData.append("file", file);
+    }
     formData.append("engineMode", engineMode);
     formData.append("strategy", strategy);
     if (pageImages) {

@@ -80,14 +80,14 @@ export const CrawlerController = {
 
       // 6. Process Markdown into 3-Tier Agentic AI Chunks via Scalable RAG
       const client = new ScalableRagClient();
-      const mockFile = new File([markdownText], `${fileName}.txt`, { type: "text/plain" });
+      const mockBlob = new Blob([markdownText], { type: "text/plain" });
 
       let scalableResult: any;
       try {
-        scalableResult = await client.processDocument(mockFile, "offline", "ai");
+        scalableResult = await client.processDocument(mockBlob, "offline", "ai", undefined, `${fileName}.txt`);
       } catch (procErr: any) {
         console.warn("[Crawler] Scalable RAG process error, fallback to adaptive:", procErr.message);
-        scalableResult = await client.processDocument(mockFile, "offline", "adaptive");
+        scalableResult = await client.processDocument(mockBlob, "offline", "adaptive", undefined, `${fileName}.txt`);
       }
 
       const ferventChunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
@@ -182,8 +182,9 @@ export const CrawlerController = {
         vectorsUpserted,
       });
     } catch (err: any) {
-      console.error("[Crawler] Crawl failed:", err);
-      return c.json({ ok: false, message: "Crawl failed", error: err.message }, 500);
+      const errMsg = err?.stack || err?.message || String(err);
+      console.error("[Crawler] Crawl failed:", errMsg);
+      return c.json({ ok: false, message: err?.message || "Crawl failed", error: errMsg }, 500);
     }
   },
 };
