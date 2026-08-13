@@ -37,7 +37,7 @@ AUTORAG_SCORE_THRESHOLD = "0.3"
 CF_AUTORAG_REWRITE_QUERY = "false"
 AUTORAG_REWRITE_QUERY = "false"
 PUBLIC_LOGS_ENABLED = "false"
-DEBUG_TRACE = "false"
+ENABLE_WEB_CRAWLER = "true"
 ENABLE_WEB_SEARCH = "false"
 ENABLE_PDF_SEARCH = "false"
 CF_ACCOUNT_ID = "4121119f33ed1a8c63d10bc277206677"
@@ -91,6 +91,9 @@ index_name = "chatbot-query-cache-dev"
 
 [ai]
 binding = "AI"
+
+[browser]
+binding = "MY_BROWSER"
 
 [observability]
 enabled = true

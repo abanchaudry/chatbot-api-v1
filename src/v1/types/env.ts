@@ -44,10 +44,12 @@ export type Env = {
     APP_VERSION?: string;
 
     // -----------------------------
-    // Feature flags
+    // Feature flags & Browser
     // -----------------------------
-    ENABLE_WEB_SEARCH?: string; // "true"/"false"
-    ENABLE_PDF_SEARCH?: string; // "true"/"false"
+    MY_BROWSER?: any;
+    ENABLE_WEB_CRAWLER?: string; // "true"/"false"
+    ENABLE_WEB_SEARCH?: string;  // "true"/"false"
+    ENABLE_PDF_SEARCH?: string;  // "true"/"false"
 
     // -----------------------------
     // Retrieval tuning (0..100)

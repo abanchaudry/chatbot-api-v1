@@ -212,3 +212,17 @@ This document maintains a complete, chronological record of all architectural up
 - **Live Chunk Count Query (`files.db.ts`)**:
   - Updated `getAllFilesWithChunkCount` SQL query to count live chunk rows directly from `chunks` (`COUNT(c.chunk_id)`) instead of stale `f.chunk_count`.
   - Both Top KPI Card (`1,461`) and Pagination Stat (`1,461`) now match 1:1 down to the exact digit.
+
+---
+
+## 18. Cloudflare Browser Run Web Crawler & Agentic AI 3-Tier Chunking
+
+- **Cloudflare Edge Browser Run (`crawler.service.ts`)**:
+  - Added Cloudflare Browser Rendering headless Chrome binding (`[browser] binding = "MY_BROWSER"`) to `wrangler.toml` with an Edge Fetcher fallback for local dev.
+- **Feature Flag (`ENABLE_WEB_CRAWLER = "true"`)**:
+  - Controlled via `ENABLE_WEB_CRAWLER = "true"` in `wrangler.toml` `[vars]` to allow enabling or disabling web crawling per deployment.
+- **Backend Crawl Endpoint (`POST /api/crawler/crawl`)**:
+  - Crawls web URLs, converts DOM into clean Markdown, runs **Agentic AI 3-Tier Semantic Chunking** (`ScalableRagClient`), inserts 3-tier chunks into D1 `files` and `chunks` tables, embeds 1536d OpenAI vectors in Cloudflare Vectorize, and purges query cache.
+- **Admin UI Web Crawler Tab (`add-new.component.html` & `.ts`)**:
+  - Added a top tab bar on **Add AI Knowledge** page (**📁 Document File Upload** vs **🌐 Cloudflare Web Crawler**).
+  - Built real-time step progress modal (`Fetching Web Page` → `DOM Cleaning` → `Agentic AI 3-Tier Chunking` → `Vectorizing` → `Complete`).
