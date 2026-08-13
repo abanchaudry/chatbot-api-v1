@@ -35,12 +35,65 @@ import {
   normalizeQuery,
 } from "../services/cache.service";
 
-function formatRetrievedSources(pieces: any[]): Array<{ fileName: string; section: string; topic?: string; score: number | null; isWeb?: boolean; url?: string }> {
+const STOP_WORDS_SET = new Set([
+  "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
+  "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can", "cannot", "could",
+  "did", "do", "does", "doing", "don't", "down", "during", "each", "few", "for", "from", "further", "had", "has",
+  "have", "having", "he", "her", "here", "hers", "herself", "him", "himself", "his", "how", "i", "if", "in", "into",
+  "is", "it", "its", "itself", "just", "me", "more", "most", "my", "myself", "no", "nor", "not", "of", "off", "on",
+  "once", "only", "or", "other", "our", "ours", "ourselves", "out", "over", "own", "same", "she", "should", "so",
+  "some", "such", "than", "that", "the", "their", "theirs", "them", "themselves", "then", "there", "these", "they",
+  "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "we", "were", "what", "when",
+  "where", "which", "while", "who", "whom", "why", "with", "would", "you", "your", "yours", "yourself", "yourselves",
+  "solar", "energy", "information", "questions", "question", "assistance", "direct", "directly", "contact", "feel", "free", "ask"
+]);
+
+function getDistinctWords(text: string): Set<string> {
+  if (!text) return new Set();
+  const words = String(text)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP_WORDS_SET.has(w));
+  return new Set(words);
+}
+
+function formatRetrievedSources(
+  pieces: any[],
+  answerText?: string
+): Array<{ fileName: string; section: string; topic?: string; score: number | null; isWeb?: boolean; url?: string }> {
   if (!Array.isArray(pieces) || !pieces.length) return [];
+
+  // Filter pieces by answer token overlap if answerText is provided
+  let activePieces = pieces;
+  if (answerText && answerText.trim().length > 0) {
+    const answerWords = getDistinctWords(answerText);
+    const scoredPieces = pieces.map((p) => {
+      const rawFileName = p.file_name || p.meta?.file_name || p.fileName || "";
+      const content = p.content || p.text || p.meta?.content || "";
+      const topic = p.topic || p.meta?.topic || "";
+
+      const contentWords = getDistinctWords(content + " " + rawFileName + " " + topic);
+      let matchCount = 0;
+      for (const w of contentWords) {
+        if (answerWords.has(w)) {
+          matchCount++;
+        }
+      }
+      return { piece: p, matchCount };
+    });
+
+    const matched = scoredPieces.filter((sp) => sp.matchCount >= 2).map((sp) => sp.piece);
+    if (matched.length > 0) {
+      activePieces = matched;
+    } else {
+      activePieces = [pieces[0]];
+    }
+  }
 
   const docMap = new Map<string, any>();
 
-  for (const p of pieces) {
+  for (const p of activePieces) {
     const rawFileName =
       p.file_name ||
       p.meta?.file_name ||
@@ -60,7 +113,7 @@ function formatRetrievedSources(pieces: any[]): Array<{ fileName: string; sectio
       p.meta?.url?.startsWith("http") ||
       p.source === "web" ||
       p.meta?.source === "web" ||
-      !p.file_name?.includes(".")
+      (fileName !== "Knowledge Source" && !fileName.includes("."))
     );
 
     const url = p.file_path?.startsWith("http")
@@ -441,7 +494,7 @@ async function runSharedAskLogic(
     tokensUsed: executed.tokensUsed,
     source: executed.source,
     startedAt: prep.startedAt,
-    sources: formatRetrievedSources(retrieve?.pieces),
+    sources: formatRetrievedSources(retrieve?.pieces, executed.answer),
   };
 }
 
@@ -777,7 +830,7 @@ export const askController = {
             ok: true,
             tokensUsed: executed.tokensUsed,
             timing: { ms: now() - prep.startedAt },
-            sources: formatRetrievedSources(retrieve?.pieces),
+            sources: formatRetrievedSources(retrieve?.pieces, answer),
           });
         } catch (streamError: any) {
           logError("stream_generation_error", streamError);
