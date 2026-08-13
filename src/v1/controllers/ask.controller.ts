@@ -35,7 +35,7 @@ import {
   normalizeQuery,
 } from "../services/cache.service";
 
-function formatRetrievedSources(pieces: any[]) {
+function formatRetrievedSources(pieces: any[]): Array<{ fileName: string; section: string; topic?: string; score: number | null; isWeb?: boolean; url?: string }> {
   if (!Array.isArray(pieces) || !pieces.length) return [];
 
   const docMap = new Map<string, any>();
@@ -49,7 +49,22 @@ function formatRetrievedSources(pieces: any[]) {
       (typeof p.meta?.file_path === "string" ? p.meta.file_path.split("/").pop() : null) ||
       (typeof p.file_path === "string" ? p.file_path.split("/").pop() : null);
 
-    const fileName = rawFileName ? String(rawFileName).trim() : "Knowledge Document";
+    let fileName = rawFileName ? String(rawFileName).trim() : "Knowledge Source";
+
+    const isWeb = Boolean(
+      p.file_id?.startsWith("web_") ||
+      p.meta?.file_id?.startsWith("web_") ||
+      p.file_path?.startsWith("http") ||
+      p.meta?.file_path?.startsWith("http") ||
+      p.url?.startsWith("http") ||
+      p.meta?.url?.startsWith("http")
+    );
+
+    const url = p.file_path?.startsWith("http")
+      ? p.file_path
+      : p.meta?.file_path?.startsWith("http")
+      ? p.meta.file_path
+      : p.url || p.meta?.url || null;
 
     let rawScore = typeof p.score === "number" ? p.score : 0;
     let scoreInt = rawScore > 1 ? Math.round(rawScore) : Math.round(rawScore * 100);
@@ -64,6 +79,8 @@ function formatRetrievedSources(pieces: any[]) {
         section,
         topic,
         score: scoreInt > 0 ? scoreInt : null,
+        isWeb,
+        url,
       });
     }
   }
