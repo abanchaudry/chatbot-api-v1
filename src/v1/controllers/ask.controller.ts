@@ -794,19 +794,19 @@ export const askController = {
             });
           }
 
-          if (c.env.CACHE && executed.answer && executed.outcome !== "final_fallback" && !isStreamingFallback) {
-            const cachePayload = {
-              answer: executed.answer,
-              context: retrieve.context,
-              sources: retrieve.pieces,
-              tokensUsed: executed.tokensUsed,
-            };
+          c.executionCtx.waitUntil(
+            (async () => {
+              if (c.env.CACHE && executed.answer && executed.outcome !== "final_fallback" && !isStreamingFallback) {
+                const cachePayload = {
+                  answer: executed.answer,
+                  context: retrieve?.context,
+                  sources: retrieve?.pieces,
+                  tokensUsed: executed.tokensUsed,
+                };
 
-            const rawMsg = prep.message;
-            const rewrittenQuery = prep.query;
+                const rawMsg = prep.message;
+                const rewrittenQuery = prep.query;
 
-            c.executionCtx.waitUntil(
-              (async () => {
                 await saveQueryResponseToCache(c.env.CACHE, rawMsg, cachePayload);
 
                 if (rewrittenQuery && rewrittenQuery.toLowerCase().trim() !== rawMsg.toLowerCase().trim()) {
@@ -819,9 +819,23 @@ export const askController = {
                 }
 
                 console.log(JSON.stringify({ level: "INFO", label: "stream_cache_writeback_success", rawMsg, query: rewrittenQuery }));
-              })().catch((err) => logError("stream_cache_writeback_failed", err))
-            );
-          }
+              }
+
+              // Persist full execution trace and message to D1 SQLite database
+              const finalTraceJson = JSON.stringify(finalizeTrace(prep.trace, true));
+              await persist(
+                c.env.DB as any,
+                prep.userId,
+                prep.threadId,
+                prep.message,
+                answer,
+                retrieve?.context || "",
+                executed.tokensUsed || 0,
+                true,
+                finalTraceJson
+              );
+            })().catch((err) => logError("stream_persist_and_cache_failed", err))
+          );
 
           yield formatSSEDoneEvent({
             threadId: prep.threadId,

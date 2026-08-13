@@ -536,7 +536,7 @@ function setLatestScopeMirror(trace: TraceShape, scope: string, data: any) {
   if (scope === "gate") trace.gate = data;
   if (scope === "verifier") trace.verifier = data;
   if (scope === "context") trace.context = data;
-  if (scope === "answer") trace.answer = data;
+  if (scope === "answer" || scope === "answer_detail") trace.answer = data;
   if (scope === "persist") trace.persist = data;
 }
 
