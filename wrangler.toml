@@ -92,8 +92,9 @@ index_name = "chatbot-query-cache-dev"
 [ai]
 binding = "AI"
 
-[browser]
-binding = "MY_BROWSER"
+# To enable Cloudflare Browser Rendering (Browser Run) in production deployment, uncomment:
+# [browser]
+# binding = "MY_BROWSER"
 
 [observability]
 enabled = true
