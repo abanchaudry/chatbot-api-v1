@@ -1,0 +1,146 @@
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">Thread Logs</h1>
+            <p class="ai-subtitle">
+              A complete log of all user interaction threads
+            </p>
+          </div>
+          <div class="ai-stats"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header card-header-icon card-header-rose m-0">
+            <h4
+              class="card-title pb-10 pl-10 border-bottom"
+              style="padding: 15px 10px"
+            >
+              All Thread Logs
+            </h4>
+          </div>
+          <div class="card-body">
+            <div
+              class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2"
+            >
+              <div class="form-group mb-0 position-relative search-wrapper">
+                <i class="ri-search-2-line search-icon"></i>
+                <input
+                  type="text"
+                  class="form-control pl-4"
+                  placeholder="Search by Thread ID or User ID..."
+                  [(ngModel)]="searchText"
+                />
+              </div>
+            </div>
+
+            <div *ngIf="!isLoading; else loadingTemplate">
+              <table class="table table-light">
+                <thead style="background-color: #f4f6f9; border-radius: 12px">
+                  <tr>
+                    <th># ID</th>
+                    <th>Thread Id</th>
+                    <th>User Id</th>
+                    <th>Created Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="
+                      let item of threads
+                        | searchFilter : searchText
+                        | paginate
+                          : { itemsPerPage: entries, currentPage: page };
+                      let i = index
+                    "
+                  >
+                    <td>
+                      <span class="index-cell">{{
+                        (page - 1) * entries + i + 1
+                      }}</span>
+                    </td>
+                    <td>{{ item?.thread_id }}</td>
+                    <td>{{ item?.user_id }}</td>
+                    <td>{{ item?.created_at | date }}</td>
+                    <td class="td-actions">
+                      <button
+                        [routerLink]="[
+                          '/dashboard/threads/detail-page',
+                          item.thread_id
+                        ]"
+                        type="button"
+                        class="view-btn"
+                      >
+                        <span class="mat-button-wrapper"
+                          ><i class="ri-eye-line"></i
+                        ></span>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div
+                class="pagination-block text-right"
+                *ngIf="threads.length > itemPerPage"
+              >
+                <pagination-controls
+                  class="custom-pagination"
+                  (pageChange)="page = $event"
+                ></pagination-controls>
+              </div>
+            </div>
+
+            <ng-template #loadingTemplate>
+              <table class="table table-light">
+                <thead style="background-color: #f4f6f9; border-radius: 12px">
+                  <tr>
+                    <th># ID</th>
+                    <th>Thread Id</th>
+                    <th>User Id</th>
+                    <th>Created Date</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let i of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]">
+                    <td>
+                      <div
+                        class="skeleton skeleton-text"
+                        style="width: 50%"
+                      ></div>
+                    </td>
+                    <td>
+                      <div
+                        class="skeleton skeleton-text"
+                        style="width: 90%"
+                      ></div>
+                    </td>
+                    <td>
+                      <div
+                        class="skeleton skeleton-text"
+                        style="width: 80%"
+                      ></div>
+                    </td>
+                    <td>
+                      <div
+                        class="skeleton skeleton-text"
+                        style="width: 70%"
+                      ></div>
+                    </td>
+                    <td><div class="skeleton skeleton-action-btn"></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,401 @@
+<div class="main-content">
+  <div class="container-fluid">
+
+    <!-- 🔵 Royal Blue Hero Banner Box (Matches Chat Analytics 1:1) -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div class="content">
+            <h1 class="ai-title">Fallback Intelligence</h1>
+            <p class="ai-subtitle">Automated AI clustering of unmapped user fallback queries into actionable knowledge gap topics</p>
+          </div>
+          <div class="quick-stat d-none d-md-block">
+            <span class="badge-live">Live Updates</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🎛️ Filter & Action Toolbar (Matches Chat Analytics 1:1) -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="filter-toolbar">
+          <div class="toolbar-layout">
+            <div class="filter-group">
+
+              <!-- Auto-Schedule Picker Dropdown -->
+              <div class="d-flex align-items-center bg-light border rounded px-3 py-2 me-2" style="border-color: #cbd5e1 !important; border-radius: 8px !important;">
+                <label class="small text-muted me-2 mb-0 fw-semibold text-nowrap" style="font-size: 12px;">
+                  <i class="ri-history-line me-1 text-primary"></i> Auto-Schedule:
+                </label>
+                <select
+                  class="form-select form-select-sm border-0 bg-transparent fw-bold text-primary shadow-none py-0 ps-1 pe-4"
+                  style="cursor: pointer; font-size: 13px;"
+                  [ngModel]="clusteringSchedule"
+                  (ngModelChange)="updateSchedule($event)"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+
+              <!-- Filter & Re-Cluster Trigger Button -->
+              <button
+                class="btn btn-outline-secondary d-flex align-items-center gap-2 me-2"
+                [disabled]="isClusteringLoading"
+                (click)="toggleCustomFilterModal()"
+                style="padding: 8px 16px; font-size: 13px; border-color: #cbd5e1; color: #334155; background: #ffffff; border-radius: 8px; font-weight: 600;"
+              >
+                <i class="ri-filter-3-line text-primary"></i>
+                Filter & Re-Cluster
+              </button>
+
+              <!-- Primary Action Button -->
+              <button
+                class="apply-action-btn d-flex align-items-center gap-2"
+                [disabled]="isClusteringLoading"
+                (click)="triggerManualClustering('manual')"
+                style="background: #3167f3; font-weight: 600; border-radius: 8px; padding: 9px 20px;"
+              >
+                <i class="ri-cpu-line" [class.ri-loader-4-line]="isClusteringLoading" [class.spin]="isClusteringLoading"></i>
+                <span>{{ isClusteringLoading ? 'Clustering Fallbacks...' : 'Run Clustering Now' }}</span>
+              </button>
+
+            </div>
+          </div>
+
+          <!-- 🎛️ Collapsible Custom Re-Clustering Control Panel -->
+          <div *ngIf="customFilterModalOpen" class="border-top mt-3 pt-3" style="background: #f8fafc; margin: -12px; margin-top: 12px; padding: 18px 24px; border-radius: 0 0 8px 8px;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <div class="d-flex align-items-center gap-2">
+                <i class="ri-equalizer-fill text-warning fs-5"></i>
+                <h5 class="mb-0 fw-bold text-dark" style="font-size: 15px; color: #1e293b;">Custom Re-Clustering & Time Filters</h5>
+              </div>
+              <button type="button" class="btn btn-sm btn-light border py-1 px-2 text-dark fw-bold" (click)="closeCustomFilterModal()">
+                <i class="ri-close-line me-1"></i> Close Panel
+              </button>
+            </div>
+
+            <div class="row g-3 align-items-end">
+              <!-- Preset horizon -->
+              <div class="col-md-5">
+                <label class="form-label text-dark fw-bold mb-1.5" style="font-size: 12px;">1. Select Time Horizon:</label>
+                <div class="preset-pill-group w-100">
+                  <button type="button" class="pill-btn flex-fill" [class.active]="filterTimePreset === 'all'" (click)="selectClusterPreset('all')">All Time</button>
+                  <button type="button" class="pill-btn flex-fill" [class.active]="filterTimePreset === '24h'" (click)="selectClusterPreset('24h')">Last 24h</button>
+                  <button type="button" class="pill-btn flex-fill" [class.active]="filterTimePreset === '7d'" (click)="selectClusterPreset('7d')">Last 7d</button>
+                  <button type="button" class="pill-btn flex-fill" [class.active]="filterTimePreset === '30d'" (click)="selectClusterPreset('30d')">Last 30d</button>
+                  <button type="button" class="pill-btn flex-fill" [class.active]="filterTimePreset === 'custom'" (click)="selectClusterPreset('custom')">Custom</button>
+                </div>
+              </div>
+
+              <!-- Action Mode -->
+              <div class="col-md-4">
+                <label class="form-label text-dark fw-bold mb-1.5" style="font-size: 12px;">2. Clustering Action Mode:</label>
+                <div class="d-flex gap-2">
+                  <button type="button" class="mode-btn mode-btn-unclustered w-50 text-nowrap" [class.active]="filterMode === 'unclustered_only'" (click)="filterMode = 'unclustered_only'; updateFilterPreview()">Unclustered Only</button>
+                  <button type="button" class="mode-btn mode-btn-recluster w-50 text-nowrap" [class.active]="filterMode === 'recluster_all'" (click)="filterMode = 'recluster_all'; updateFilterPreview()">Re-Cluster All</button>
+                </div>
+              </div>
+
+              <!-- Matching Count & Action -->
+              <div class="col-md-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <small class="text-dark fw-bold" style="font-size: 11px;">Matching Fallbacks:</small>
+                  <strong class="text-primary fw-bold" style="font-size: 12px;">
+                    <span *ngIf="!isLoadingPreview">{{ previewMatchingCount }} selected</span>
+                    <span *ngIf="isLoadingPreview"><div class="spinner-border spinner-border-sm me-1"></div></span>
+                  </strong>
+                </div>
+                <button type="button" class="apply-action-btn w-100 d-flex align-items-center justify-content-center gap-1" [disabled]="previewMatchingCount === 0 || isClusteringLoading" (click)="executeCustomClustering()" style="background: #3167f3; padding: 7px 12px; font-size: 12px;">
+                  <i class="ri-cpu-line"></i> Run Custom AI
+                </button>
+              </div>
+            </div>
+
+            <!-- Custom date range inputs if custom selected -->
+            <div *ngIf="filterTimePreset === 'custom'" class="row g-2 mt-2 pt-2 border-top">
+              <div class="col-6">
+                <label class="form-label text-muted small mb-1">Start Date & Time:</label>
+                <input type="datetime-local" class="form-control form-control-sm" [(ngModel)]="filterStartDate" (ngModelChange)="updateFilterPreview()"/>
+              </div>
+              <div class="col-6">
+                <label class="form-label text-muted small mb-1">End Date & Time:</label>
+                <input type="datetime-local" class="form-control form-control-sm" [(ngModel)]="filterEndDate" (ngModelChange)="updateFilterPreview()"/>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- 📊 KPI Stat Cards (Corner Image + Icon Badges - Matches Chat Analytics 1:1) -->
+    <div class="row justify-content-center mb-4">
+      <!-- Unclustered Fallbacks -->
+      <div class="col-md-4">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">Pending Unclustered Fallbacks</p>
+                <h4 class="mt-1 mb-0 price">
+                  <span *ngIf="!isLoadingClusters; else statsLoading">{{ unclusteredCount }}</span>
+                </h4>
+              </div>
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto icon-info border-dashed rounded">
+                  <i class="ri-question-line fs-22"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Identified Knowledge Clusters -->
+      <div class="col-md-4">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">Identified Knowledge Clusters</p>
+                <h4 class="mt-1 mb-0 price">
+                  <span *ngIf="!isLoadingClusters; else statsLoading">{{ totalClusters }}</span>
+                </h4>
+              </div>
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto icon-success border-dashed rounded">
+                  <i class="ri-radar-line fs-22"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- New Category Suggestions -->
+      <div class="col-md-4">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">New Category Suggestions</p>
+                <h4 class="mt-1 mb-0 price">
+                  <span *ngIf="!isLoadingClusters; else statsLoading">{{ newCategorySuggestionsCount }}</span>
+                </h4>
+              </div>
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto icon-warning border-dashed rounded">
+                  <i class="ri-sparkling-fill fs-22"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ng-template #statsLoading>
+        <span class="text-muted fs-6">Loading...</span>
+      </ng-template>
+    </div>
+
+    <!-- 🌐 Main Cluster Grid & Header Container -->
+    <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
+      <div class="card-header card-header-icon m-0 border-bottom" style="display:flex; align-items:center; justify-content:space-between; padding: 18px 24px; background: #ffffff;">
+        <h4 class="card-title m-0 fw-bold" style="font-size: 16px; color: #1e293b;">
+          <i class="ri-node-tree text-primary me-2"></i> Identified Knowledge Gap Clusters
+        </h4>
+      </div>
+
+      <div class="card-body p-4">
+        <!-- Alert message -->
+        <div *ngIf="clusteringMessage" class="alert alert-info py-2 mb-3 fade-enter d-flex align-items-center justify-content-between" style="border-radius: 6px;">
+          <span><i class="ri-information-line me-2"></i>{{ clusteringMessage }}</span>
+          <span *ngIf="isClusteringLoading" class="spinner-border spinner-border-sm text-primary"></span>
+        </div>
+
+        <!-- Clusters Loading State -->
+        <div *ngIf="isLoadingClusters" class="text-center py-5 text-muted">
+          <div class="spinner-border text-primary spinner-border-sm me-2"></div>
+          Loading fallback clusters...
+        </div>
+
+        <!-- Empty State -->
+        <div *ngIf="!isLoadingClusters && fallbackClusters.length === 0" class="text-center py-5 bg-light rounded border">
+          <i class="ri-sparkling-fill fs-1 text-muted"></i>
+          <h5 class="mt-3 text-dark fw-bold">No Fallback Clusters Found</h5>
+          <p class="text-muted small max-w-md mx-auto">
+            All user fallback queries have been mapped or no fallbacks exist for the selected period.
+          </p>
+          <button class="btn action-btn button-primary btn-sm mt-2" (click)="triggerManualClustering('manual')">
+            <i class="ri-cpu-line me-1"></i> Trigger Fresh AI Clustering
+          </button>
+        </div>
+
+        <!-- Cluster Cards Grid -->
+        <div *ngIf="!isLoadingClusters && fallbackClusters.length > 0" class="row g-4">
+          <div *ngFor="let cluster of fallbackClusters" class="col-md-6">
+            <div class="card h-100 border shadow-none" style="border-color: #e2e8f0 !important; border-radius: 10px;">
+              <div class="card-body p-4 d-flex flex-column justify-content-between">
+                <div>
+                  <!-- Title & Query Badge -->
+                  <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                    <h5 class="card-title fw-bold text-dark m-0" style="font-size: 15px; color: #1e293b;">
+                      {{ cluster.cluster_name }}
+                    </h5>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-semibold px-2 py-1" style="font-size: 11px;">
+                      {{ cluster.query_count }} FALLBACK QUERIES
+                    </span>
+                  </div>
+
+                  <!-- New Category Banner -->
+                  <div *ngIf="cluster.is_new_category" class="mb-3 p-2 bg-warning-subtle border border-warning rounded d-flex align-items-center justify-content-between" style="font-size: 12px;">
+                    <span class="fw-semibold text-warning-emphasis">
+                      <i class="ri-sparkling-fill me-1"></i>New Category Suggested:
+                    </span>
+                    <code class="px-2 py-0.5 bg-white text-dark rounded border border-warning-subtle fw-bold">
+                      {{ cluster.suggested_category_name || 'NEW_TOPIC' }}
+                    </code>
+                  </div>
+
+                  <!-- Summary Description -->
+                  <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">
+                    {{ cluster.summary }}
+                  </p>
+
+                  <!-- Representative Sample Queries Header -->
+                  <div class="d-flex align-items-center justify-content-between border-top pt-3 mb-2">
+                    <span class="text-uppercase text-muted card-h" style="font-size: 10px;">Representative Sample Queries:</span>
+                    <div class="d-flex align-items-center gap-2">
+                      <button
+                        *ngIf="cluster.sample_queries.length > 1"
+                        class="btn btn-link btn-sm p-0 text-decoration-none fw-bold text-primary"
+                        style="font-size: 11px;"
+                        (click)="toggleQueryExpansion(cluster.id, $event)"
+                      >
+                        {{ isClusterExpanded(cluster.id) ? 'Collapse ▲' : ('View All (' + cluster.sample_queries.length + ') ▼') }}
+                      </button>
+                      <button
+                        class="btn btn-sm btn-outline-secondary px-2 py-0 d-flex align-items-center gap-1"
+                        style="font-size: 11px; height: 24px; border-color: #cbd5e1; color: #334155; border-radius: 6px;"
+                        (click)="openClusterDrawer(cluster)"
+                        title="Inspect full query details"
+                      >
+                        <i class="ri-article-line"></i> Inspect
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Sample Queries -->
+                  <div class="bg-light rounded p-2.5 mb-3 border" style="border-color: #f1f5f9 !important;">
+                    <ng-container *ngIf="!isClusterExpanded(cluster.id)">
+                      <div class="d-flex align-items-start gap-2 text-dark" style="font-size: 12px;">
+                        <i class="ri-question-line text-muted mt-0.5"></i>
+                        <span>"{{ cluster.sample_queries[0] }}"</span>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngIf="isClusterExpanded(cluster.id)">
+                      <div *ngFor="let queryStr of cluster.sample_queries; let qIdx = index" class="d-flex align-items-start gap-2 text-dark py-1" [class.border-top]="qIdx > 0">
+                        <i class="ri-question-line text-muted mt-0.5"></i>
+                        <span>"{{ queryStr }}"</span>
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+
+                <!-- Recommendation -->
+                <div class="p-3 rounded border" style="background: #eff6ff; border-color: #bfdbfe !important;">
+                  <div class="d-flex align-items-center gap-1 text-primary fw-bold mb-1" style="font-size: 12px;">
+                    <i class="ri-lightbulb-line"></i> AI Recommendation:
+                  </div>
+                  <div class="text-slate-700" style="font-size: 12px; color: #334155;">
+                    {{ cluster.suggested_action }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 📄 Pagination Block (Matches Chat Analytics 1:1) -->
+      <div *ngIf="!isLoadingClusters && totalClusters > 0" class="pagination-block d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="pagination-info text-muted small">
+          Showing <strong>{{ (currentPage - 1) * limit + 1 }}</strong> to
+          <strong>{{ mathMin(currentPage * limit, totalClusters) }}</strong> of
+          <strong>{{ totalClusters }}</strong> entries
+        </div>
+
+        <div class="custom-pagination">
+          <ul class="ngx-pagination">
+            <!-- Previous Button -->
+            <li class="pagination-previous" [class.disabled]="currentPage === 1" (click)="currentPage > 1 && onPageChange(currentPage - 1)">
+              <a></a>
+            </li>
+
+            <!-- Page Ratio / Pages List -->
+            <li *ngFor="let pageNum of getPagesArray()" [class.current]="pageNum === currentPage" (click)="onPageChange(pageNum)">
+              <span>{{ pageNum }}</span>
+            </li>
+
+            <!-- Next Button -->
+            <li class="pagination-next" [class.disabled]="currentPage === totalPages" (click)="currentPage < totalPages && onPageChange(currentPage + 1)">
+              <a></a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 📑 Side Drawer for Inspecting Cluster Queries -->
+<div class="drawer-overlay" [class.active]="drawerOpen" (click)="closeDrawer()"></div>
+
+<div class="drawer" [class.open]="drawerOpen">
+  <div class="drawer-header">
+    <div>
+      <h5 class="fw-bold text-dark mb-0 fs-6">{{ selectedClusterName }}</h5>
+      <small class="text-muted">Detailed fallback query records linked to this topic cluster</small>
+    </div>
+    <button class="btn btn-sm btn-light border" (click)="closeDrawer()">
+      <i class="ri-close-line fs-5"></i>
+    </button>
+  </div>
+
+  <div class="drawer-body">
+    <div *ngIf="isLoadingDrawerQueries" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <div class="text-muted small mt-2">Fetching cluster fallback queries...</div>
+    </div>
+
+    <div *ngIf="!isLoadingDrawerQueries && selectedClusterQueries.length === 0" class="text-center py-5 text-muted">
+      No specific queries logged for this cluster.
+    </div>
+
+    <div *ngIf="!isLoadingDrawerQueries && selectedClusterQueries.length > 0">
+      <div *ngFor="let q of selectedClusterQueries; let idx = index" class="p-3 mb-2 bg-white rounded border">
+        <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+          <div class="fw-bold text-dark fs-6 d-flex align-items-center gap-2">
+            <span class="badge bg-primary-subtle text-primary border me-1">#{{ idx + 1 }}</span>
+            <span>"{{ q.query_text }}"</span>
+          </div>
+          <small class="text-muted text-nowrap" style="font-size: 11px;">
+            {{ q.created_at | date:'short' }}
+          </small>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-2 text-xs text-muted" style="font-size: 11px;">
+          <span><i class="ri-user-3-line text-primary me-1"></i>User: <strong class="text-dark">{{ q.user_id || 'anonymous' }}</strong></span>
+          <span *ngIf="q.thread_id"><i class="ri-discuss-line text-info me-1"></i>Thread: <strong class="text-dark">{{ q.thread_id }}</strong></span>
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-auto">{{ q.reason || 'fallback' }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

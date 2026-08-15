@@ -1,0 +1,180 @@
+<div class="main-content">
+  <div class="container-fluid">
+
+    <!-- 🔵 Royal Blue Hero Banner Box (Matches Chat Analytics 1:1) -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div class="content">
+            <h1 class="ai-title">Business & AI Persona</h1>
+            <p class="ai-subtitle">Configure company branding, persona tone, language, and dynamic AI domain instructions</p>
+          </div>
+          <div class="quick-stat d-none d-md-block">
+            <span class="badge-live">Active Persona</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📊 Persona Quick Overview Cards (Matches Chat Analytics 1:1) -->
+    <div class="row justify-content-center mb-4">
+      <!-- Company Name Card -->
+      <div class="col-md-4">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">Company Name</p>
+                <h4 class="mt-1 mb-0 price text-truncate" style="max-width: 180px;">
+                  <span>{{ settings.company_name || 'Not Configured' }}</span>
+                </h4>
+              </div>
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto icon-info border-dashed rounded">
+                  <i class="ri-building-4-line fs-22"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Assistant Name Card -->
+      <div class="col-md-4">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">Assistant Persona</p>
+                <h4 class="mt-1 mb-0 price text-truncate" style="max-width: 180px;">
+                  <span>{{ settings.assistant_name || 'AI Assistant' }}</span>
+                </h4>
+              </div>
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto icon-success border-dashed rounded">
+                  <i class="ri-robot-line fs-22"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Brand Tone Card -->
+      <div class="col-md-4">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">Brand Tone & Language</p>
+                <h4 class="mt-1 mb-0 price text-truncate" style="max-width: 180px; font-size: 16px !important;">
+                  <span>{{ settings.brand_tone || 'Friendly' }} ({{ (settings.primary_language || 'english') | uppercase }})</span>
+                </h4>
+              </div>
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto icon-warning border-dashed rounded">
+                  <i class="ri-global-line fs-22"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🏢 Business Profile & Persona Configuration Card -->
+    <div class="row mb-4">
+      <div class="col-md-12">
+        <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
+          <div class="card-header card-header-icon m-0 border-bottom" style="display:flex; align-items:center; justify-content:space-between; padding: 18px 24px; background: #ffffff;">
+            <h4 class="card-title m-0 fw-bold" style="font-size: 16px; color: #1e293b;">
+              <i class="ri-user-settings-line text-primary me-2"></i> Business Profile & System Prompt Settings
+            </h4>
+          </div>
+          <div class="card-body p-4">
+            <form (ngSubmit)="onSaveBusinessSettings()">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <mat-form-field class="example-full-width custom-border w-100" appearance="outline">
+                    <mat-label>Company / Brand Name</mat-label>
+                    <input matInput placeholder="e.g. Acme Corporation" name="companyName" [(ngModel)]="settings.company_name" required />
+                  </mat-form-field>
+                </div>
+                <div class="col-md-6">
+                  <mat-form-field class="example-full-width custom-border w-100" appearance="outline">
+                    <mat-label>Assistant Name (Persona)</mat-label>
+                    <input matInput placeholder="e.g. Acme Support Bot" name="assistantName" [(ngModel)]="settings.assistant_name" required />
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <mat-form-field class="example-full-width custom-border w-100" appearance="outline">
+                    <mat-label>Brand Tone & Communication Style</mat-label>
+                    <input matInput placeholder="e.g. professional, friendly, concise" name="brandTone" [(ngModel)]="settings.brand_tone" />
+                  </mat-form-field>
+                </div>
+                <div class="col-md-6">
+                  <mat-form-field class="example-full-width custom-border w-100" appearance="outline">
+                    <mat-label>Primary Language</mat-label>
+                    <mat-select name="primaryLanguage" [(ngModel)]="settings.primary_language">
+                      <mat-option value="english">English</mat-option>
+                      <mat-option value="spanish">Spanish</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <!-- ✨ AI DOMAIN PROMPT GENERATOR SECTION -->
+              <div class="row mt-3 mb-3">
+                <div class="col-md-12">
+                  <div class="p-4 rounded border" style="background: #f0f9ff; border-color: #bae6fd !important;">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <i class="ri-sparkling-fill text-primary fs-5"></i>
+                      <h5 style="font-size: 15px; font-weight: 700; color: #1e293b;" class="mb-0">AI Domain System Instruction Generator</h5>
+                    </div>
+                    <p style="font-size: 13px; color: #475569;" class="mb-3">
+                      Type a brief summary of what your business does, and click <strong>Generate System Prompt with AI</strong> to automatically synthesize structured domain instructions for your RAG chatbot.
+                    </p>
+
+                    <mat-form-field class="example-full-width custom-border w-100 bg-white rounded" appearance="outline">
+                      <mat-label>Raw Business Summary (for AI Generator)</mat-label>
+                      <textarea matInput placeholder="e.g. We are an e-commerce store selling wireless headphones. We assist with order tracking, returns, warranty claims, and troubleshooting." name="rawBusinessDescription" [(ngModel)]="rawBusinessDescription" rows="2"></textarea>
+                    </mat-form-field>
+
+                    <div class="d-flex justify-content-end mt-2">
+                      <button type="button" class="apply-action-btn d-flex align-items-center gap-2" (click)="onGenerateDomainPrompt()" [disabled]="isGeneratingDomain" style="background: #3167f3;">
+                        <i class="ri-sparkling-line" [class.ri-loader-4-line]="isGeneratingDomain" [class.spin]="isGeneratingDomain"></i>
+                        <span>{{ isGeneratingDomain ? 'Generating Prompt...' : '✨ Generate System Prompt with AI' }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Active System Prompt Domain Instructions -->
+              <div class="row">
+                <div class="col-md-12">
+                  <mat-form-field class="example-full-width custom-border w-100" appearance="outline">
+                    <mat-label>Active System Prompt Domain Instructions (domain_hint)</mat-label>
+                    <textarea matInput placeholder="Generated or custom domain instruction prompt..." name="domainHint" [(ngModel)]="settings.domain_hint" rows="5" required></textarea>
+                  </mat-form-field>
+                </div>
+              </div>
+
+              <!-- Save Action Button -->
+              <div class="col-12 d-flex justify-content-end mt-3 pt-3 border-top">
+                <button type="submit" class="apply-action-btn d-flex align-items-center gap-2" [disabled]="isSavingSettings" style="background: #3167f3; font-size: 14px; padding: 10px 24px;">
+                  <i class="ri-save-line" [class.ri-loader-4-line]="isSavingSettings" [class.spin]="isSavingSettings"></i>
+                  <span>{{ isSavingSettings ? 'Saving Settings...' : '💾 Save Business Settings' }}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

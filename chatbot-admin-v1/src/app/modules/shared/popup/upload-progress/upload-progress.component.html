@@ -1,0 +1,25 @@
+<div class="upload-dialog-container p-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="dialog-title">📦 Uploading Chunks</h5>
+    <span class="close cursor-pointer" (click)="closePopup()">&times;</span>
+  </div>
+
+  <p class="uploading-file-name mb-3">
+    Uploading file: <strong>{{ data.fileName }}</strong>
+  </p>
+
+  <div class="progress-bar-container mb-4">
+    <div class="progress-label mb-1">{{ getProgressPercentage(uploadProgress) }}%</div>
+    <div class="progress-wrapper bg-light rounded" style="height:18px;">
+      <div class="progress-fill bg-success"
+           [style.width]="getProgressPercentage(uploadProgress) + '%'"
+           style="height:100%;transition:width .5s;"></div>
+    </div>
+  </div>
+
+  <ul class="upload-steps list-unstyled mt-3" *ngIf="uploadProgress?.steps?.length">
+    <li *ngFor="let step of uploadProgress.steps.slice().reverse()">
+      <span [innerHTML]="formatStep(step)"></span>
+    </li>
+  </ul>
+</div>

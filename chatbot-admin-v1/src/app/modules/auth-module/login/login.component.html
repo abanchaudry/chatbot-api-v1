@@ -1,0 +1,90 @@
+<div class="container-xxl">
+  <div class="row vh-100 d-flex justify-content-center">
+    <div class="col-12 align-self-center">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-lg-4 mx-auto">
+            <div class="card">
+              <div class="card-body p-0 bg-black auth-header-box">
+                <div class="text-center p-3">
+          
+                  <h4 class="mb-0 fw-semibold text-white fs-22">
+                    Welcome to {{appName}}
+                  </h4>
+                  <p class="header-secondary fw-medium mb-0 fs-15">
+                    Sign in to access your dashboard.
+                  </p>
+                </div>
+              </div>
+              <div class="card-body pt-0">
+                <form class="form my-4 mb-1" role="form" novalidate (ngSubmit)="loginForm.valid && onSubmit()"
+                  #loginForm="ngForm">
+                  <div class="form-group mb-3 position-relative">
+                    <label class="form-label" for="username" style="margin-top: 8px">Username</label>
+
+                    <i class="ri-user-line position-absolute" style="top: 47px; right: 15px; color: #aaa"></i>
+                    <input type="text" class="form-control ps-4" id="username" name="username"
+                      placeholder="Enter username" [(ngModel)]="user.username" #username="ngModel" required [ngClass]="{
+                        'is-invalid': loginForm.submitted && username.invalid
+                      }" />
+                    <div *ngIf="loginForm.submitted && username.invalid" class="invalid-feedback">
+                      <div *ngIf="username.errors?.['required']">
+                        Username is required.
+                      </div>
+                    </div>
+                  </div>
+                  <div class="form-group mb-3 position-relative">
+                    <label class="form-label" for="userpassword">Password</label>
+                    <i class="ri-lock-line position-absolute" style="top: 39px; right: 15px; color: #aaa"></i>
+                    <input type="password" class="form-control ps-4" name="password" id="userpassword"
+                      placeholder="Enter password" required minlength="3" [(ngModel)]="user.password"
+                      #password="ngModel" [ngClass]="{
+                        'is-invalid': loginForm.submitted && password.invalid
+                      }" />
+                    <div *ngIf="loginForm.submitted && password.invalid" class="invalid-feedback">
+                      <div *ngIf="password.errors?.['required']">
+                        Password is required.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-group row">
+                    <div class="col-12 p-0">
+                      <div class="form-check form-switch form-switch-success">
+                        <label for="cbx" class="cbx">
+                          <div class="checkmark">
+                            <input type="checkbox" id="cbx" />
+                            <div class="flip">
+                              <div class="front"></div>
+                              <div class="back">
+                                <svg viewBox="0 0 16 14" height="14" width="16">
+                                  <path d="M2 8.5L6 12.5L14 1.5"></path>
+                                </svg>
+                              </div>
+                            </div>
+                          </div>
+                        </label>
+                        <label class="form-check-label" for="customSwitchSuccess">Remember me</label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="form-group mb-0 row">
+                    <div class="col-12 p-0">
+                      <div class="d-grid">
+                        <button class="btn button-primary" type="submit">
+                          Log In
+                          <i class="fas fa-sign-in-alt icon-hover ms-1"></i>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

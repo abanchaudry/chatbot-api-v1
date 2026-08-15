@@ -1,0 +1,214 @@
+<div class="support-widget" [class.open]="isChatOpen">
+  <button
+    *ngIf="!isChatOpen"
+    class="widget-launcher"
+    type="button"
+    (click)="toggleChat()"
+    aria-label="Open support chat"
+    [attr.aria-expanded]="isChatOpen"
+  >
+    <span class="launcher-pulse" aria-hidden="true"></span>
+
+    <span class="launcher-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path
+          d="M6.25 6.5h11.5c1.24 0 2.25 1.01 2.25 2.25v5.95c0 1.24-1.01 2.25-2.25 2.25h-5.6L7.5 20v-3.05H6.25A2.25 2.25 0 0 1 4 14.7V8.75C4 7.51 5.01 6.5 6.25 6.5Z"
+          fill="currentColor"
+        />
+        <circle cx="9.2" cy="11.7" r="1.05" fill="white" />
+        <circle cx="12" cy="11.7" r="1.05" fill="white" />
+        <circle cx="14.8" cy="11.7" r="1.05" fill="white" />
+      </svg>
+    </span>
+  </button>
+
+  <section
+    *ngIf="isChatOpen"
+    @chatPopupAnimation
+    class="widget-panel"
+    role="dialog"
+    aria-label="Customer support chat"
+  >
+    <header class="panel-header">
+      <div class="header-main">
+        <div class="brand-badge">{{ appInitial }}</div>
+
+        <div class="brand-copy">
+          <div class="brand-title-row">
+            <h3>{{ appName }}</h3>
+          </div>
+          <div class="sub-meta">
+            {{ threadId ? 'Returning conversation' : 'New conversation' }}
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <button
+          class="header-btn"
+          type="button"
+          [disabled]="isTyping"
+          (click)="clearChat()"
+        >
+          Clear
+        </button>
+
+        <button
+          class="header-btn icon"
+          type="button"
+          (click)="toggleChat()"
+          aria-label="Close support chat"
+        >
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            <path d="M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="quick-prompts" *ngIf="showQuickPrompts">
+      <button
+        *ngFor="let prompt of quickPrompts"
+        type="button"
+        class="quick-chip"
+        (click)="useQuickPrompt(prompt)"
+      >
+        {{ prompt.label }}
+      </button>
+    </div>
+
+    <div class="chat-feed" #chatBody>
+      <div class="history-loading" *ngIf="isHistoryLoading">
+        <div class="history-loading-card">
+          <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <p>Loading conversation…</p>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="!isHistoryLoading && !hasConversationMessages">
+        <div class="empty-state-card">
+          <div class="empty-icon">{{ appInitial }}</div>
+          <h4>Hi there! I’m {{ appName }}.</h4>
+          <p>Ask me about policies, office details, forms, access, billing, or support topics.</p>
+        </div>
+      </div>
+
+      <ng-container *ngIf="!isHistoryLoading && hasConversationMessages">
+        <ng-container *ngFor="let item of chatTimeline; trackBy: trackByTimeline">
+          <div class="date-divider" *ngIf="item.type === 'divider'">
+            <span>{{ item.label }}</span>
+          </div>
+
+          <div
+            *ngIf="item.type === 'message'"
+            class="message-row"
+            [class.user]="item.message.sender === 'user'"
+            [class.bot]="item.message.sender === 'bot'"
+          >
+            <div class="message-shell">
+              <div class="message-avatar" *ngIf="item.message.sender === 'bot'">
+                {{ appInitial }}
+              </div>
+
+              <article
+                class="message-bubble"
+                [class.connecting]="isConnectingById(item.message.id)"
+                [class.streaming]="isStreamingById(item.message.id)"
+              >
+                <ng-container *ngIf="!isConnectingById(item.message.id); else connectingTpl">
+                  <div class="bubble-content" [innerHTML]="item.message.html"></div>
+                  <span
+                    *ngIf="isStreamingById(item.message.id)"
+                    class="stream-caret"
+                    aria-hidden="true"
+                  ></span>
+                </ng-container>
+
+                <ng-template #connectingTpl>
+                  <div class="typing-inline" aria-label="Assistant is thinking">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </ng-template>
+                <!-- Admin-Only Cited Documents & Websites Feature -->
+                <div *ngIf="item.message.sender === 'bot' && item.message.sources && item.message.sources.length > 0" class="cited-sources-wrapper">
+                  <div class="cited-sources-label">
+                    <i class="ri-book-read-line text-primary mr-1"></i> Cited Knowledge Sources ({{ item.message.sources.length }})
+                  </div>
+                  <div class="cited-sources-chips">
+                    <ng-container *ngFor="let src of item.message.sources">
+                      <!-- Web Crawled Source: Click opens original URL in new tab -->
+                      <a
+                        *ngIf="src.isWeb || (src.url && src.url.startsWith('http')); else docChip"
+                        [href]="src.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="cited-chip-btn text-decoration-none mr-1 mb-1"
+                        style="border-color: #bae6fd; background-color: #f0f9ff;"
+                        [title]="'Click to open website: ' + (src.url || src.fileName)"
+                      >
+                        <i class="ri-global-line text-info mr-1" style="font-size: 14px;"></i>
+                        <span class="cited-chip-text" style="color: #0369a1; font-weight: 500;">🌐 {{ src.fileName || 'Web Source' }}</span>
+                        <span *ngIf="src.score" class="cited-score-pill" style="background-color: #e0f2fe; color: #0284c7;">{{ src.score }}% match</span>
+                      </a>
+
+                      <!-- Document File Source: Click navigates to AI Knowledge -->
+                      <ng-template #docChip>
+                        <button
+                          type="button"
+                          class="cited-chip-btn mr-1 mb-1"
+                          (click)="navigateToAiKnowledge()"
+                          title="Click to view all documents in AI Knowledge"
+                        >
+                          <i class="ri-file-text-line text-primary mr-1"></i>
+                          <span class="cited-chip-text">📄 {{ src.fileName || 'Knowledge Document' }}</span>
+                          <span *ngIf="src.score" class="cited-score-pill">{{ src.score }}% match</span>
+                        </button>
+                      </ng-template>
+                    </ng-container>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </ng-container>
+      </ng-container>
+    </div>
+
+    <footer class="panel-footer">
+      <div class="composer-shell" [class.disabled]="isTyping">
+        <textarea
+          #chatInput
+          class="composer-input"
+          [(ngModel)]="newMessage"
+          rows="1"
+          placeholder="Type your message..."
+          aria-label="Type your support question"
+          [disabled]="isTyping"
+          (input)="autoResizeTextarea()"
+          (keydown)="onComposerKeydown($event)"
+        ></textarea>
+
+        <button
+          class="send-btn"
+          type="button"
+          [disabled]="!canSend"
+          (click)="sendMessage()"
+          aria-label="Send message"
+        >
+          <span>Send</span>
+        </button>
+      </div>
+
+      <div class="footer-note">
+        Responses may not always be accurate. Do not share personal or sensitive information.
+      </div>
+    </footer>
+  </section>
+</div>

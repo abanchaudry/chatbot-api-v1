@@ -1,0 +1,177 @@
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">Conversation Details</h1>
+            <p class="ai-subtitle">
+              Review the complete interaction between the user and the AI.
+            </p>
+          </div>
+          <div class="ai-stats"></div>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="!isLoading; else loadingTemplate">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-12">
+                  <div
+                    class="border-bottom"
+                    style="
+                      display: flex;
+                      align-items: center;
+                      justify-content: space-between;
+                      margin-bottom: 10px;
+                    "
+                  >
+                    <h3
+                      style="
+                        font-size: 18px;
+                        line-height: 1.4em;
+
+                        color: #474747 !important;
+                        text-transform: uppercase;
+                        font-weight: 900 !important;
+                      "
+                    >
+                      Thread Information
+                    </h3>
+                    <div class="text-right">
+                      <button
+                        type="button"
+                        class="btn button-primary"
+                        [disabled]="isDownloading"
+                        (click)="downloadPDF()"
+                      >
+                        <i
+                          [ngClass]="iconClass"
+                          class="remix-icon"
+                          style="vertical-align: middle; margin-right: 5px"
+                        ></i>
+                        {{ isDownloading ? "Downloading..." : "Download" }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="card-block">
+                    <div class="d">
+                      <div class="icon blue-bg">
+                        <i class="ri-hashtag text-blue icon-svg"></i>
+                      </div>
+                      <div>
+                        <p class="label">Thread ID</p>
+                        <p class="value mono">
+                          {{ threadId }}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="d">
+                      <div class="icon green-bg">
+                        <i class="ri-calendar-line text-green icon-svg"></i>
+                      </div>
+                      <div>
+                        <p class="label">Date</p>
+                        <p class="value">
+                          {{
+                            conversation[0]?.created_at
+                              | date : "MM/dd/yyyy, hh:mm:ss a"
+                          }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header card-header-icon card-header-rose m-0">
+              <h4 class="card-title pb-10 pl-10 border-bottom">
+                Conversations
+              </h4>
+            </div>
+            <div class="card-body mt-2">
+              <div class="conversation">
+                <div *ngFor="let item of conversation">
+                  <div class="message user-message">
+                    <div class="message-content">
+                      <p class="mb-0 text-white">{{ item?.question }}</p>
+                    </div>
+                  </div>
+                  <div class="message bot-message">
+                    <div class="message-content">
+                      <p class="mb-0">{{ item?.answer }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #loadingTemplate>
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body">
+              <div class="row">
+                <div class="col-6">
+                  <div
+                    class="skeleton skeleton-text mb-2"
+                    style="width: 70%"
+                  ></div>
+                  <div class="skeleton skeleton-text" style="width: 50%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header card-header-icon card-header-rose m-0">
+              <h4 class="card-title pb-10 pl-10 border-bottom">
+                Conversations
+              </h4>
+            </div>
+            <div class="card-body mt-2">
+              <div class="conversation">
+                <div
+                  class="skeleton skeleton-message skeleton-user-message"
+                ></div>
+                <div
+                  class="skeleton skeleton-message skeleton-bot-message"
+                ></div>
+                <div
+                  class="skeleton skeleton-message skeleton-user-message"
+                  style="width: 60%"
+                ></div>
+                <div
+                  class="skeleton skeleton-message skeleton-bot-message"
+                  style="width: 80%"
+                ></div>
+                <div
+                  class="skeleton skeleton-message skeleton-user-message"
+                  style="width: 70%"
+                ></div>
+                <div
+                  class="skeleton skeleton-message skeleton-bot-message"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-template>
+  </div>
+</div>

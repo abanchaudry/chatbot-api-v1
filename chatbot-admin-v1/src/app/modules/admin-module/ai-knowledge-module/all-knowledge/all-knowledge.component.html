@@ -1,0 +1,269 @@
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">Knowledge Base Overview</h1>
+            <p class="ai-subtitle">
+              Manage, search, and review all documents in your AI's knowledge base.
+            </p>
+          </div>
+          <div class="ai-stats">
+            <div class="ai-stat-item">
+              <span>Total Files: {{ aiKnowledgeData.length }}</span>
+            </div>
+            <div class="ai-stat-item">
+              <span>Total Chunks: {{ totalChunks }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div
+            class="card-header card-header-icon card-header-rose m-0 border-bottom"
+            style="display:flex;align-items:center;justify-content:space-between;padding:5px 10px;"
+          >
+            <h4 class="card-title m-0">All AI Knowledge</h4>
+            <button
+              class="btn button-primary d-flex align-items-center gap-1"
+              [routerLink]="['/dashboard/ai-knowledge/add-new-knowledge']"
+            >
+              <i class="ri-add-line" style="width: unset"></i>
+              Add Knowledge
+            </button>
+          </div>
+
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <div class="form-group mb-0 position-relative search-wrapper">
+                <i class="ri-search-2-line search-icon"></i>
+                <input
+                  type="text"
+                  class="form-control pl-4"
+                  placeholder="Search AI Knowledge..."
+                  [(ngModel)]="searchText"
+                />
+              </div>
+            </div>
+
+            <div *ngIf="!isLoading; else loadingTemplate" class="content-wrapper">
+              <div class="table-container">
+                <table class="table table-light">
+                  <thead style="background-color:#f4f6f9;border-radius:12px">
+                    <tr>
+                      <th># ID</th>
+                      <th>Type</th>
+                      <th>File Name / Title</th>
+                      <th>Status</th>
+                      <th>Chunks</th>
+                      <th>Upload Date</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <tr
+                      *ngFor="
+                        let item of aiKnowledgeData
+                          | searchFilter : searchText
+                          | paginate : { itemsPerPage: entries, currentPage: page };
+                        let i = index
+                      "
+                    >
+                      <td>
+                        <span class="index-cell">
+                          {{ (page - 1) * entries + i + 1 }}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          *ngIf="item.file_id?.startsWith('web_') || item.file_path?.startsWith('http') || !item.file_name?.includes('.'); else docBadge"
+                          class="badge d-inline-flex align-items-center gap-1"
+                          style="background-color: #e0f2fe; color: #0369a1; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #bae6fd;"
+                          title="Web Crawled Source"
+                        >
+                          <i class="ri-global-line"></i> Web Crawled
+                        </span>
+                        <ng-template #docBadge>
+                          <span
+                            class="badge d-inline-flex align-items-center gap-1"
+                            style="background-color: #f3e8ff; color: #6b21a8; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #e9d5ff;"
+                            title="Uploaded Document File"
+                          >
+                            <i class="ri-file-text-line"></i> Uploaded Doc
+                          </span>
+                        </ng-template>
+                      </td>
+
+                      <td class="d-flex align-items-center" style="gap: 6px">
+                        <span style="font-weight: 500; color: #1e293b;">{{ item.file_name }}</span>
+                        <a
+                          *ngIf="item.file_path?.startsWith('http')"
+                          [href]="item.file_path"
+                          target="_blank"
+                          class="text-primary text-decoration-none ml-1"
+                          title="Open Original Website Link"
+                        >
+                          <i class="ri-external-link-line" style="font-size: 13px;"></i>
+                        </a>
+                      </td>
+
+                      <td>
+                        <span
+                          class="badge-custom-status"
+                          [ngClass]="{
+                            'status-completed': item.file_status === 'completed',
+                            'status-processing': item.file_status === 'processing',
+                            'status-deleting': item.file_status === 'deleting',
+                            'status-failed': item.file_status === 'delete_failed'
+                          }"
+                        >
+                          {{ item.file_status }}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span class="dot-indicator"></span>
+                        {{ item.chunk_count }}
+                      </td>
+
+                      <td>{{ item.created_at | date: 'mediumDate' }}</td>
+
+                      <td class="td-actions d-flex align-items-center" style="gap: 6px">
+                        <button
+                          [routerLink]="['/dashboard/ai-knowledge/detail', item.file_id]"
+                          type="button"
+                          class="view-btn"
+                          title="View"
+                        >
+                          <i class="ri-eye-line"></i>
+                        </button>
+
+                        <button
+                          type="button"
+                          class="download-btn"
+                          title="Download original file"
+                          [disabled]="!canDownload(item)"
+                          (click)="download(item)"
+                        >
+                          <i class="ri-download-2-line"></i>
+                        </button>
+
+                        <button
+                          type="button"
+                          class="delete-btn"
+                          title="Delete"
+                          [disabled]="!canDelete(item)"
+                          (click)="openDeleteModal(item)"
+                        >
+                          <i class="ri-delete-bin-line"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="pagination-block text-right" *ngIf="aiKnowledgeData.length > itemPerPage">
+                <pagination-controls
+                  class="custom-pagination mb-0"
+                  (pageChange)="page = $event"
+                ></pagination-controls>
+              </div>
+
+              <div class="modal-backdrop-custom" *ngIf="deleting.open"></div>
+
+              <div class="modal-custom" *ngIf="deleting.open" role="dialog" aria-modal="true">
+                <div class="modal-card">
+                  <div class="modal-header">
+                    <h5 class="mb-0">Delete Knowledge File</h5>
+                    <button
+                      type="button"
+                      class="modal-close-btn"
+                      (click)="closeDeleteModal()"
+                      [disabled]="deleting.busy"
+                      aria-label="Close"
+                      title="Close"
+                    >
+                      <i class="ri-close-line"></i>
+                    </button>
+                  </div>
+
+                  <div class="modal-body">
+                    <p class="mb-2">Are you sure you want to permanently delete:</p>
+                    <p class="fw-bold mb-3">{{ deleting.fileName }}</p>
+
+                    <p class="text-muted">This action will:</p>
+                    <ul class="text-muted small">
+                      <li>Delete all chunks from the database</li>
+                      <li>Remove embeddings from Vectorize</li>
+                      <li>Remove the file permanently</li>
+                    </ul>
+
+                    <div class="alert alert-danger py-2 mt-2" *ngIf="deleting.error">
+                      {{ deleting.error }}
+                    </div>
+                  </div>
+
+                  <div class="modal-footer">
+                    <button
+                      type="button"
+                      class="btn btn-light"
+                      (click)="closeDeleteModal()"
+                      [disabled]="deleting.busy"
+                    >
+                      Cancel
+                    </button>
+
+                    <button
+                      type="button"
+                      class="btn btn-danger"
+                      (click)="confirmDelete()"
+                      [disabled]="deleting.busy"
+                    >
+                      <span *ngIf="!deleting.busy">Delete</span>
+                      <span *ngIf="deleting.busy">Deleting...</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <ng-template #loadingTemplate>
+              <div class="table-container">
+                <table class="table table-light">
+                  <thead style="background-color:#f4f6f9;border-radius:12px">
+                    <tr>
+                      <th># ID</th>
+                      <th>File Name</th>
+                      <th>Status</th>
+                      <th>Chunks</th>
+                      <th>Upload Date</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let i of [1,2,3,4,5,6,7,8,9,10]">
+                      <td><div class="skeleton skeleton-text" style="width:50%"></div></td>
+                      <td><div class="skeleton skeleton-text" style="width:80%"></div></td>
+                      <td><div class="skeleton skeleton-badge"></div></td>
+                      <td><div class="skeleton skeleton-text" style="width:60%"></div></td>
+                      <td><div class="skeleton skeleton-text" style="width:70%"></div></td>
+                      <td><div class="skeleton skeleton-action-btn"></div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

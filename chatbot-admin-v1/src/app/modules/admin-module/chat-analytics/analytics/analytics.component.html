@@ -1,0 +1,332 @@
+<div class="main-content">
+  <div class="container-fluid">
+
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div class="content">
+            <h1 class="ai-title">Chat Analytics</h1>
+            <p class="ai-subtitle">Monitor session volume and bot performance</p>
+          </div>
+          <div class="quick-stat d-none d-md-block">
+            <span class="badge-live">Live Updates</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky Filter Toolbar -->
+    <div class="row">
+      <div class="col-12">
+
+        <div #toolbarPlaceholder
+             *ngIf="isFixed"
+             [style.height.px]="toolbarHeight"
+             class="filter-placeholder"></div>
+
+        <div #filterToolbar
+             class="filter-toolbar fade-enter"
+             [class.fixed-toolbar]="isFixed"
+             [style.width.px]="isFixed ? fixedWidth : null"
+             [style.left.px]="isFixed ? fixedLeft : null">
+
+          <div class="toolbar-layout">
+
+            <div class="filter-group">
+
+              <!-- date range picker -->
+              <div class="date-picker-container">
+                <div class="input-wrapper custom-picker-box">
+                  <i class="ri-calendar-todo-fill icon-start"></i>
+
+                  <input
+                    type="text"
+                    ngxDaterangepickerMd
+                    [(ngModel)]="selected"
+                    [showCustomRangeLabel]="true"
+                    [alwaysShowCalendars]="true"
+                    [ranges]="ranges"
+                    [linkedCalendars]="true"
+                    class="ngx-input-element"
+                    placeholder="Select date range"
+                    (datesUpdated)="onDateSelected($event)"
+                  />
+                </div>
+              </div>
+
+              <!-- active range display -->
+              <div class="active-filters-display" *ngIf="selected?.startDate && selected?.endDate">
+                <div class="filter-chip-premium">
+                  <span class="label">Showing data for</span>
+                  <span class="value">
+                    {{ formatRange(selected.startDate, selected.endDate) }}
+                  </span>
+
+                  <button class="clear-filter-btn" title="Clear" (click)="clearDate()">
+                    <i class="ri-close-line"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- presets -->
+              <div class="preset-pill-group">
+                <button *ngFor="let p of presets"
+                        class="pill-btn"
+                        [class.active]="draft.preset === p.value"
+                        (click)="selectPreset(p.value)">
+                  {{ p.label }}
+                </button>
+              </div>
+
+              <button class="apply-action-btn"
+                      [disabled]="!canApply"
+                      [class.pulse]="canApply"
+                      (click)="applyFilters()">
+                <span>Apply Changes</span>
+              </button>
+
+            </div>
+
+            <!-- aggregation -->
+            <!-- <div class="aggregation-segmented-control">
+              <button *ngFor="let opt of aggregationOptions"
+                      class="segment-btn"
+                      [class.active]="draft.aggregation === opt"
+                      (click)="draft.aggregation = opt">
+                {{ opt }}
+              </button>
+            </div> -->
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards -->
+    <div class="row justify-content-center mt-4">
+      <div class="col" *ngFor="let card of analyticsCards" style="cursor: pointer">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row align-items-center">
+
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">{{ card.label }}</p>
+
+                <h4 class="mt-1 mb-0 price">
+                  <span *ngIf="!isLoadingStats; else statsLoading">{{ card.value }}</span>
+                  <ng-template #statsLoading>
+                    <span class="text-muted">Loading...</span>
+                  </ng-template>
+                </h4>
+
+                <small *ngIf="card.subLabel" class="text-muted d-block mt-1">
+                  {{ card.subLabel }}
+                </small>
+              </div>
+
+              <div class="col-3 text-right">
+                <div class="thumb-md icon-wrapper mx-auto" [ngClass]="card.iconStyle">
+                  <i class="fs-22" [class]="card.icon"></i>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Breakdown -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+
+          <div class="card-header card-header-icon card-header-rose m-0 border-bottom"
+               style="display:flex; align-items:center; justify-content:space-between; padding:0px 20px;">
+            <h4 class="card-title m-0">Daily Breakdown Sessions</h4>
+
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div class="form-group mb-0 position-relative search-wrapper">
+                <i class="ri-search-2-line search-icon"></i>
+                <input
+                  type="text"
+                  class="form-control pl-4 mb-0"
+                  placeholder="Search Daily Breakdown Sessions..."
+                  [(ngModel)]="searchText"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="card-body">
+
+            <!-- loading state -->
+            <ng-container *ngIf="!isLoadingBreakdown; else loadingTemplate">
+
+              <div class="content-wrapper">
+                <div class="table-container">
+                  <table class="table custom-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 40%;">Date</th>
+                        <th style="width: 40%;">Sessions</th>
+                        <th style="width: 20%;" class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      <tr *ngFor="let session of dailySessions | searchFilter: searchText | paginate: { itemsPerPage: itemPerPage, currentPage: page }">
+
+                        <td class="date-cell">
+                          <i class="ri-calendar-event-line date-icon"></i>
+                          <span>{{ session.date | date:'mediumDate' }}</span>
+                        </td>
+
+                        <td>
+                          <div class="session-count-wrapper">
+                            <i class="ri-message-3-line session-icon"></i>
+                            
+                            <span class="session-count">{{ session.sessions === 0 ? 'No Sessions' : session.sessions }}</span>
+                          </div>
+                        </td>
+
+                        <td class="text-end action-btn">
+                       <button
+  class="btn button-primary"
+  [disabled]="session.sessions === 0"
+  [attr.title]="session.sessions === 0 ? 'No sessions available' : 'View session threads'"
+  (click)="session.sessions > 0 && viewThreads(session)"
+  [ngClass]="{ 'disabled-btn': session.sessions === 0 }"
+>
+  <span class="label">View Threads</span>
+  <span class="icon"><i class="ri-arrow-right-line"></i></span>
+</button>
+
+                        </td>
+
+                      </tr>
+
+                      <tr *ngIf="dailySessions.length === 0">
+                        <td colspan="3" class="text-center text-muted" style="padding: 24px;">
+                          No data found for this date range.
+                        </td>
+                      </tr>
+
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="pagination-footer" *ngIf="dailySessions.length > itemPerPage">
+                  <div class="pagination-info">
+                    Showing {{ (page - 1) * itemPerPage + 1 }} to
+                    {{ page * itemPerPage > dailySessions.length ? dailySessions.length : page * itemPerPage }}
+                    of {{ dailySessions.length }} entries
+                  </div>
+
+                  <pagination-controls
+                    class="custom-pagination"
+                    (pageChange)="page = $event"
+                    previousLabel=""
+                    nextLabel=""
+                  ></pagination-controls>
+                </div>
+              </div>
+
+            </ng-container>
+
+            <ng-template #loadingTemplate>
+              <div class="text-muted" style="padding: 16px;">
+                Loading daily breakdown...
+              </div>
+            </ng-template>
+
+          </div>
+    </div>
+
+
+
+    <!-- Overlay -->
+    <div class="drawer-overlay" [class.active]="drawerOpen" (click)="closeDrawer()"></div>
+
+    <!-- Drawer -->
+    <div class="drawer" [class.open]="drawerOpen">
+
+      <div class="drawer-header">
+        <div class="header-text">
+          <h5>Session Threads</h5>
+          <span class="date-badge">{{ selectedDate | date:'longDate' }}</span>
+        </div>
+
+        <button class="close-btn" (click)="closeDrawer()">
+          <i class="ri-close-line"></i>
+        </button>
+      </div>
+
+      <div class="drawer-meta">
+        <ng-container *ngIf="!isLoadingThreads; else threadLoading">
+          Showing <strong>{{ selectedThreads.length }}</strong> conversations
+        </ng-container>
+        <ng-template #threadLoading>
+          Loading conversations...
+        </ng-template>
+      </div>
+
+      <div class="drawer-body">
+
+        <table class="drawer-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Time</th>
+              <th class="text-center">Msgs</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr *ngFor="let thread of selectedThreads  ">
+
+              <td>
+                <div class="user-cell">
+                  <div class="avatar-xs">
+                    {{ (thread.user || 'U').charAt(0).toUpperCase() }}
+                  </div>
+                  <div class="user-meta">
+                    <span class="user-id">{{ thread.user }}</span>
+                  </div>
+                </div>
+              </td>
+
+              <td class="time-cell">
+                <i class="ri-time-line time-icon"></i>
+                {{ thread.time }}
+              </td>
+
+              <td class="text-center">
+                <span class="msg-count">{{ thread.messages }}</span>
+              </td>
+
+              <td class="text-end">
+                <button class="btn-view" (click)="openChatModel(thread)">
+                  View <i class="ri-arrow-right-line"></i>
+                </button>
+              </td>
+              
+
+            </tr>
+
+            <tr *ngIf="!isLoadingThreads && selectedThreads.length === 0">
+              <td colspan="4" class="empty-state">
+                No conversations found for this date
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+
+      </div>
+      
+    </div>
+
+  </div>
+</div>

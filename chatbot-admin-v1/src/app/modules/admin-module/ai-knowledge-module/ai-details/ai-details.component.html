@@ -1,0 +1,169 @@
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">Knowledge Chunks Overview</h1>
+            <p class="ai-subtitle">
+              Review, search, and analyze the individual knowledge chunks
+            </p>
+          </div>
+          <div class="ai-stats">
+            <div class="ai-stat-item">
+              <span>Total Chunks: {{ totalChunks }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header card-header-icon card-header-rose m-0">
+            <h4 class="card-title pb-10 pl-10 border-bottom">AI File Chunks</h4>
+          </div>
+
+          <div class="card-body">
+            <div *ngIf="!isLoading; else loadingTemplate">
+              <div class="table-responsive table-container">
+                <table class="table">
+                  <thead style="background-color: #f4f6f9; border-radius: 12px">
+                    <tr>
+                      <th style="width: 100px"># ID</th>
+                      <th style="width: 200px">Topic</th>
+                      <th style="width: 300px">Section</th>
+                      <th style="width: 400px">Content</th>
+                      <th style="width: 300px">Tags</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let chunk of aiKnowledgeDetails; let i = index">
+                      <td>
+                        <span class="index-cell">{{
+                          (page - 1) * perPage + i + 1
+                        }}</span>
+                      </td>
+                      <td>{{ chunk.topic || "-" }}</td>
+                      <td>{{ chunk.section }}</td>
+                      <td>
+                        <div
+                          class="content-preview"
+                          [matTooltip]="chunk.content"
+                          matTooltipPosition="above"
+                        >
+                          <span *ngIf="!isExpanded(i)">
+                            {{ chunk.content | slice : 0 : 50 }}
+                            <span *ngIf="chunk.content.length > 50">...</span>
+                            <a
+                              href="#"
+                              (click)="
+                                toggleContent(i); $event.preventDefault()
+                              "
+                              >See More</a
+                            >
+                          </span>
+                          <span *ngIf="isExpanded(i)">
+                            {{ chunk.content }}
+                            <a
+                              href="#"
+                              (click)="
+                                toggleContent(i); $event.preventDefault()
+                              "
+                              >See Less</a
+                            >
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <ng-container
+                          *ngIf="
+                            chunk.tags &&
+                              chunk.tags.length > 0 &&
+                              chunk.tags[0] !== '' &&
+                              chunk.tags[0] !== null;
+                            else noTags
+                          "
+                        >
+                          <span
+                            *ngFor="let tag of chunk.tags"
+                            class="tag-badge"
+                            >{{ tag }}</span
+                          >
+                        </ng-container>
+                        <ng-template #noTags
+                          ><span class="text-muted">—</span></ng-template
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pagination-block text-right">
+                <mat-paginator
+                  [length]="totalChunks"
+                  [pageSize]="perPage"
+                  [pageSizeOptions]="[10, 20, 50, 100]"
+                  [pageIndex]="page - 1"
+                  (page)="onMaterialPageChange($event)"
+                >
+                </mat-paginator>
+              </div>
+            </div>
+
+            <ng-template #loadingTemplate>
+              <div class="table-responsive table-container">
+                <table class="table">
+                  <thead style="background-color: #f4f6f9; border-radius: 12px">
+                    <tr>
+                      <th style="width: 100px"># ID</th>
+                      <th style="width: 200px">Topic</th>
+                      <th style="width: 300px">Section</th>
+                      <th style="width: 400px">Content</th>
+                      <th style="width: 300px">Tags</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let i of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]">
+                      <td>
+                        <div
+                          class="skeleton skeleton-text"
+                          style="width: 50%"
+                        ></div>
+                      </td>
+                      <td>
+                        <div
+                          class="skeleton skeleton-text"
+                          style="width: 80%"
+                        ></div>
+                      </td>
+                      <td>
+                        <div
+                          class="skeleton skeleton-text"
+                          style="width: 80%"
+                        ></div>
+                      </td>
+                      <td>
+                        <div class="skeleton skeleton-text"></div>
+                        <div
+                          class="skeleton skeleton-text"
+                          style="width: 90%"
+                        ></div>
+                      </td>
+                      <td>
+                        <div style="display: flex; gap: 5px">
+                          <div class="skeleton skeleton-badge"></div>
+                          <div class="skeleton skeleton-badge"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

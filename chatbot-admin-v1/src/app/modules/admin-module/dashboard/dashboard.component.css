@@ -1,0 +1,142 @@
+.bg-corner-img {
+  background-image: url("https://mannatthemes.com/approx/default/assets/images/extra/corner.png");
+  background-position: right;
+  background-repeat: no-repeat;
+  background-size: contain;
+
+  .card-h {
+    font-size: 14px;
+    font-weight: 600;
+    color: #96a0cd;
+  }
+
+  .price {
+    font-weight: 700 !important;
+    font-size: 22px;
+    color: #25282d;
+  }
+
+  .thumb-md {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 36px;
+    width: 36px;
+    font-size: 14px;
+    font-weight: 700;
+    transition: transform 0.3s ease;
+  }
+
+  .border-dashed {
+    border: 1px dashed;
+  }
+
+  .rounded {
+    border-radius: 0.4rem !important;
+  }
+
+  .mx-auto {
+    margin-right: auto !important;
+    margin-left: auto !important;
+  }
+
+  i {
+    font-size: 22px !important;
+    transition: transform 0.3s ease;
+  }
+}
+
+.dashboard-card {
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+
+    .thumb-md i {
+      transform: scale(1.2) rotate(5deg);
+    }
+  }
+}
+
+apx-chart {
+  width: 100%;
+  margin-top: 10px;
+}
+.ai-knowledge-box {
+  background: linear-gradient(to right, #3167f3, #2a58cf);
+border-radius: 6px;
+   padding: 30px 20px;
+
+  margin-bottom: 2rem;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-title {
+  font-size: 1.875rem; /* approx 30px */
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.ai-subtitle {
+color: #fff;
+  margin-bottom: 1rem;
+  font-weight: 500;
+}
+
+
+.ai-stats {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.ai-stat-item {
+  background-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  border-radius: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* skelton update */
+
+.skeleton {
+  opacity: 0.7;
+  animation: shimmer 1.5s infinite linear;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  border-radius: 0.4rem;
+}
+
+.skeleton-text {
+  width: 70%;
+  height: 14px;
+  margin-bottom: 12px;
+}
+
+.skeleton-title {
+  width: 50%;
+  height: 22px;
+}
+
+.skeleton-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0.4rem;
+  margin: 0 auto;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

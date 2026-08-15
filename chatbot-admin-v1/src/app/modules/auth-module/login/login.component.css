@@ -1,0 +1,282 @@
+.card-heading h4 {
+  background-color: #000000 !important;
+  color: #fff !important;
+  padding: 20px 10px;
+  font-weight: 700;
+  width: 90%;
+  display: block;
+  margin: auto;
+  margin-top: -21px;
+}
+.wrapper {
+  height: 100vh;
+}
+.btn-primary {
+  /* background-color: #3762ea !important; */
+
+  color: #ffffff !important;
+  font-weight: 800;
+  width: 100%;
+
+  margin: 0 10px;
+  cursor: pointer;
+  border-radius: 8px !important;
+}
+
+.btn.btn-rose.btn-link {
+  background: #006666 !important;
+}
+
+.input-group {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  width: 100%;
+  display: flex;
+  align-items: end;
+}
+
+.admin-img img {
+  height: 390px;
+}
+
+.card {
+  border-radius: 16px;
+  margin-bottom: 0;
+}
+
+.login-page .card-login .card-body .input-group .form-control {
+  padding-bottom: 10px;
+  margin: 40px 0 0;
+}
+
+.admin-img img {
+  display: block;
+  margin-left: auto;
+}
+.log img {
+  width: 115px;
+}
+.login-page .card-login .card-body {
+  padding: 0px 30px 0 30px;
+}
+
+.mat-mdc-form-field {
+  margin-top: 20px;
+}
+
+/* update */
+.bg-black {
+  background-color: #000000;
+  border-radius: 16px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.p-3 {
+  padding: 30px !important;
+}
+.fs-22 {
+  font-size: 23px;
+  margin-top: 13px;
+}
+.fw-semibold {
+  font-weight: 700;
+}
+.fs-15 {
+  font-size: 12px;
+}
+.mb-1 {
+  margin-bottom: 0.375rem !important;
+}
+.mt-3 {
+  margin-top: 1.5rem !important;
+}
+label {
+  color: #656d9a;
+  vertical-align: middle;
+}
+.form-control {
+  display: block;
+  width: 100%;
+  padding: 0.517rem 0.95rem;
+  font-size: 0.812rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: #25282d;
+  height: 45px;
+  background-image: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-color: #ffffff !important;
+  background-clip: padding-box;
+  border: 1px solid #edf2f9;
+  border-radius: 0.4rem;
+  -webkit-transition: border-color 0.15s ease-in-out,
+    -webkit-box-shadow 0.15s ease-in-out;
+  transition: border-color 0.15s ease-in-out,
+    -webkit-box-shadow 0.15s ease-in-out;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out,
+    -webkit-box-shadow 0.15s ease-in-out;
+}
+
+/* .container-xxl {
+  background-image: url("https://themesdesign.in/morvin-laravel/layouts/assets/images/title-img.png");
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(82, 92, 229, 0.5);
+} */
+.col-lg-4 {
+  flex: 0 0 30.333333%;
+}
+
+.form-label {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+/* checkbox */
+/* From Uiverse.io by SharpTH */
+.cbx {
+  -webkit-perspective: 20;
+  perspective: 20;
+
+  border: 2px solid #e8e8eb;
+  background: #e8e8eb;
+  border-radius: 4px;
+  transform: translate3d(0, 0, 0);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-bottom: 0;
+}
+
+.cbx:hover {
+  border-color: #3167f3;
+}
+
+.flip {
+  display: block;
+  transition: all 0.4s ease;
+  transform-style: preserve-3d;
+  position: relative;
+  width: 13px;
+  height: 13px;
+}
+
+#cbx {
+  display: none;
+}
+
+#cbx:checked + .cbx {
+  border-color: #3167f3;
+}
+
+#cbx:checked + .flip {
+  transform: rotateY(180deg);
+}
+
+.front,
+.back {
+  backface-visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 13px;
+  height: 13px;
+
+  border-radius: 2px;
+}
+
+.front {
+  background: #fff;
+  z-index: 1;
+}
+
+.back {
+  transform: rotateY(180deg);
+  background: #3167f3;
+  text-align: center;
+  color: #fff;
+  line-height: 20px;
+  box-shadow: 0 0 0 1px #3167f3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back svg {
+  margin-top: 0px;
+  fill: none;
+  width: 9px;
+}
+
+.back svg path {
+  stroke: #fff;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.form-check .form-check-label {
+  cursor: pointer;
+  padding-left: 10px;
+}
+.label {
+  margin-bottom: 0 !important;
+  font-weight: 600;
+}
+.card .form-check {
+  margin-top: 5px;
+}
+.button-primary {
+  background-color: #3167f3;
+  border: 1px solid #3167f3;
+  width: 100%;
+  box-shadow: 0 1px 2px #3167f359;
+  border-radius: 0.4rem;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  color: white;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+    border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out,
+    transform 0.15s ease-in-out;
+  will-change: transform;
+}
+
+.button-primary:hover {
+  background-color: #2a58cf;
+  border-color: #2a58cf;
+  transform: translateY(-1px);
+}
+
+.button-primary .icon-hover {
+  transition: color 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.button-primary:hover .icon-hover {
+  color: #e0e0e0;
+  transform: translateX(2px);
+}
+
+.mb-0 {
+  margin-bottom: 0px !important;
+}
+.form-check .form-check-label {
+  cursor: pointer;
+  font-size: 14px;
+  padding-left: 6px;
+  font-weight: 600;
+}
+.header-secondary {
+  color: #96a0b5;
+  font-weight: 500;
+}

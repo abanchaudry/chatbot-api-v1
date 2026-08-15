@@ -1,0 +1,65 @@
+<div class="main-content">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">Dashboard Overview</h1>
+            <p class="ai-subtitle">
+              A quick overview of your AI's performance and key metrics
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row justify-content-center" *ngIf="isLoading">
+      <div class="col-md-3" *ngFor="let i of [1, 2, 3, 4]">
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row d-flex justify-content-center">
+              <div class="col-9">
+                <p class="skeleton skeleton-text"></p>
+                <h4 class="skeleton skeleton-title"></h4>
+              </div>
+              <div class="col-3 align-self-center">
+                <div class="skeleton skeleton-icon"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row justify-content-center" *ngIf="!isLoading">
+      <div
+        class="col-md-3"
+        *ngFor="let stat of stats"
+        (click)="navigateTo(stat.route)"
+        style="cursor: pointer"
+      >
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row d-flex justify-content-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">{{ stat.title }}</p>
+                <h4 class="mt-1 mb-0 price">{{ stat.value | number }}</h4>
+              </div>
+              <div class="col-3 align-self-center">
+                <div
+                  class="d-flex justify-content-center align-items-center thumb-md border-dashed rounded mx-auto"
+                  [ngClass]="stat.borderClass"
+                >
+                  <i
+                    class="{{ stat.icon }} fs-22"
+                    [ngClass]="stat.colorClass"
+                  ></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

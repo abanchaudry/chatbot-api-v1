@@ -1,0 +1,522 @@
+<!-- threads-detail.component.html -->
+<div class="page thread-page mt-5">
+  <div class="main">
+    <div class="container-fluid mb-5">
+      <div *ngIf="!isLoading; else loadingTemplate">
+        <div class="row">
+          <div class="col-12">
+            <div class="card convo-card">
+              <!-- Header -->
+              <div class="card-header convo-header">
+                <div class="header-left">
+                  <div class="title-row">
+                    <div class="title">Conversations</div>
+                    <span class="badge-soft">Thread</span>
+                  </div>
+
+                  <div class="sub">
+                    <span class="sub-label">thread:</span>
+                    <span class="mono thread-id">{{ threadId }}</span>
+                  </div>
+                </div>
+
+                <div class="header-right">
+                  <button class="btn btn-sm btn-outline-primary export-btn" type="button" (click)="downloadPDF()"
+                    [disabled]="isDownloading">
+                    <i [class]="iconClass" class="me-2"></i>
+                    <span>Export PDF</span>
+                  </button>
+                </div>
+              </div>
+
+
+              <div class="top-kpis" *ngIf="!isLoading">
+                <div class="kpi-card kpi-total">
+                  <div class="kpi-icon"><i class="ri-message-3-line"></i></div>
+                  <div class="kpi-body">
+                    <div class="kpi-label">Total Messages</div>
+                    <div class="kpi-value">{{ kpiTotalMessages }}</div>
+                    <div class="kpi-sub">All questions in this thread</div>
+                  </div>
+                </div>
+
+                <div class="kpi-card kpi-answered">
+                  <div class="kpi-icon"><i class="ri-checkbox-circle-line"></i></div>
+                  <div class="kpi-body">
+                    <div class="kpi-label">Answered</div>
+                    <div class="kpi-value">{{ kpiAnswered }}</div>
+                    <div class="kpi-sub">Answered successfully</div>
+                    
+                  </div>
+                </div>
+
+                <div class="kpi-card kpi-notanswered">
+                  <div class="kpi-icon"><i class="ri-error-warning-line"></i></div>
+                  <div class="kpi-body">
+                    <div class="kpi-label">Not Answered</div>
+                    <div class="kpi-value">{{ kpiNotAnswered }}</div>
+                    <div class="kpi-sub">Fallback / empty answers</div>
+                  </div>
+                </div>
+
+                <div class="kpi-card kpi-tokens">
+                  <div class="kpi-icon"><i class="ri-cpu-line"></i></div>
+                  <div class="kpi-body">
+                    <div class="kpi-label">Total Tokens</div>
+                    <div class="kpi-value">{{ kpiTotalTokens | number : "1.0-0" }}</div>
+                    <div class="kpi-sub">Sum of token usage</div>
+                  </div>
+                </div>
+              </div>
+
+
+              <!-- Body -->
+            <div class="card-body convo-body">
+  <div class="conversation qa-mode" #scrollArea>
+    <div class="conversation-inner qa-list">
+      <div *ngFor="let item of conversation; let i = index" class="qa-item">
+        <!-- Header -->
+        <div class="qa-head">
+          <div class="qa-meta">
+            <span class="qa-badge user">User</span>
+
+            <span class="qa-time" *ngIf="item?.createdAt">
+              {{ item.createdAt }}
+            </span>
+
+   
+            <span class="qa-id mono">#{{ item?.id || (i + 1) }}</span> 
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-sm trace-btn"
+            (click)="openInspect(item, i)"
+            [disabled]="traceLoadingMap[item?.id] === true || !item?.id"
+            title="Inspect trace"
+          >
+            <i
+              class="ri-pulse-line"
+              [ngClass]="{ 'remix-spin': traceLoadingMap[item?.id] === true }"
+            ></i>
+            <span>Inspect</span>
+          </button>
+        </div>
+
+        <!-- Question -->
+        <div class="qa-row qa-q">
+          <div class="qa-mark">Q</div>
+          <div class="qa-text">
+            {{ item?.question }}
+          </div>
+        </div>
+
+        <!-- Answer -->
+        <div class="qa-row qa-a">
+          <div class="qa-mark">A</div>
+          <div class="qa-text">
+            {{ item?.answer }}
+          </div>
+        </div>
+
+        <!-- trace summary (same info as before) -->
+        <ng-container *ngIf="item?.traceLoaded && item?.trace as t">
+          <div class="qa-foot">
+            <div class="qa-left">
+              <span class="pill" [ngClass]="getHealth(t).cls">
+                {{ getHealth(t).label }}
+              </span>
+            </div>
+
+            <div class="trace-summary">
+              <span class="chip chip-muted">
+                route: {{ getTraceRoute(t) }}
+              </span>
+
+              <span class="chip" *ngIf="getTiming(t, 'total_ms') as total">
+                <i class="ri-timer-line"></i>
+                {{ total }}ms
+              </span>
+
+              <span class="chip" *ngIf="getUsedChunks(t) as used">
+                <i class="ri-stack-line"></i>
+                used: {{ used }}
+              </span>
+
+              <span class="chip chip-info" *ngIf="getTopScores(t).vector != null">
+                vec: {{ getTopScores(t).vector }}
+              </span>
+
+              <span class="chip chip-info" *ngIf="getTopScores(t).web != null">
+                web: {{ getTopScores(t).web }}
+              </span>
+
+              <span class="chip chip-warn" *ngIf="isFallbackFromTrace(t)">
+                <i class="ri-alert-line"></i>
+                fallback
+              </span>
+            </div>
+          </div>
+        </ng-container>
+
+        <div class="tiny-warn" *ngIf="!item?.id">
+          messageId missing (trace not available)
+        </div>
+      </div>
+
+      <!-- Empty -->
+      <div class="empty" *ngIf="!conversation?.length">
+        <div class="empty-icon">
+          <i class="ri-chat-3-line"></i>
+        </div>
+        <div class="empty-title">No conversations yet</div>
+        <div class="empty-sub">
+          This thread doesn’t have any messages to display.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+            </div>
+
+            <div class="toast" *ngIf="copiedToast">
+              <i class="ri-checkbox-circle-line"></i>
+              Copied
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <ng-template #loadingTemplate>
+        <div class="card convo-card">
+          <div class="card-body">
+            <div class="skeleton skeleton-message skeleton-bot-message"></div>
+            <div class="skeleton skeleton-message skeleton-user-message"></div>
+            <div class="skeleton skeleton-message skeleton-bot-message"></div>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="drawer-backdrop" [class.open]="isInspectOpen" (click)="closeInspect()"></div>
+
+  <aside class="drawer" [class.open]="isInspectOpen" role="dialog" aria-label="Inspect Trace">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        Inspect
+        <div class="drawer-sub" *ngIf="selectedMessageId">
+          messageId: <span class="mono">{{ selectedMessageId }}</span>
+        </div>
+        <div class="drawer-sub" *ngIf="selectedTrace?.traceId">
+          traceId: <span class="mono">{{ selectedTrace?.traceId }}</span>
+        </div>
+      </div>
+
+      <div class="drawer-actions">
+        <button class="btn btn-sm btn-outline-secondary" (click)="copyTraceJson()" [disabled]="!selectedTrace">
+          <i class="ri-file-copy-line" style="margin-right: 6px"></i>
+          Copy
+        </button>
+        <button class="btn btn-sm btn-outline-danger" (click)="closeInspect()">
+          <i class="ri-close-line" style="margin-right: 6px"></i>
+          Close
+        </button>
+      </div>
+    </div>
+
+    <div class="drawer-toolbar">
+      <div class="search-wrap">
+        <i class="ri-search-line"></i>
+        <input type="text" class="form-control form-control-sm" placeholder="Search hits / logs / JSON..."
+          [(ngModel)]="traceSearch" />
+      </div>
+
+      <button class="btn btn-sm btn-outline-secondary" type="button" (click)="showOnlyErrors = !showOnlyErrors"
+        [ngClass]="{ 'btn-outline-secondary': !showOnlyErrors, 'btn-danger-soft': showOnlyErrors }">
+        <i class="ri-alert-line" style="margin-right: 6px"></i>
+        {{ showOnlyErrors ? "Errors only" : "All logs" }}
+      </button>
+
+      <button class="btn btn-sm btn-outline-secondary" type="button" (click)="toggleSearchMode()">
+        <i class="ri-flashlight-line" style="margin-right: 6px"></i>
+        {{ searchMode === "highlight" ? "Highlight" : "Filter" }}
+      </button>
+    </div>
+
+    <div class="drawer-tabs">
+      <button class="tab" [class.active]="traceTab==='overview'" (click)="setTab('overview')">
+        <i class="ri-dashboard-2-line"></i><span>Overview</span>
+      </button>
+      <button class="tab" [class.active]="traceTab==='timings'" (click)="setTab('timings')">
+        <i class="ri-timer-line"></i><span>Timings</span>
+      </button>
+      <button class="tab" [class.active]="traceTab==='pipeline'" (click)="setTab('pipeline')">
+        <i class="ri-route-line"></i><span>Pipeline</span>
+      </button>
+      <button class="tab" [class.active]="traceTab==='retrieval'" (click)="setTab('retrieval')">
+        <i class="ri-database-2-line"></i><span>Retrieval</span>
+      </button>
+      <button class="tab" [class.active]="traceTab==='logs'" (click)="setTab('logs')">
+        <i class="ri-terminal-box-line"></i><span>Logs</span>
+      </button>
+      <button class="tab" [class.active]="traceTab==='raw'" (click)="setTab('raw')">
+        <i class="ri-code-s-slash-line"></i><span>Raw</span>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <ng-container *ngIf="selectedTrace; else drawerLoadingTpl">
+        <div *ngIf="traceTab==='overview'" class="drawer-section">
+          <div class="section-title">Run</div>
+
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="kpi-top">
+                <span class="kpi-title">Route</span>
+                <span class="pill pill-mini" [ngClass]="getHealth(selectedTrace).cls">{{ getHealth(selectedTrace).label
+                  }}</span>
+              </div>
+              <div class="kpi-value">{{ getTraceRoute(selectedTrace) }}</div>
+              <div class="kpi-sub mono">{{ selectedTrace?.assistantName || "assistant" }}</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-top"><span class="kpi-title">Total</span></div>
+              <div class="kpi-value mono">{{ (getTiming(selectedTrace,'total_ms') ?? 0) }} ms</div>
+              <div class="kpi-sub">{{ getLatencyLabel(selectedTrace) }}</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-top"><span class="kpi-title">Context</span></div>
+              <div class="kpi-value mono">{{ getContextSummary(selectedTrace).used }} used</div>
+              <div class="kpi-sub mono">{{ getContextSummary(selectedTrace).selectedSource }}</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-top"><span class="kpi-title">Gate</span></div>
+              <div class="kpi-value">{{ getGateDecision(selectedTrace) }}</div>
+              <div class="kpi-sub">{{ getGateReason(selectedTrace) }}</div>
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top: 12px">Signals</div>
+          <div class="signals">
+            <span class="chip" *ngIf="getTopScores(selectedTrace).vector != null">vector top: {{
+              getTopScores(selectedTrace).vector }}</span>
+            <span class="chip" *ngIf="getTopScores(selectedTrace).web != null">web top: {{
+              getTopScores(selectedTrace).web }}</span>
+            <span class="chip" *ngIf="getCoverage(selectedTrace) != null">coverage: {{ getCoverage(selectedTrace)
+              }}%</span>
+            <span class="chip" *ngIf="getTiming(selectedTrace,'preflight_ms') != null">preflight: {{
+              getTiming(selectedTrace,'preflight_ms') }}ms</span>
+            <span class="chip" *ngIf="getTiming(selectedTrace,'vector_ms') != null">vector: {{
+              getTiming(selectedTrace,'vector_ms') }}ms</span>
+            <span class="chip" *ngIf="getTiming(selectedTrace,'web_ms') != null">web: {{
+              getTiming(selectedTrace,'web_ms') }}ms</span>
+            <span class="chip" *ngIf="getTiming(selectedTrace,'pdf_ms') != null">pdf: {{
+              getTiming(selectedTrace,'pdf_ms') }}ms</span>
+            <span class="chip chip-warn" *ngIf="isFallbackFromTrace(selectedTrace)">fallback</span>
+            <span class="chip" *ngIf="selectedTrace?.flags?.onlySearch">onlySearch</span>
+            <span class="chip" *ngIf="selectedTrace?.flags?.debug">debug</span>
+          </div>
+
+          <div class="section-title" style="margin-top: 12px">Planner</div>
+          <pre class="pre" [innerText]="filterJson(selectedTrace?.planner)"></pre>
+
+          <div class="section-title" style="margin-top: 12px">Answer</div>
+          <pre class="pre" [innerText]="filterJson(selectedTrace?.answer)"></pre>
+        </div>
+
+        <div *ngIf="traceTab==='timings'" class="drawer-section">
+          <div class="section-title">Timings</div>
+          <div class="kv-grid">
+            <div class="kv" *ngFor="let k of traceTimingKeys(selectedTrace)">
+              <div class="k">{{ k }}</div>
+              <div class="v mono">{{ selectedTrace.timings?.[k] }} ms</div>
+              <div class="mini-bar">
+                <span class="mini-fill" [style.width.%]="timingPct(selectedTrace, selectedTrace.timings?.[k])"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="traceTab==='pipeline'" class="drawer-section">
+          <div class="section-title">Pipeline</div>
+
+          <div class="pipeline">
+            <div class="stage" *ngFor="let s of getPipeline(selectedTrace)">
+              <div class="stage-left">
+                <span class="badge" [ngClass]="s.badgeCls">{{ s.badgeLabel }}</span>
+                <div class="stage-title">{{ s.label }}</div>
+                <div class="stage-sub mono">{{ s.key }}</div>
+              </div>
+
+              <div class="stage-mid">
+                <div class="stage-bar">
+                  <span class="stage-fill" [style.width.%]="s.pct"></span>
+                </div>
+                <div class="stage-meta">
+                  <span class="mono">{{ s.ms }} ms</span>
+                  <span class="dot">•</span>
+                  <span class="muted">{{ s.note }}</span>
+                </div>
+              </div>
+
+              <div class="stage-right">
+                <button class="chip chip-btn" type="button" (click)="toggleStage(s.key)">
+                  {{ expandedStageKey === s.key ? "collapse" : "expand" }}
+                </button>
+              </div>
+
+              <div class="stage-details" *ngIf="expandedStageKey === s.key">
+                <pre class="pre pre-log" [innerText]="filterJson(s.data)"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="muted" *ngIf="!getPipeline(selectedTrace)?.length">No pipeline events</div>
+        </div>
+
+        <div *ngIf="traceTab==='retrieval'" class="drawer-section">
+          <div class="section-title">Retrieval Summary</div>
+
+          <div class="retrieval-kpis">
+            <div class="rk">
+              <div class="rk-k">Vector</div>
+              <div class="rk-v mono">{{ getRetrievalHits(selectedTrace,'vector')?.length || 0 }}</div>
+              <div class="rk-s" *ngIf="getTopScores(selectedTrace).vector != null">top {{
+                getTopScores(selectedTrace).vector }}</div>
+            </div>
+            <div class="rk">
+              <div class="rk-k">Web</div>
+              <div class="rk-v mono">{{ getRetrievalHits(selectedTrace,'web')?.length || 0 }}</div>
+              <div class="rk-s" *ngIf="getTopScores(selectedTrace).web != null">top {{ getTopScores(selectedTrace).web
+                }}</div>
+            </div>
+            <div class="rk">
+              <div class="rk-k">PDF</div>
+              <div class="rk-v mono">{{ getRetrievalHits(selectedTrace,'pdf')?.length || 0 }}</div>
+              <div class="rk-s" *ngIf="getTopScores(selectedTrace).pdf != null">top {{ getTopScores(selectedTrace).pdf
+                }}</div>
+            </div>
+            <div class="rk">
+              <div class="rk-k">Kept</div>
+              <div class="rk-v mono">{{ getContextSummary(selectedTrace).used || 0 }}</div>
+              <div class="rk-s mono">{{ getContextSummary(selectedTrace).selectedSource }}</div>
+            </div>
+          </div>
+
+          <div class="section-title" style="margin-top: 12px">Vector</div>
+          <div class="hit" *ngFor="let h of getRetrievalHits(selectedTrace,'vector'); let idx = index">
+            <div class="hit-meta">
+              <span class="chip">id: {{ h.id }}</span>
+              <span class="chip" *ngIf="h.score != null">score: {{ h.score }}</span>
+              <span class="chip" *ngIf="h.rawScore != null">raw: {{ toFixed(h.rawScore, 4) }}</span>
+              <span class="chip" *ngIf="h.section">section: {{ h.section }}</span>
+              <button class="chip chip-btn" type="button" (click)="toggleHit('vec_'+idx)">
+                {{ expandedHitKey === ('vec_'+idx) ? "collapse" : "expand" }}
+              </button>
+            </div>
+            <pre class="pre pre-text" [class.pre-collapsed]="expandedHitKey !== ('vec_'+idx)"
+              [innerText]="filterText(h.text)"></pre>
+          </div>
+          <div class="muted" *ngIf="!getRetrievalHits(selectedTrace,'vector')?.length">No vector hits</div>
+
+          <div class="section-title" style="margin-top: 12px">Web</div>
+          <div class="hit" *ngFor="let h of getRetrievalHits(selectedTrace,'web'); let idx = index">
+            <div class="hit-meta">
+              <span class="chip">id: {{ h.id }}</span>
+              <span class="chip" *ngIf="h.score != null">score: {{ h.score }}</span>
+              <span class="chip" *ngIf="h.rawScore != null">raw: {{ toFixed(h.rawScore, 4) }}</span>
+              <a class="chip chip-link" *ngIf="h.url" [href]="h.url" target="_blank">url</a>
+              <button class="chip chip-btn" type="button" (click)="toggleHit('web_'+idx)">
+                {{ expandedHitKey === ('web_'+idx) ? "collapse" : "expand" }}
+              </button>
+            </div>
+            <pre class="pre pre-text" [class.pre-collapsed]="expandedHitKey !== ('web_'+idx)"
+              [innerText]="filterText(h.text)"></pre>
+          </div>
+          <div class="muted" *ngIf="!getRetrievalHits(selectedTrace,'web')?.length">No web hits</div>
+
+          <div class="section-title" style="margin-top: 12px">PDF</div>
+          <div class="hit" *ngFor="let h of getRetrievalHits(selectedTrace,'pdf'); let idx = index">
+            <div class="hit-meta">
+              <span class="chip">id: {{ h.id }}</span>
+              <span class="chip" *ngIf="h.score != null">score: {{ h.score }}</span>
+              <span class="chip" *ngIf="h.rawScore != null">raw: {{ toFixed(h.rawScore, 4) }}</span>
+              <span class="chip" *ngIf="h.section">section: {{ h.section }}</span>
+              <button class="chip chip-btn" type="button" (click)="toggleHit('pdf_'+idx)">
+                {{ expandedHitKey === ('pdf_'+idx) ? "collapse" : "expand" }}
+              </button>
+            </div>
+            <pre class="pre pre-text" [class.pre-collapsed]="expandedHitKey !== ('pdf_'+idx)"
+              [innerText]="filterText(h.text)"></pre>
+          </div>
+          <div class="muted" *ngIf="!getRetrievalHits(selectedTrace,'pdf')?.length">No pdf hits</div>
+        </div>
+
+        <div *ngIf="traceTab==='logs'" class="drawer-section">
+          <div class="section-title">Logs</div>
+
+          <div class="log-summary">
+            <div class="ls-card">
+              <div class="ls-k">Total</div>
+              <div class="ls-v mono">{{ getLogs(selectedTrace).length }}</div>
+            </div>
+            <div class="ls-card">
+              <div class="ls-k">Errors</div>
+              <div class="ls-v mono">{{ getLogCounts(selectedTrace).error }}</div>
+            </div>
+            <div class="ls-card">
+              <div class="ls-k">Warn</div>
+              <div class="ls-v mono">{{ getLogCounts(selectedTrace).warn }}</div>
+            </div>
+            <div class="ls-card">
+              <div class="ls-k">Scopes</div>
+              <div class="ls-v mono">{{ getLogCounts(selectedTrace).scopes }}</div>
+            </div>
+          </div>
+
+          <div class="scope-list">
+            <button class="scope-chip" type="button" [class.active]="activeScope === s"
+              *ngFor="let s of getScopes(selectedTrace)" (click)="setScope(s)">
+              <span class="mono">{{ s }}</span>
+              <span class="scope-count mono">{{ getScopeCount(selectedTrace, s) }}</span>
+            </button>
+            <button class="scope-chip" type="button" [class.active]="activeScope === 'ALL'" (click)="setScope('ALL')">
+              <span class="mono">ALL</span>
+              <span class="scope-count mono">{{ getLogs(selectedTrace).length }}</span>
+            </button>
+          </div>
+
+          <div class="log-list">
+            <div class="log-row" *ngFor="let e of getScopedLogs(selectedTrace)">
+              <div class="log-left">
+                <span [class]="getLogBadgeClass(e.level)">{{ (e.level || "info") | uppercase }}</span>
+                <span class="log-scope mono">{{ e.scope || "scope" }}</span>
+                <span class="log-name mono">{{ e.name || "event" }}</span>
+                <span class="log-time mono" *ngIf="e.ts">{{ formatTs(e.ts) }}</span>
+              </div>
+              <pre class="pre pre-log" [innerText]="filterJson(e.data)"></pre>
+            </div>
+          </div>
+
+          <div class="muted" *ngIf="!getScopedLogs(selectedTrace)?.length">No logs found</div>
+        </div>
+
+        <div *ngIf="traceTab==='raw'" class="drawer-section">
+          <div class="section-title">Raw JSON</div>
+          <pre class="pre pre-raw" [innerText]="filterJson(selectedTrace)"></pre>
+        </div>
+      </ng-container>
+
+      <ng-template #drawerLoadingTpl>
+        <div class="drawer-empty" *ngIf="selectedTraceError">{{ selectedTraceError }}</div>
+        <div class="drawer-empty" *ngIf="!selectedTraceError">Loading trace...</div>
+      </ng-template>
+    </div>
+  </aside>
+</div>

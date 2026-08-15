@@ -1,0 +1,151 @@
+<div class="modal-content-popup">
+  <span class="close" (click)="closePopup()">&times;</span>
+  <div class="popup-header">
+    <h2>Chunks Strategy</h2>
+
+    <p class="color-sec text-sec">
+      Understanding different chunking approaches
+    </p>
+  </div>
+
+  <div class="info-card">
+    <div class="info-card-body">
+      <div class="icon-container">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="icon"
+        >
+          <path
+            d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+          ></path>
+          <circle cx="12" cy="12" r="3"></circle>
+        </svg>
+      </div>
+      <div class="text-content">
+        <h3 class="info-card-heading">General</h3>
+        <div class="list">
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">Splits content into equal-sized text chunks</p>
+          </div>
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">Simple and fast to implement</p>
+          </div>
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">
+              Best for basic file processing or when context isn't crucial
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="info-card">
+    <div class="info-card-body">
+      <div class="icon-container-amber">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="icon"
+        >
+          <path
+            d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"
+          ></path>
+          <path
+            d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"
+          ></path>
+          <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"></path>
+          <path d="M17.599 6.5a3 3 0 0 0 .399-1.375"></path>
+          <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"></path>
+          <path d="M3.477 10.896a4 4 0 0 1 .585-.396"></path>
+          <path d="M19.938 10.5a4 4 0 0 1 .585.396"></path>
+          <path d="M6 18a4 4 0 0 1-1.967-.516"></path>
+          <path d="M19.967 17.484A4 4 0 0 1 18 18"></path>
+        </svg>
+      </div>
+      <div class="text-content">
+        <h3 class="info-card-heading">Semantic</h3>
+        <div class="list">
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">
+              Splits content based on meaning and structure
+            </p>
+          </div>
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">
+              Preserves logical paragraph or section boundaries
+            </p>
+          </div>
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">
+              Ideal for documents like FAQs, articles, or research papers
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="info-card">
+    <div class="info-card-body">
+      <div class="icon-container-blue">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="icon"
+        >
+          <path
+            d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"
+          ></path>
+        </svg>
+      </div>
+      <div class="text-content">
+        <h3 class="info-card-heading">Agentic</h3>
+        <div class="list">
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">Advanced chunking for AI agent workflows</p>
+          </div>
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">
+              Optimized for interaction, recall, and agent memory use
+            </p>
+          </div>
+          <div class="list-item">
+            <div class="bullet"></div>
+            <p class="list-text">
+              Best for dynamic assistants and contextual learning
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

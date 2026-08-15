@@ -1,0 +1,167 @@
+/* 🔵 Business & AI Persona Styles (Matches Chat Analytics Theme 1:1) */
+
+/* Hero Blue Banner Box */
+.ai-knowledge-box {
+  background: linear-gradient(135deg, #3167f3 0%, #2a58cf 100%);
+  padding: 30px 24px;
+  border-radius: 8px;
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease-in-out;
+}
+
+.ai-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.ai-subtitle {
+  color: #ffffff;
+  margin-bottom: 0rem;
+  font-weight: 500;
+  margin-top: 4px;
+  font-size: 0.9rem;
+}
+
+.badge-live {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border-radius: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.badge-live::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background-color: #ffffff;
+  border-radius: 50%;
+  margin-right: 6px;
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 📊 Summary Stat Cards (Matches Chat Analytics 1:1) */
+.bg-corner-img {
+  background-image: url("https://mannatthemes.com/approx/default/assets/images/extra/corner.png");
+  background-position: right;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.card-h {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.price {
+  font-weight: 700 !important;
+  font-size: 22px;
+  color: #1e293b;
+}
+
+.thumb-md {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 42px;
+  width: 42px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 0.3s ease;
+}
+
+.border-dashed {
+  border: 1px dashed;
+}
+
+.dashboard-card {
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
+}
+
+.icon-wrapper {
+  border: 1px dashed;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 40px;
+  width: 40px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.icon-primary { background-color: rgba(99, 102, 241, 0.12); border-color: #6366f1; }
+.icon-primary i { color: #6366f1; }
+
+.icon-success { background-color: rgba(16, 185, 129, 0.12); border-color: #10b981; }
+.icon-success i { color: #10b981; }
+
+.icon-warning { background-color: rgba(245, 158, 11, 0.15); border-color: #f59e0b; }
+.icon-warning i { color: #f59e0b; }
+
+.icon-info { background-color: rgba(49, 103, 243, 0.12); border-color: #3167f3; }
+.icon-info i { color: #3167f3; }
+
+/* Apply Action Button */
+.apply-action-btn {
+  background: #3167f3;
+  color: #ffffff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.apply-action-btn:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.apply-action-btn:not(:disabled):hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(49, 103, 243, 0.3);
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% { transform: rotate(360deg); }
+}

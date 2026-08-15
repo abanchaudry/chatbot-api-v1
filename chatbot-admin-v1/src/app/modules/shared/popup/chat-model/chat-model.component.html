@@ -1,0 +1,66 @@
+<div class="chat-modal-container">
+  <div class="chat-header">
+    <div class="user-info">
+      <div class="avatar">
+        {{data?.userId[0]}}
+      </div>
+      <div class="details">
+        <h6>{{ data?.userId || 'User' }}</h6>
+
+  <span class="status-indicator">
+  <span class="dot"></span> Completed Session • ID #{{ threadId }}
+</span>
+ <div class="date" style="font-size: 12px;
+    color: #ffffffd9;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 0;
+    font-weight: 500;">
+        {{ data?.date   | date : "MM/dd/yyyy" }}
+      </div>
+      </div>
+     
+    </div>
+    <button class="close-icon-btn" (click)="close()">
+      <i class="ri-close-line"></i>
+    </button>
+  </div>
+
+<div class="chat-body" *ngIf="!isLoading; else loading">
+  <div *ngFor="let item of conversation">
+    <div class="message-row user">
+      <div class="bubble">{{ item.question }}</div>
+      <span class="timestamp">User</span>
+    </div>
+
+    <div class="message-row bot">
+      <div class="bubble">{{ item.answer }}</div>
+      <span class="timestamp">Bot</span>
+    </div>
+  </div>
+</div>
+
+<ng-template #loading>
+  <p style="padding: 20px; text-align: center;">Loading conversation...</p>
+</ng-template>
+
+
+  <div class="chat-footer">
+    <p>This session is archived and read-only.</p>
+
+    <button
+      type="button"
+      class="btn footer-download-btn"
+      [disabled]="isDownloading"
+      (click)="downloadPDF()"
+    >
+      <i
+        [ngClass]="iconClass"
+        class="remix-icon"
+        style="vertical-align: middle; margin-right: 5px"
+      ></i>
+      {{ isDownloading ? "Downloading..." : "  Download Report" }}
+    </button>
+  </div>
+</div>

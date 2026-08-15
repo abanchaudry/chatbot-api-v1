@@ -1,0 +1,178 @@
+<div class="main-content">
+  <div class="container-fluid">
+    <div  *ngIf="inProcess"  class="loader">
+      <div class="spinner"></div>
+   
+    </div>
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header card-header-icon card-header-rose m-0">
+           
+            <h4 class="card-title pb-10 pl-10 border-bottom">Select Assistant</h4>
+          </div>
+          <div class="card-body mt-10">
+            <mat-form-field class="example-full-width custom-border" appearance="outline">
+              <mat-label>Select Assistant</mat-label>
+              <mat-select name="selectedAssistant" required [(ngModel)]="selectedAssistantId" (selectionChange)="onAssistantSelect()">
+                <mat-option *ngFor="let assistant of allAssistants" [value]="assistant.id">
+                  {{ assistant.name }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+      </div>
+  
+      <!-- <div class="col-6" *ngIf="selectedAssistantId">
+        <div class="card">
+         
+          <div class="card-header card-header-icon card-header-rose m-0">
+           
+            <h4 class="card-title pb-10 pl-10 border-bottom">File Details {{selectedStoreId}}</h4>
+          </div>
+          <div class="card-body mt-10">
+            <table class="table table-light">
+              <thead style="background-color: #f4f6f9; border-radius: 12px;">
+                <tr>
+  
+                  <th>File Name</th>
+                  <th>File Size</th>
+                  <th>Usage (Bytes)</th>
+                  <th>Status</th>
+                  <th>Upload Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let file of allFiles">
+                <td>{{file?.file_name}}</td>
+                <td>{{file?.file_size}}</td>
+                <td>{{file?.usage_bytes}}</td>
+                <td 
+               
+                ><span class="badge badge-success">{{file?.status}}</span></td>
+                
+                <td>{{file?.created_at | date}}</td>
+                </tr>
+               
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div> -->
+
+      <div class="col-8" *ngIf="selectedAssistantId">
+        <div class="card">
+       
+            <div class="card-header card-header-icon card-header-rose m-0">
+              <h4 class="card-title pb-10 pl-10 border-bottom">File Details</h4>
+            </div>
+         
+      
+          <div class="card-body mt-1">
+            <table class="table table-light">
+              <thead style="background-color: #f4f6f9; border-radius: 12px ; ">
+                <tr>
+                  <th style="width: 230px;">File Name</th>
+                  <th>File Size</th>
+                  <th>Usage (Bytes)</th>
+                  <th>Status</th>
+                  <th>Upload Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let file of allFiles">
+                  <td class="line-height-16px">{{ file.file_name }}</td>
+                  <td>{{ file.file_size }}</td>
+                  <td>{{ file.usage_bytes }}</td>
+                  <td><span class="badge badge-success">{{ file.status }}</span></td>
+                  <td>{{ file.created_at | date }}</td>
+                  <td class="d-flex align-items-center">
+                    <a mat-icon-button  style="color: #006666;" (click)="downloadFile(file.file_path)">
+                      <mat-icon>visibility</mat-icon>
+                    </a>
+                    <a mat-icon-button color="warn" (click)="confirmDeleteFile(file)">
+                      <mat-icon>delete</mat-icon>
+                    </a>
+                  </td>
+                  
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      
+
+      <div class="col-4" *ngIf="selectedAssistantId">
+        <div class="card">
+          <div class="card-header card-header-icon card-header-rose m-0">
+            <h4 class="card-title pb-10 pl-10 border-bottom">Upload File</h4>
+          </div>
+          <div class="card-body mt-10">
+            <form #imageForm="ngForm" (ngSubmit)="onSubmit(imageForm)">
+
+      
+              <div class="mb-4">
+                <div class="file-input-container mt-2">
+                  <input type="file" id="file" class="file-input" (change)="onFile($event)" required 
+                    [ngClass]="{ 'is-invalid': imageForm.submitted && !filePreview }" #fileInput>
+         
+                </div>
+                <div *ngIf="imageForm.submitted && !filePreview" class="invalid-feedback">
+                  <div>File is required.</div>
+                </div>
+              </div>
+
+
+      
+      
+              <div *ngIf="filePreview" class="mb-4 d-flex align-flex-start gap-2 justify-content-between">
+              <div class="d-flex align-items-center">
+                <h5 style="font-size: 15px; font-weight: 600; padding-right: 10px; display: flex; align-items: center;">
+                  <span>Selected File:</span>
+                </h5>
+                <p class="filename-text">{{ fileName }}</p>
+              </div>
+      
+               
+            
+              <div>
+             <!-- <a >
+              <i class="material-icons text-danger cursor-pointer" style="font-size: 20px !important; cursor: pointer;"
+              (click)="confirmDeleteFile(i)">
+              delete
+            </i>
+             </a> -->
+              </div>
+              </div>
+
+              <div class="mb-4">
+                <div class="alert alert-warning d-flex align-items-center" role="alert">
+                  <mat-icon class="mr-2">info</mat-icon>
+                  <small class="text-muted">
+                    <strong  style="color: #aa6666; font-size: 14px;">Only plain text (.TXT) documents are allowed
+                    </strong>
+                  </small>
+                </div>
+              </div>
+      
+              <div class="d-flex justify-content-end mt-4 custom-btn">
+                <button type="button" class="btn btn-secondary mr-3" (click)="onCancel()">Cancel</button>
+                <button type="submit" class="btn btn-primary" [disabled]="inProcess">
+                  <span class="material-icons" style="vertical-align: middle; margin-right: 5px;">file_upload</span>
+                  Upload</button>
+              </div>
+          
+          
+              
+            </form>
+          </div>
+        </div>
+      </div>
+     
+      
+    </div>
+  </div>
+</div>
