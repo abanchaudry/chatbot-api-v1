@@ -158,3 +158,151 @@ export async function crawlWebPage(
     method: "edge_fetch",
   };
 }
+
+export type DiscoveredPage = {
+  url: string;
+  title: string;
+  depth: number;
+};
+
+function extractInternalLinks(html: string, currentUrl: string, origin: string): string[] {
+  const links: string[] = [];
+  const regex = /href=["']([^"'#?]+)/gi;
+  let match;
+  
+  const badExts = ['.pdf', '.jpg', '.png', '.css', '.js', '.svg', '.ico', '.xml', '.json', '.zip', '.gz', '.mp4', '.mp3', '.woff', '.woff2', '.ttf', '.eot'];
+
+  while ((match = regex.exec(html)) !== null) {
+    const href = match[1];
+    try {
+      const urlObj = new URL(href, currentUrl);
+      
+      if (urlObj.origin !== origin || (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:')) {
+        continue;
+      }
+      
+      const lowerPath = urlObj.pathname.toLowerCase();
+      if (badExts.some(ext => lowerPath.endsWith(ext))) {
+        continue;
+      }
+      
+      urlObj.hash = '';
+      urlObj.search = '';
+      let cleanUrl = urlObj.toString();
+      if (cleanUrl.endsWith('/')) {
+        cleanUrl = cleanUrl.slice(0, -1);
+      }
+      
+      links.push(cleanUrl);
+    } catch (e) {
+      // Invalid URL, skip
+    }
+  }
+  
+  return [...new Set(links)];
+}
+
+export async function discoverLinks(
+  env: Env["Bindings"],
+  rootUrl: string,
+  maxDepth: number = 2,
+  maxPages: number = 50
+): Promise<DiscoveredPage[]> {
+  try {
+    const rootUrlObj = new URL(rootUrl);
+    const origin = rootUrlObj.origin;
+    
+    rootUrlObj.hash = '';
+    rootUrlObj.search = '';
+    let cleanRootUrl = rootUrlObj.toString();
+    if (cleanRootUrl.endsWith('/')) {
+      cleanRootUrl = cleanRootUrl.slice(0, -1);
+    }
+
+    const queue: {url: string, depth: number}[] = [{url: cleanRootUrl, depth: 0}];
+    const visited = new Set<string>();
+    const results: DiscoveredPage[] = [];
+    
+    visited.add(cleanRootUrl);
+    
+    while (queue.length > 0 && results.length < maxPages) {
+      const { url, depth } = queue.shift()!;
+      let html = "";
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      try {
+        const res = await fetch(url, {
+          redirect: "follow",
+          signal: controller.signal,
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          },
+        });
+        clearTimeout(timeoutId);
+        
+        if (res.ok) {
+          const contentType = res.headers.get("content-type") || "";
+          if (contentType.includes("text/html")) {
+            html = await res.text();
+          }
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+      }
+      
+      if (!html || html.includes("Access Denied") || html.includes("errors.edgesuite.net")) {
+        const fallbackController = new AbortController();
+        const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 8000);
+        try {
+          const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
+            signal: fallbackController.signal,
+            headers: {
+              Accept: "text/html, application/json",
+              "X-No-Cache": "true",
+            },
+          });
+          clearTimeout(fallbackTimeoutId);
+          if (jinaRes.ok) {
+            html = await jinaRes.text();
+          }
+        } catch (err) {
+          clearTimeout(fallbackTimeoutId);
+        }
+      }
+      
+      if (!html || html.includes("Access Denied")) {
+        continue;
+      }
+      
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : url;
+      
+      results.push({ url, title, depth });
+      
+      if (depth < maxDepth && results.length < maxPages) {
+        const links = extractInternalLinks(html, url, origin);
+        for (const link of links) {
+          if (!visited.has(link)) {
+            visited.add(link);
+            queue.push({ url: link, depth: depth + 1 });
+          }
+        }
+      }
+    }
+    
+    results.sort((a, b) => {
+      if (a.depth !== b.depth) return a.depth - b.depth;
+      return a.url.localeCompare(b.url);
+    });
+    
+    return results;
+  } catch (err) {
+    console.error("Error in discoverLinks:", err);
+    return [];
+  }
+}
+

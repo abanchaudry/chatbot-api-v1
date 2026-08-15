@@ -2,7 +2,7 @@
 
 import type { Context } from "hono";
 import { nanoid } from "nanoid";
-import { crawlWebPage } from "../services/crawler.service";
+import { crawlWebPage, discoverLinks, DiscoveredPage } from "../services/crawler.service";
 import { fileDb } from "../services/db/files.db";
 import { chunkDb } from "../services/db/chunk.db";
 import { vectorService } from "../services/vector.service";
@@ -203,6 +203,234 @@ export const CrawlerController = {
       const errMsg = err?.stack || err?.message || String(err);
       console.error("[Crawler] Crawl failed:", errMsg);
       return c.json({ ok: false, message: err?.message || "Crawl failed", error: errMsg }, 500);
+    }
+  },
+
+  /**
+   * DISCOVER LINKS
+   * POST /api/crawler/discover
+   */
+  discover: async (c: Context) => {
+    try {
+      if (String(c.env.ENABLE_WEB_CRAWLER || "true") === "false") {
+        return c.json({ ok: false, message: "Web Crawler feature is disabled in wrangler.toml" }, 403);
+      }
+
+      const adminKey = c.req.header("x-api-key") || c.req.header("x-admin-key");
+      const expectedKey = c.env.ADMIN_API_KEY || (c.env.CONFIG ? await c.env.CONFIG.get("ADMIN_API_KEY") : null);
+      if (!adminKey || (expectedKey && adminKey !== expectedKey)) {
+        return c.json({ ok: false, message: "Unauthorized: Invalid admin key" }, 401);
+      }
+
+      const body = await c.req.json().catch(() => ({}));
+      const rawUrl = String(body.url || "").trim();
+      
+      if (!rawUrl) {
+        return c.json({ ok: false, message: "URL is required" }, 400);
+      }
+
+      let targetUrl = rawUrl;
+      if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+        targetUrl = `https://${targetUrl}`;
+      }
+
+      const maxDepth = body.maxDepth !== undefined ? Number(body.maxDepth) : 2;
+      const maxPages = body.maxPages !== undefined ? Number(body.maxPages) : 50;
+
+      const pages = await discoverLinks(c.env, targetUrl, maxDepth, maxPages);
+
+      return c.json({
+        ok: true,
+        rootUrl: targetUrl,
+        pages,
+        totalDiscovered: pages.length
+      });
+    } catch (err: any) {
+      return c.json({ ok: false, message: err?.message || "Discover failed" }, 500);
+    }
+  },
+
+  /**
+   * CRAWL SELECTED
+   * POST /api/crawler/crawl-selected
+   */
+  crawlSelected: async (c: Context) => {
+    try {
+      if (String(c.env.ENABLE_WEB_CRAWLER || "true") === "false") {
+        return c.json({ ok: false, message: "Web Crawler feature is disabled in wrangler.toml" }, 403);
+      }
+
+      const adminKey = c.req.header("x-api-key") || c.req.header("x-admin-key");
+      const expectedKey = c.env.ADMIN_API_KEY || (c.env.CONFIG ? await c.env.CONFIG.get("ADMIN_API_KEY") : null);
+      if (!adminKey || (expectedKey && adminKey !== expectedKey)) {
+        return c.json({ ok: false, message: "Unauthorized: Invalid admin key" }, 401);
+      }
+
+      const body = await c.req.json().catch(() => ({}));
+      const pages = Array.isArray(body.pages) ? body.pages : [];
+      
+      if (pages.length === 0) {
+        return c.json({ ok: false, message: "pages array is required and must not be empty" }, 400);
+      }
+
+      const results = [];
+      let totalChunks = 0;
+      let totalVectors = 0;
+      let crawled = 0;
+
+      const openAiKey = getOpenAIKey(c.env);
+      const client = new ScalableRagClient();
+
+      for (const pageUrl of pages) {
+        try {
+          const targetUrl = String(pageUrl).trim();
+          if (!targetUrl) continue;
+          
+          const crawlResult = await crawlWebPage(c.env, targetUrl);
+
+          const fileName = crawlResult.title || targetUrl.replace(/^https?:\/\//, "");
+          const fileId = `web_${nanoid(12)}`;
+          const markdownText = crawlResult.markdown;
+
+          await fileDb.saveFile(
+            c.env.DB,
+            fileName,
+            markdownText.length,
+            "processing",
+            fileId,
+            targetUrl
+          );
+
+          const mockBlob = new Blob([markdownText], { type: "text/plain" });
+
+          let scalableResult: any;
+          try {
+            scalableResult = await client.processDocument(mockBlob, "offline", "ai", undefined, `${fileName}.txt`);
+          } catch (procErr: any) {
+            console.warn(`[Crawler] Scalable RAG error for ${targetUrl}:`, procErr.message);
+            scalableResult = await client.processDocument(mockBlob, "offline", "adaptive", undefined, `${fileName}.txt`);
+          }
+
+          const ferventChunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
+
+          const formattedChunks = ferventChunks.map((ch, idx) => ({
+            chunk_id: `chk_${nanoid(12)}`,
+            file_id: fileId,
+            section: ch.section,
+            section_number: null,
+            topic: ch.topic || "Web Ingestion",
+            first_sentence: ch.content.slice(0, 100).replace(/\n/g, " "),
+            content: ch.content,
+            tags: ch.tags,
+            chunk_index: idx,
+            tier: ch.tier,
+            parentId: ch.parentId,
+          }));
+
+          await fileDb.saveChunksBatch(c.env.DB, {
+            fileId: fileId,
+            fileName: fileName,
+            version: "v1",
+            chunks: formattedChunks.map((ch) => ({
+              index: ch.chunk_index,
+              content: ch.content,
+              section: ch.section,
+              tags: ch.tags,
+              topic: ch.topic,
+              tier: ch.tier,
+              parentId: ch.parentId,
+            })),
+            embeddingModel: "text-embedding-3-small",
+            chunkMethod: "ai",
+            source: "web",
+          });
+
+          for (const ch of formattedChunks) {
+            try {
+              await c.env.DB.prepare(
+                `INSERT INTO document_chunks (id, document_id, tier, content, category, parent_id, token_count, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+              ).bind(
+                ch.chunk_id,
+                fileId,
+                ch.tier || "small",
+                ch.content,
+                ch.topic,
+                ch.parentId || null,
+                Math.ceil(ch.content.length / 4),
+                new Date().toISOString()
+              ).run();
+            } catch {}
+          }
+
+          await fileDb.updateFileStatus(c.env.DB, fileId, "completed", formattedChunks.length);
+
+          let vectorsUpserted = 0;
+
+          if (openAiKey && c.env.VECTORIZE) {
+            try {
+              const detailChunks = formattedChunks.filter(c => c.tier === "small" || !c.tier);
+              const chunkToEmbed = detailChunks.length > 0 ? detailChunks : formattedChunks;
+
+              const textsToEmbed = chunkToEmbed.map(ch => `${ch.section ? `[${ch.section}] ` : ""}${ch.content}`);
+              const embeddings = await EmbeddingService.generateBatchEmbeddings(textsToEmbed, openAiKey);
+
+              const vectors = chunkToEmbed.map((ch, idx) => ({
+                id: ch.chunk_id,
+                values: embeddings[idx],
+                metadata: {
+                  chunk_id: ch.chunk_id,
+                  file_id: fileId,
+                  file_name: fileName,
+                  section_title: ch.section,
+                  topic: ch.topic,
+                  source_type: "web",
+                  url: targetUrl,
+                },
+              }));
+
+              const upsertRes = await vectorService.upsertVectors(vectors, c.env.VECTORIZE);
+              vectorsUpserted = upsertRes.upserted;
+            } catch (vErr: any) {
+              console.warn(`[Crawler] Vectorize upsert warning for ${targetUrl}:`, vErr.message);
+            }
+          }
+
+          crawled++;
+          totalChunks += formattedChunks.length;
+          totalVectors += vectorsUpserted;
+
+          results.push({
+            url: targetUrl,
+            fileId,
+            fileName,
+            chunks: formattedChunks.length,
+            vectors: vectorsUpserted
+          });
+
+        } catch (pageErr: any) {
+          console.error(`[Crawler] Failed to process selected page ${pageUrl}:`, pageErr.message);
+          results.push({
+            url: pageUrl,
+            error: pageErr.message
+          });
+        }
+      }
+
+      if (c.env.CACHE) {
+        try { await purgeAllQueryCache(c.env.CACHE); } catch {}
+      }
+
+      return c.json({
+        ok: true,
+        crawled,
+        results,
+        totalChunks,
+        totalVectors
+      });
+    } catch (err: any) {
+      console.error("[Crawler] crawlSelected failed:", err.message);
+      return c.json({ ok: false, message: err?.message || "Crawl selected failed" }, 500);
     }
   },
 };

@@ -232,6 +232,15 @@ export class AddNewKnowledgeComponent implements OnInit {
   crawlUrl = "";
   crawlSchedule = "manual";
 
+  // Recursive crawler state
+  crawlMaxDepth = 2;
+  crawlMaxPages = 50;
+  discoveredPages: Array<{ url: string; title: string; depth: number; selected: boolean }> = [];
+  showPageSelector = false;
+  isDiscovering = false;
+  isCrawlingSelected = false;
+  crawlResults: any[] = [];
+
   fileToUpload: File | null = null;
   fileName = "";
   filePreview = false;
@@ -384,6 +393,164 @@ export class AddNewKnowledgeComponent implements OnInit {
     this.processingSubText = "Web content chunked and indexed successfully";
     this.processingSteps.forEach((s) => (s.status = "completed"));
     this.cdr.detectChanges();
+  }
+
+  // Phase 1: Discover sub-links
+  onDiscoverPages(): void {
+    if (!this.crawlUrl) {
+      Swal.fire('Error', 'Please enter a valid website URL', 'error');
+      return;
+    }
+    this.isDiscovering = true;
+    this.discoveredPages = [];
+    this.showPageSelector = false;
+
+    this.aiService.discoverLinks({
+      url: this.crawlUrl,
+      maxDepth: this.crawlMaxDepth,
+      maxPages: this.crawlMaxPages
+    }).subscribe({
+      next: (res: any) => {
+        this.isDiscovering = false;
+        if (res?.ok && res.pages?.length > 0) {
+          this.discoveredPages = res.pages.map((p: any) => ({
+            ...p,
+            selected: true  // Select all by default
+          }));
+          this.showPageSelector = true;
+        } else {
+          Swal.fire('No Pages Found', 'Could not discover any sub-pages from this URL.', 'warning');
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.isDiscovering = false;
+        const errMsg = err?.error?.message || err?.message || 'Failed to discover pages';
+        Swal.fire('Discovery Error', errMsg, 'error');
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  // Toggle select all / deselect all
+  toggleSelectAll(event: any): void {
+    const checked = event.target.checked;
+    this.discoveredPages.forEach(p => p.selected = checked);
+  }
+
+  get selectedPageCount(): number {
+    return this.discoveredPages.filter(p => p.selected).length;
+  }
+
+  get allPagesSelected(): boolean {
+    return this.discoveredPages.length > 0 && this.discoveredPages.every(p => p.selected);
+  }
+
+  // Phase 2: Crawl selected pages
+  onCrawlSelected(): void {
+    const selectedUrls = this.discoveredPages.filter(p => p.selected).map(p => p.url);
+    if (selectedUrls.length === 0) {
+      Swal.fire('Error', 'Please select at least one page to crawl.', 'error');
+      return;
+    }
+
+    this.isCrawlingSelected = true;
+    this.inProcess = true;
+    this.startCrawlSelectedProgress(selectedUrls.length);
+
+    this.aiService.crawlSelectedPages({
+      rootUrl: this.crawlUrl,
+      crawlSchedule: this.crawlSchedule,
+      pages: selectedUrls
+    }).subscribe({
+      next: (res: any) => {
+        this.completeCrawlSelectedProgress();
+        this.isCrawlingSelected = false;
+        this.inProcess = false;
+        if (res?.ok) {
+          this.crawlResults = res.results || [];
+          Swal.fire({
+            title: 'Web Pages Crawled & Indexed!',
+            html: `Successfully crawled <strong>${res.crawled || selectedUrls.length}</strong> pages.<br><br>` +
+                  `Total chunks created: <strong>${res.totalChunks || 0}</strong><br>` +
+                  `Total vectors indexed: <strong>${res.totalVectors || 0}</strong>`,
+            icon: 'success',
+            confirmButtonText: 'View All Knowledge'
+          }).then(() => {
+            this.router.navigate(['/dashboard/ai-knowledge/all-ai-knowledge']);
+          });
+        } else {
+          Swal.fire('Error', res?.message || 'Failed to crawl selected pages', 'error');
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.completeCrawlSelectedProgress();
+        this.isCrawlingSelected = false;
+        this.inProcess = false;
+        const errMsg = err?.error?.message || err?.message || 'Failed to crawl selected pages';
+        Swal.fire('Crawl Error', errMsg, 'error');
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  startCrawlSelectedProgress(pageCount: number) {
+    this.processingPercent = 10;
+    this.processingStatusText = `Crawling ${pageCount} selected pages...`;
+    this.processingSubText = 'Launching Cloudflare Edge crawler for each page';
+    this.processingSteps = [
+      { key: 'discover', label: 'Page Discovery Complete', icon: 'search', status: 'completed' },
+      { key: 'fetch', label: `Fetching ${pageCount} Pages via Edge Browser`, icon: 'public', status: 'active' },
+      { key: 'chunk', label: 'Agentic AI 3-Tier Semantic Chunking', icon: 'account_tree', status: 'pending' },
+      { key: 'vector', label: '1536d OpenAI Vector Embedding & Indexing', icon: 'scatter_plot', status: 'pending' },
+      { key: 'done', label: 'Saving Per-Page Files to D1 & Cache Purge', icon: 'check_circle', status: 'pending' },
+    ];
+
+    let timerCount = 0;
+    this.progressTimer = setInterval(() => {
+      timerCount++;
+      if (timerCount === 3) {
+        this.processingPercent = 40;
+        this.processingStatusText = 'Processing page content...';
+        this.processingSubText = 'Cleaning DOM & stripping boilerplate for each page';
+        this.processingSteps[1].status = 'completed';
+        this.processingSteps[2].status = 'active';
+      } else if (timerCount === 6) {
+        this.processingPercent = 70;
+        this.processingStatusText = 'Generating vectors & indexing...';
+        this.processingSubText = 'Upserting 1536d vectors for each page into Cloudflare Vectorize';
+        this.processingSteps[2].status = 'completed';
+        this.processingSteps[3].status = 'active';
+      } else if (timerCount === 9) {
+        this.processingPercent = 90;
+        this.processingStatusText = 'Saving per-page records...';
+        this.processingSubText = 'Creating individual file records in Cloudflare D1';
+        this.processingSteps[3].status = 'completed';
+        this.processingSteps[4].status = 'active';
+      }
+      this.cdr.detectChanges();
+    }, 2000);
+  }
+
+  completeCrawlSelectedProgress() {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+    this.processingPercent = 100;
+    this.processingStatusText = 'All pages crawled & indexed!';
+    this.processingSubText = 'Per-page files, chunks, and vectors saved successfully';
+    this.processingSteps.forEach(s => s.status = 'completed');
+    this.cdr.detectChanges();
+  }
+
+  resetCrawlerState(): void {
+    this.discoveredPages = [];
+    this.showPageSelector = false;
+    this.isDiscovering = false;
+    this.isCrawlingSelected = false;
+    this.crawlResults = [];
   }
 
   ngOnInit(): void {
@@ -806,6 +973,7 @@ export class AddNewKnowledgeComponent implements OnInit {
     this.model.fileId = this.uploadId;
     this.fileId = "";
     this.page = 1;
+    this.resetCrawlerState();
   }
 
   getProgressPercentage(progress: any): number {

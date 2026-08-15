@@ -5,5 +5,7 @@ import type { Env } from "../types/env";
 const crawler = new Hono<Env>();
 
 crawler.post("/crawl", CrawlerController.crawl);
+crawler.post("/discover", CrawlerController.discover);
+crawler.post("/crawl-selected", CrawlerController.crawlSelected);
 
 export default crawler;

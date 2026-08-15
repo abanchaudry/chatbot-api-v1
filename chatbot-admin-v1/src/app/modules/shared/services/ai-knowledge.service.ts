@@ -91,6 +91,24 @@ export class AiKnowledgeService {
     );
   }
 
+  discoverLinks(payload: { url: string; maxDepth?: number; maxPages?: number }) {
+    return this._api
+      .post('crawler/discover', payload)
+      .pipe(
+        map((res: any) => res),
+        catchError((error: any) => { throw error; })
+      );
+  }
+
+  crawlSelectedPages(payload: { rootUrl: string; crawlSchedule: string; pages: string[] }) {
+    return this._api
+      .post('crawler/crawl-selected', payload)
+      .pipe(
+        map((res: any) => res),
+        catchError((error: any) => { throw error; })
+      );
+  }
+
     deleteFile(fileId: string) {
     return this._api.post(`data/files/${encodeURIComponent(fileId)}`).pipe(
       map((res: any) => res),
