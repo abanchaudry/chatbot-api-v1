@@ -7,15 +7,12 @@ const app = new Hono<Env>();
 app.use(
   "*",
   cors({
-
     origin: "*",
     allowHeaders: ["*"],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     maxAge: 86400,
   })
 );
-
-app.options("*", (c) => c.body(null, 204));
 
 app.use("*", async (c, next) => {
   await next();

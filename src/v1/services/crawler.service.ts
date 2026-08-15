@@ -185,6 +185,19 @@ function extractInternalLinks(html: string, currentUrl: string, origin: string):
       if (badExts.some(ext => lowerPath.endsWith(ext))) {
         continue;
       }
+
+      // Filter out non-content utility paths
+      if (
+        lowerPath.includes('/wp-json') ||
+        lowerPath.includes('/xmlrpc') ||
+        lowerPath.includes('/feed') ||
+        lowerPath.includes('/wp-admin') ||
+        lowerPath.includes('/wp-includes') ||
+        lowerPath.includes('/cart') ||
+        lowerPath.includes('/checkout')
+      ) {
+        continue;
+      }
       
       urlObj.hash = '';
       urlObj.search = '';
@@ -219,86 +232,131 @@ export async function discoverLinks(
       cleanRootUrl = cleanRootUrl.slice(0, -1);
     }
 
-    const queue: {url: string, depth: number}[] = [{url: cleanRootUrl, depth: 0}];
     const visited = new Set<string>();
-    const results: DiscoveredPage[] = [];
-    
-    visited.add(cleanRootUrl);
-    
-    while (queue.length > 0 && results.length < maxPages) {
-      const { url, depth } = queue.shift()!;
-      let html = "";
-      
+    const resultsMap = new Map<string, DiscoveredPage>();
+
+    function decodeEntities(text: string): string {
+      return (text || "")
+        .replace(/&#8211;/g, "–")
+        .replace(/&#8212;/g, "—")
+        .replace(/&#8230;/g, "…")
+        .replace(/&#8217;/g, "'")
+        .replace(/&#8216;/g, "'")
+        .replace(/&#8220;/g, '"')
+        .replace(/&#8221;/g, '"')
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&#\d+;/g, "");
+    }
+
+    // Infer human-readable title from URL pathname
+    function titleFromUrl(url: string): string {
+      try {
+        const u = new URL(url);
+        const parts = u.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+        if (parts.length === 0) return u.hostname;
+        const lastPart = parts[parts.length - 1];
+        return decodeEntities(lastPart
+          .replace(/[-_]/g, " ")
+          .replace(/\b\w/g, c => c.toUpperCase()));
+      } catch {
+        return url;
+      }
+    }
+
+    // Fast HTML title fetcher (2.5s max timeout per request, no Jina proxy for discovery speed)
+    async function fetchPageTitleFast(url: string): Promise<string> {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
       try {
         const res = await fetch(url, {
           redirect: "follow",
           signal: controller.signal,
           headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            Accept: "text/html,application/xhtml+xml",
           },
         });
         clearTimeout(timeoutId);
-        
         if (res.ok) {
           const contentType = res.headers.get("content-type") || "";
           if (contentType.includes("text/html")) {
-            html = await res.text();
+            const text = await res.text();
+            const titleMatch = text.match(/<title[^>]*>([^<]+)<\/title>/i);
+            if (titleMatch && titleMatch[1].trim()) {
+              return decodeEntities(titleMatch[1].trim());
+            }
           }
         }
-      } catch (err) {
+      } catch {
         clearTimeout(timeoutId);
       }
-      
-      if (!html || html.includes("Access Denied") || html.includes("errors.edgesuite.net")) {
-        const fallbackController = new AbortController();
-        const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 8000);
-        try {
-          const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
-            signal: fallbackController.signal,
-            headers: {
-              Accept: "text/html, application/json",
-              "X-No-Cache": "true",
-            },
-          });
-          clearTimeout(fallbackTimeoutId);
-          if (jinaRes.ok) {
-            html = await jinaRes.text();
-          }
-        } catch (err) {
-          clearTimeout(fallbackTimeoutId);
-        }
-      }
-      
-      if (!html || html.includes("Access Denied")) {
-        continue;
-      }
-      
-      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-      const title = titleMatch ? titleMatch[1].trim() : url;
-      
-      results.push({ url, title, depth });
-      
-      if (depth < maxDepth && results.length < maxPages) {
-        const links = extractInternalLinks(html, url, origin);
-        for (const link of links) {
-          if (!visited.has(link)) {
-            visited.add(link);
-            queue.push({ url: link, depth: depth + 1 });
-          }
-        }
-      }
+      return titleFromUrl(url);
     }
+
+    // 1. Fetch Root Page (Depth 0)
+    visited.add(cleanRootUrl);
     
+    // Root fetch gets 4 seconds timeout
+    const rootController = new AbortController();
+    const rootTimeout = setTimeout(() => rootController.abort(), 4000);
+    let rootHtml = "";
+    let rootTitle = titleFromUrl(cleanRootUrl);
+
+    try {
+      const rootRes = await fetch(cleanRootUrl, {
+        redirect: "follow",
+        signal: rootController.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      });
+      clearTimeout(rootTimeout);
+      if (rootRes.ok) {
+        rootHtml = await rootRes.text();
+        const tm = rootHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (tm && tm[1].trim()) rootTitle = decodeEntities(tm[1].trim());
+      }
+    } catch {
+      clearTimeout(rootTimeout);
+    }
+
+    resultsMap.set(cleanRootUrl, { url: cleanRootUrl, title: rootTitle, depth: 0 });
+
+    // 2. Extract links from root page HTML
+    if (rootHtml) {
+      const allExtractedLinks = extractInternalLinks(rootHtml, cleanRootUrl, origin);
+
+      // Separate into direct level 1 links (depth 1)
+      const targetLinks = allExtractedLinks
+        .filter(u => u !== cleanRootUrl && !visited.has(u))
+        .slice(0, Math.min(maxPages - 1, 40));
+
+      targetLinks.forEach(u => visited.add(u));
+
+      // Fetch titles for all Depth 1 links IN PARALLEL in a single pass
+      const titleResults = await Promise.all(
+        targetLinks.map(async (u) => {
+          const t = await fetchPageTitleFast(u);
+          return { url: u, title: t };
+        })
+      );
+
+      titleResults.forEach(item => {
+        resultsMap.set(item.url, { url: item.url, title: item.title, depth: 1 });
+      });
+    }
+
+    const results = Array.from(resultsMap.values()).slice(0, maxPages);
     results.sort((a, b) => {
       if (a.depth !== b.depth) return a.depth - b.depth;
       return a.url.localeCompare(b.url);
     });
-    
+
     return results;
   } catch (err) {
     console.error("Error in discoverLinks:", err);

@@ -159,24 +159,31 @@ export const CrawlerController = {
           const chunkToEmbed = detailChunks.length > 0 ? detailChunks : formattedChunks;
 
           const textsToEmbed = chunkToEmbed.map(ch => `${ch.section ? `[${ch.section}] ` : ""}${ch.content}`);
-          const embeddings = await EmbeddingService.generateBatchEmbeddings(textsToEmbed, openAiKey);
+          const embeddings = await EmbeddingService.generate(textsToEmbed, openAiKey);
 
-          const vectors = chunkToEmbed.map((ch, idx) => ({
-            id: ch.chunk_id,
-            values: embeddings[idx],
-            metadata: {
-              chunk_id: ch.chunk_id,
-              file_id: fileId,
-              file_name: fileName,
-              section_title: ch.section,
+          await vectorService.storeChunks(
+            chunkToEmbed.map((ch, idx) => ({
+              id: ch.chunk_id,
+              content: ch.content,
+              index: ch.chunk_index,
               topic: ch.topic,
-              source_type: "web",
-              url: targetUrl,
-            },
-          }));
-
-          const upsertRes = await vectorService.upsertVectors(vectors, c.env.VECTORIZE);
-          vectorsUpserted = upsertRes.upserted;
+              tags: ch.tags,
+              section: ch.section,
+              values: embeddings[idx],
+              metadata: {
+                chunk_id: ch.chunk_id,
+                file_id: fileId,
+                file_name: fileName,
+                section_title: ch.section,
+                topic: ch.topic,
+                source_type: "web",
+                url: targetUrl,
+              },
+            })),
+            openAiKey,
+            c.env.VECTORIZE
+          );
+          vectorsUpserted = chunkToEmbed.length;
         } catch (vErr: any) {
           console.warn("[Crawler] Vectorize upsert warning (non-blocking):", vErr.message);
         }
@@ -281,140 +288,153 @@ export const CrawlerController = {
       const openAiKey = getOpenAIKey(c.env);
       const client = new ScalableRagClient();
 
-      for (const pageUrl of pages) {
-        try {
-          const targetUrl = String(pageUrl).trim();
-          if (!targetUrl) continue;
-          
-          const crawlResult = await crawlWebPage(c.env, targetUrl);
-
-          const fileName = crawlResult.title || targetUrl.replace(/^https?:\/\//, "");
-          const fileId = `web_${nanoid(12)}`;
-          const markdownText = crawlResult.markdown;
-
-          await fileDb.saveFile(
-            c.env.DB,
-            fileName,
-            markdownText.length,
-            "processing",
-            fileId,
-            targetUrl
-          );
-
-          const mockBlob = new Blob([markdownText], { type: "text/plain" });
-
-          let scalableResult: any;
-          try {
-            scalableResult = await client.processDocument(mockBlob, "offline", "ai", undefined, `${fileName}.txt`);
-          } catch (procErr: any) {
-            console.warn(`[Crawler] Scalable RAG error for ${targetUrl}:`, procErr.message);
-            scalableResult = await client.processDocument(mockBlob, "offline", "adaptive", undefined, `${fileName}.txt`);
-          }
-
-          const ferventChunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
-
-          const formattedChunks = ferventChunks.map((ch, idx) => ({
-            chunk_id: `chk_${nanoid(12)}`,
-            file_id: fileId,
-            section: ch.section,
-            section_number: null,
-            topic: ch.topic || "Web Ingestion",
-            first_sentence: ch.content.slice(0, 100).replace(/\n/g, " "),
-            content: ch.content,
-            tags: ch.tags,
-            chunk_index: idx,
-            tier: ch.tier,
-            parentId: ch.parentId,
-          }));
-
-          await fileDb.saveChunksBatch(c.env.DB, {
-            fileId: fileId,
-            fileName: fileName,
-            version: "v1",
-            chunks: formattedChunks.map((ch) => ({
-              index: ch.chunk_index,
-              content: ch.content,
-              section: ch.section,
-              tags: ch.tags,
-              topic: ch.topic,
-              tier: ch.tier,
-              parentId: ch.parentId,
-            })),
-            embeddingModel: "text-embedding-3-small",
-            chunkMethod: "ai",
-            source: "web",
-          });
-
-          for (const ch of formattedChunks) {
+      const batchSize = 5;
+      for (let i = 0; i < pages.length; i += batchSize) {
+        const pageBatch = pages.slice(i, i + batchSize);
+        await Promise.all(
+          pageBatch.map(async (pageUrl) => {
             try {
-              await c.env.DB.prepare(
-                `INSERT INTO document_chunks (id, document_id, tier, content, category, parent_id, token_count, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-              ).bind(
-                ch.chunk_id,
+              const targetUrl = String(pageUrl).trim();
+              if (!targetUrl) return;
+              
+              const crawlResult = await crawlWebPage(c.env, targetUrl);
+
+              const fileName = crawlResult.title || targetUrl.replace(/^https?:\/\//, "");
+              const fileId = `web_${nanoid(12)}`;
+              const markdownText = crawlResult.markdown;
+
+              await fileDb.saveFile(
+                c.env.DB,
+                fileName,
+                markdownText.length,
+                "processing",
                 fileId,
-                ch.tier || "small",
-                ch.content,
-                ch.topic,
-                ch.parentId || null,
-                Math.ceil(ch.content.length / 4),
-                new Date().toISOString()
-              ).run();
-            } catch {}
-          }
+                targetUrl
+              );
 
-          await fileDb.updateFileStatus(c.env.DB, fileId, "completed", formattedChunks.length);
+              const mockBlob = new Blob([markdownText], { type: "text/plain" });
 
-          let vectorsUpserted = 0;
+              let scalableResult: any;
+              try {
+                scalableResult = await client.processDocument(mockBlob, "offline", "ai", undefined, `${fileName}.txt`);
+              } catch (procErr: any) {
+                console.warn(`[Crawler] Scalable RAG error for ${targetUrl}:`, procErr.message);
+                scalableResult = await client.processDocument(mockBlob, "offline", "adaptive", undefined, `${fileName}.txt`);
+              }
 
-          if (openAiKey && c.env.VECTORIZE) {
-            try {
-              const detailChunks = formattedChunks.filter(c => c.tier === "small" || !c.tier);
-              const chunkToEmbed = detailChunks.length > 0 ? detailChunks : formattedChunks;
+              const ferventChunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
 
-              const textsToEmbed = chunkToEmbed.map(ch => `${ch.section ? `[${ch.section}] ` : ""}${ch.content}`);
-              const embeddings = await EmbeddingService.generateBatchEmbeddings(textsToEmbed, openAiKey);
-
-              const vectors = chunkToEmbed.map((ch, idx) => ({
-                id: ch.chunk_id,
-                values: embeddings[idx],
-                metadata: {
-                  chunk_id: ch.chunk_id,
-                  file_id: fileId,
-                  file_name: fileName,
-                  section_title: ch.section,
-                  topic: ch.topic,
-                  source_type: "web",
-                  url: targetUrl,
-                },
+              const formattedChunks = ferventChunks.map((ch, idx) => ({
+                chunk_id: `chk_${nanoid(12)}`,
+                file_id: fileId,
+                section: ch.section,
+                section_number: null,
+                topic: ch.topic || "Web Ingestion",
+                first_sentence: ch.content.slice(0, 100).replace(/\n/g, " "),
+                content: ch.content,
+                tags: ch.tags,
+                chunk_index: idx,
+                tier: ch.tier,
+                parentId: ch.parentId,
               }));
 
-              const upsertRes = await vectorService.upsertVectors(vectors, c.env.VECTORIZE);
-              vectorsUpserted = upsertRes.upserted;
-            } catch (vErr: any) {
-              console.warn(`[Crawler] Vectorize upsert warning for ${targetUrl}:`, vErr.message);
+              await fileDb.saveChunksBatch(c.env.DB, {
+                fileId: fileId,
+                fileName: fileName,
+                version: "v1",
+                chunks: formattedChunks.map((ch) => ({
+                  index: ch.chunk_index,
+                  content: ch.content,
+                  section: ch.section,
+                  tags: ch.tags,
+                  topic: ch.topic,
+                  tier: ch.tier,
+                  parentId: ch.parentId,
+                })),
+                embeddingModel: "text-embedding-3-small",
+                chunkMethod: "ai",
+                source: "web",
+              });
+
+              for (const ch of formattedChunks) {
+                try {
+                  await c.env.DB.prepare(
+                    `INSERT INTO document_chunks (id, document_id, tier, content, category, parent_id, token_count, created_at)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+                  ).bind(
+                    ch.chunk_id,
+                    fileId,
+                    ch.tier || "small",
+                    ch.content,
+                    ch.topic,
+                    ch.parentId || null,
+                    Math.ceil(ch.content.length / 4),
+                    new Date().toISOString()
+                  ).run();
+                } catch {}
+              }
+
+              await fileDb.updateFileStatus(c.env.DB, fileId, "completed", formattedChunks.length);
+
+              let vectorsUpserted = 0;
+
+              if (openAiKey && c.env.VECTORIZE) {
+                try {
+                  const detailChunks = formattedChunks.filter(c => c.tier === "small" || !c.tier);
+                  const chunkToEmbed = detailChunks.length > 0 ? detailChunks : formattedChunks;
+
+                  const textsToEmbed = chunkToEmbed.map(ch => `${ch.section ? `[${ch.section}] ` : ""}${ch.content}`);
+                  const embeddings = await EmbeddingService.generate(textsToEmbed, openAiKey);
+
+                  await vectorService.storeChunks(
+                    chunkToEmbed.map((ch, idx) => ({
+                      id: ch.chunk_id,
+                      content: ch.content,
+                      index: ch.chunk_index,
+                      topic: ch.topic,
+                      tags: ch.tags,
+                      section: ch.section,
+                      values: embeddings[idx],
+                      metadata: {
+                        chunk_id: ch.chunk_id,
+                        file_id: fileId,
+                        file_name: fileName,
+                        section_title: ch.section,
+                        topic: ch.topic,
+                        source_type: "web",
+                        url: targetUrl,
+                      },
+                    })),
+                    openAiKey,
+                    c.env.VECTORIZE
+                  );
+                  vectorsUpserted = chunkToEmbed.length;
+                } catch (vErr: any) {
+                  console.warn(`[Crawler] Vectorize upsert warning for ${targetUrl}:`, vErr.message);
+                }
+              }
+
+              crawled++;
+              totalChunks += formattedChunks.length;
+              totalVectors += vectorsUpserted;
+
+              results.push({
+                url: targetUrl,
+                fileId,
+                fileName,
+                chunks: formattedChunks.length,
+                vectors: vectorsUpserted
+              });
+
+            } catch (pageErr: any) {
+              console.error(`[Crawler] Failed to process selected page ${pageUrl}:`, pageErr.message);
+              results.push({
+                url: pageUrl,
+                error: pageErr.message
+              });
             }
-          }
-
-          crawled++;
-          totalChunks += formattedChunks.length;
-          totalVectors += vectorsUpserted;
-
-          results.push({
-            url: targetUrl,
-            fileId,
-            fileName,
-            chunks: formattedChunks.length,
-            vectors: vectorsUpserted
-          });
-
-        } catch (pageErr: any) {
-          console.error(`[Crawler] Failed to process selected page ${pageUrl}:`, pageErr.message);
-          results.push({
-            url: pageUrl,
-            error: pageErr.message
-          });
-        }
+          })
+        );
       }
 
       if (c.env.CACHE) {
