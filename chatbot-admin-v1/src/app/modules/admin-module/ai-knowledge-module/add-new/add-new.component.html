@@ -284,61 +284,61 @@
               </div>
             </div>
 
-            <!-- Inline processing overlay with rich real-time step status feedback -->
-            <div *ngIf="inProcess" class="sync-processing-overlay">
-              <div class="sync-processing-card">
-                
-                <!-- Top Progress Bar -->
-                <div class="progress-bar-container">
-                  <div class="progress-bar-fill" [style.width.%]="processingPercent"></div>
-                </div>
-
-                <div class="sync-header d-flex align-items-center mb-3 w-100 px-2">
-                  <div class="sync-spinner mr-3 flex-shrink-0">
-                    <div class="spinner-ring"></div>
-                    <span class="spinner-percent">{{ processingPercent }}%</span>
-                  </div>
-                  <div class="text-left flex-grow-1">
-                    <h5 class="sync-title mb-1 font-weight-bold" style="font-size: 1.05rem; color: #1e293b;">{{ processingStatusText }}</h5>
-                    <p class="sync-subtitle mb-0 text-muted" style="font-size: 0.82rem;">{{ processingSubText }}</p>
-                  </div>
-                </div>
-
-                <!-- Step Timeline Checklist -->
-                <div class="step-timeline w-100 text-left mt-1">
-                  <div *ngFor="let step of processingSteps; let idx = index" 
-                       class="step-item d-flex align-items-center py-2 px-3 mb-2"
-                       [class.step-completed]="step.status === 'completed'"
-                       [class.step-active]="step.status === 'active'"
-                       [class.step-pending]="step.status === 'pending'">
-                    
-                    <div class="step-icon mr-3 d-flex align-items-center justify-content-center">
-                      <mat-icon *ngIf="step.status === 'completed'" class="text-success" style="font-size: 20px; height: 20px; width: 20px;">check_circle</mat-icon>
-                      <mat-icon *ngIf="step.status === 'active'" class="text-primary spin-icon" style="font-size: 20px; height: 20px; width: 20px;">sync</mat-icon>
-                      <mat-icon *ngIf="step.status === 'pending'" class="text-muted" style="font-size: 20px; height: 20px; width: 20px;">radio_button_unchecked</mat-icon>
-                    </div>
-
-                    <div class="step-label flex-grow-1" style="font-size: 13px; font-weight: 500;">
-                      {{ step.label }}
-                    </div>
-
-                    <span class="badge" 
-                          [ngClass]="{
-                            'badge-success': step.status === 'completed',
-                            'badge-primary': step.status === 'active',
-                            'badge-light text-muted': step.status === 'pending'
-                          }" style="font-size: 11px; font-weight: 600; padding: 4px 8px;">
-                      {{ step.status === 'completed' ? 'Done' : step.status === 'active' ? 'In Progress' : 'Pending' }}
-                    </span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ─── Fullscreen Progress Overlay Modal with Blur ────────────────── -->
+  <div *ngIf="inProcess" class="sync-processing-overlay">
+    <div class="sync-processing-card">
+      
+      <!-- Top Progress Bar -->
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" [style.width.%]="processingPercent"></div>
+      </div>
+
+      <div class="sync-header d-flex align-items-center mb-3 w-100 px-2">
+        <div class="sync-spinner mr-3 flex-shrink-0">
+          <div class="spinner-ring"></div>
+          <span class="spinner-percent">{{ processingPercent }}%</span>
+        </div>
+        <div class="text-left flex-grow-1">
+          <h5 class="sync-title mb-1 font-weight-bold" style="font-size: 1.05rem; color: #1e293b;">{{ processingStatusText }}</h5>
+          <p class="sync-subtitle mb-0 text-muted" style="font-size: 0.82rem;">{{ processingSubText }}</p>
+        </div>
+      </div>
+
+      <!-- Step Timeline Checklist -->
+      <div class="step-timeline w-100 text-left mt-1">
+        <div *ngFor="let step of processingSteps; let idx = index" 
+             class="step-item d-flex align-items-center py-2 px-3 mb-2"
+             [class.step-completed]="step.status === 'completed'"
+             [class.step-active]="step.status === 'active'"
+             [class.step-pending]="step.status === 'pending'">
+          
+          <div class="step-icon mr-3 d-flex align-items-center justify-content-center">
+            <mat-icon *ngIf="step.status === 'completed'" class="text-success" style="font-size: 20px; height: 20px; width: 20px;">check_circle</mat-icon>
+            <mat-icon *ngIf="step.status === 'active'" class="text-primary spin-icon" style="font-size: 20px; height: 20px; width: 20px;">sync</mat-icon>
+            <mat-icon *ngIf="step.status === 'pending'" class="text-muted" style="font-size: 20px; height: 20px; width: 20px;">radio_button_unchecked</mat-icon>
+          </div>
+
+          <div class="step-label flex-grow-1" style="font-size: 13px; font-weight: 500;">
+            {{ step.label }}
+          </div>
+
+          <span class="badge" 
+                [ngClass]="{
+                  'badge-success': step.status === 'completed',
+                  'badge-primary': step.status === 'active',
+                  'badge-light text-muted': step.status === 'pending'
+                }" style="font-size: 11px; font-weight: 600; padding: 4px 8px;">
+            {{ step.status === 'completed' ? 'Done' : step.status === 'active' ? 'In Progress' : 'Pending' }}
+          </span>
+        </div>
+      </div>
+
     </div>
   </div>
 
