@@ -9,14 +9,17 @@ import { handleQueue } from "./queue/consumer.js";
 
 const app = new Hono<{ Bindings: Env }>();
 
-// CORS for local dev
-app.use("/api/*", cors());
+// CORS for local dev & worker-to-worker
+app.use("/*", cors());
 
 // API routes
 app.route("/api/documents", documents);
+app.route("/documents", documents);
 app.route("/api/jobs", jobs);
+app.route("/jobs", jobs);
 
 // Health check
+app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
 app.get("/api/health", (c) =>
   c.json({ status: "ok", timestamp: new Date().toISOString() }),
 );

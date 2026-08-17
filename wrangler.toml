@@ -94,6 +94,10 @@ index_name = "chatbot-query-cache-dev"
 [ai]
 binding = "AI"
 
+[[services]]
+binding = "SCALABLE_RAG"
+service = "scalable-rag"
+
 # To enable Cloudflare Browser Rendering (Browser Run) in production deployment, uncomment:
 # [browser]
 # binding = "MY_BROWSER"

@@ -272,9 +272,15 @@ function toKebabTag(text: string): string {
 
 export class ScalableRagClient {
   private baseUrl: string;
+  private serviceBinding?: any;
 
-  constructor(baseUrl?: string) {
-    this.baseUrl = (baseUrl || "http://127.0.0.1:8788").replace(/\/$/, "");
+  constructor(baseUrlOrBinding?: string | any) {
+    if (baseUrlOrBinding && typeof baseUrlOrBinding === "object" && typeof baseUrlOrBinding.fetch === "function") {
+      this.serviceBinding = baseUrlOrBinding;
+      this.baseUrl = "https://scalable-rag";
+    } else {
+      this.baseUrl = (typeof baseUrlOrBinding === "string" ? baseUrlOrBinding : "https://scalable-rag.hassanwaqar475.workers.dev").replace(/\/$/, "");
+    }
   }
 
   /**
@@ -289,18 +295,19 @@ export class ScalableRagClient {
     fileName: string = "document.txt"
   ): Promise<ScalableRagResult> {
     const formData = new FormData();
-    if (file instanceof Blob && typeof (file as any).name !== "string") {
-      formData.append("file", file, fileName);
-    } else {
-      formData.append("file", file);
-    }
+    const safeName = (file as any).name || fileName || "document.txt";
+    const buffer = await file.arrayBuffer();
+    const blob = new Blob([buffer], { type: (file as any).type || "application/octet-stream" });
+    formData.append("file", blob, safeName);
     formData.append("engineMode", engineMode);
     formData.append("strategy", strategy);
     if (pageImages) {
       formData.append("pageImages", pageImages);
     }
 
-    const res = await fetch(`${this.baseUrl}/api/documents/process-sync`, {
+    const fetchFn = this.serviceBinding ? this.serviceBinding.fetch.bind(this.serviceBinding) : fetch;
+    const targetUrl = `${this.baseUrl}/api/documents/process-sync`;
+    const res = await fetchFn(targetUrl, {
       method: "POST",
       body: formData,
     });

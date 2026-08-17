@@ -49,6 +49,8 @@ function normalizeChunks(chunks: any[]): Array<{
   section: string;
   tags: string[];
   topic: string;
+  tier: string;
+  parentId: string | null;
 }> {
   const out: any[] = [];
 
@@ -64,6 +66,8 @@ function normalizeChunks(chunks: any[]): Array<{
       section: (x.section || "").toString(),
       tags: Array.isArray(x.tags) ? x.tags.slice(0, 8) : [],
       topic: typeof x.topic === "string" && x.topic.trim() ? x.topic : "general",
+      tier: x.tier || "small",
+      parentId: x.parentId || null,
     });
   }
 
@@ -180,7 +184,7 @@ export const DataController = {
       const strategy = String(form.get("strategy") || "semantic");
       const uploadId = String(form.get("uploadId") || "");
       const enrich = String(form.get("enrich") || "false").toLowerCase() === "true";
-      const engineMode = String(form.get("engineMode") || "").toLowerCase();
+      const engineMode = String(form.get("engineMode") || "offline").toLowerCase() || "offline";
       const pt = progressTrackerKV(c.env.CACHE);
 
       const key = getOpenAIKey(c.env);
@@ -218,14 +222,14 @@ export const DataController = {
 
         let chunks: any[] = [];
         let extractedFullMarkdown = "";
-        const isScalableRag = ["offline", "hybrid", "ai-full"].includes(engineMode);
+        const isScalableRag = ["offline", "hybrid", "ai-full", "ai", "adaptive"].includes(engineMode) || strategy === "adaptive" || strategy === "ai";
 
         if (isScalableRag) {
           // Route through Scalable RAG microservice for multi-format extraction + 3-tier chunking
           try {
-            const scalableRagUrl = c.env.SCALABLE_RAG_URL || "http://127.0.0.1:8788";
+            const scalableBinding = (c.env as any).SCALABLE_RAG || c.env.SCALABLE_RAG_URL || "https://scalable-rag.hassanwaqar475.workers.dev";
             const { ScalableRagClient } = await import("../services/ingestion/scalable-rag.client");
-            const client = new ScalableRagClient(scalableRagUrl);
+            const client = new ScalableRagClient(scalableBinding);
 
             // Determine chunking strategy: map fervent-curie strategies to scalable-rag strategies
             const scalableStrategy = (strategy === "ai" || strategy === "agentic") ? "ai" : "adaptive";
@@ -248,7 +252,8 @@ export const DataController = {
               file,
               effectiveEngineMode,
               scalableStrategy as any,
-              pageImages || undefined
+              pageImages || undefined,
+              fileName
             );
 
             extractedFullMarkdown = scalableResult.fullMarkdown || "";

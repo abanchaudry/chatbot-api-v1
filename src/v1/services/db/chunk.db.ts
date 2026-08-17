@@ -147,6 +147,8 @@ export const chunkDb = {
            c.content,
            c.tags,
            c.chunk_index,
+           c.tier,
+           c.parent_id,
            c.created_at
          FROM chunks c
          LEFT JOIN files f ON f.file_id = c.file_id
@@ -158,7 +160,7 @@ export const chunkDb = {
       .all();
 
     const totalRow: any = await db
-      .prepare(`SELECT COUNT(*) AS total FROM chunks c WHERE c.file_id = ? ${searchClause}`)
+      .prepare(`SELECT COUNT(1) AS total FROM chunks c WHERE c.file_id = ? ${searchClause}`)
       .bind(...countArgs)
       .first();
 
@@ -203,6 +205,8 @@ export const chunkDb = {
         c.content,
         c.tags,
         c.chunk_index,
+        c.tier,
+        c.parent_id,
         c.created_at
       FROM chunks c
       LEFT JOIN files f ON f.file_id = c.file_id
@@ -653,7 +657,7 @@ export const chunkDb = {
 
     const res = await db
       .prepare(
-        `SELECT chunk_id, file_id, section, section_number, topic, first_sentence, content, tags, created_at
+        `SELECT chunk_id, file_id, section, section_number, topic, first_sentence, content, tags, tier, parent_id, created_at
          FROM chunks
          WHERE file_id = ?
          ORDER BY rowid ASC`
@@ -663,28 +667,48 @@ export const chunkDb = {
 
     const fileChunks = (res.results || []) as any[];
 
-    // Identify target title or section key (e.g. "1.3" or "Estate Premium Tier")
+    // 1. Direct tier lookup based on tier column and parent_id
+    let smallChunk: any = target.tier === "small" ? target : null;
+    let mediumChunk: any = target.tier === "medium" ? target : null;
+    let largeChunk: any = target.tier === "large" ? target : null;
+
+    if (target.tier === "small") {
+      if (target.parent_id) {
+        mediumChunk = fileChunks.find(c => c.chunk_id === target.parent_id || c.chunk_id.endsWith(target.parent_id));
+        if (mediumChunk && mediumChunk.parent_id) {
+          largeChunk = fileChunks.find(c => c.chunk_id === mediumChunk.parent_id || c.chunk_id.endsWith(mediumChunk.parent_id));
+        }
+      }
+    } else if (target.tier === "medium") {
+      if (target.parent_id) {
+        largeChunk = fileChunks.find(c => c.chunk_id === target.parent_id || c.chunk_id.endsWith(target.parent_id));
+      }
+      smallChunk = fileChunks.find(c => c.parent_id === target.chunk_id || c.parent_id === target.id);
+    } else if (target.tier === "large") {
+      mediumChunk = fileChunks.find(c => c.parent_id === target.chunk_id || c.parent_id === target.id);
+      if (mediumChunk) {
+        smallChunk = fileChunks.find(c => c.parent_id === mediumChunk.chunk_id || c.parent_id === mediumChunk.id);
+      }
+    }
+
+    // 2. Section & Content heuristic fallback
     const targetFirstLine = (target.content || "").split("\n")[0]?.trim() || "";
     const headerMatch = targetFirstLine.match(/^(?:\d+\.\d+\s+)?[^(:\n]+/i);
     const searchKey = headerMatch ? headerMatch[0].trim() : targetFirstLine.slice(0, 20).trim();
 
-    let smallChunk: any = target;
-    let mediumChunk: any = null;
-    let largeChunk: any = null;
+    if (!largeChunk || !mediumChunk || !smallChunk) {
+      for (const ch of fileChunks) {
+        const sec = (ch.section || "").toLowerCase();
+        const content = String(ch.content || "");
+        const matchesSearch = searchKey.length >= 3 && content.toLowerCase().includes(searchKey.toLowerCase());
 
-    for (const ch of fileChunks) {
-      if (ch.chunk_id === target.chunk_id) continue;
-
-      const sec = (ch.section || "").toLowerCase();
-      const content = String(ch.content || "");
-      const matchesSearch = searchKey.length >= 3 && content.toLowerCase().includes(searchKey.toLowerCase());
-
-      if (sec.includes("large chunk") || sec.includes("large")) {
-        if (!largeChunk || matchesSearch) largeChunk = ch;
-      } else if (sec.includes("medium chunk") || sec.includes("medium")) {
-        if (!mediumChunk || matchesSearch) mediumChunk = ch;
-      } else {
-        if (!smallChunk) smallChunk = ch;
+        if (ch.tier === "large" || sec.includes("large chunk") || sec.includes("large") || sec.includes("📄")) {
+          if (!largeChunk || matchesSearch) largeChunk = ch;
+        } else if (ch.tier === "medium" || sec.includes("medium chunk") || sec.includes("medium") || sec.includes("📝")) {
+          if (!mediumChunk || matchesSearch) mediumChunk = ch;
+        } else {
+          if (!smallChunk || matchesSearch) smallChunk = ch;
+        }
       }
     }
 

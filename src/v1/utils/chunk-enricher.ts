@@ -10,11 +10,15 @@ interface Chunk {
   tags?: string[];
   topic?: string;
   index: number;
+  tier?: string;
+  parentId?: string | null;
 }
 
 interface EnrichedChunk extends Chunk {
   tags: string[];
   topic: string;
+  tier: string;
+  parentId: string | null;
   enriched: true;
   firstSentencePreview: string;
   contentLength: number;
@@ -28,6 +32,8 @@ export class ChunkEnricher {
   static enrichChunk(chunk: Chunk, context?: string): EnrichedChunk {
     const enriched: EnrichedChunk = {
       ...chunk,
+      tier: chunk.tier || "small",
+      parentId: chunk.parentId || null,
       tags: this.enhanceTags(chunk.content, chunk.tags),
       topic: chunk.topic || this.determineTopic(chunk.content, chunk.section),
       enriched: true,
