@@ -28,22 +28,29 @@ export class FileStorageService {
     const safeName = FileStorageService.sanitizeFileName(fileName);
     const body = new TextEncoder().encode(rawText);
 
-    await c.env.apogee_private.put(key, body, {
-      httpMetadata: {
-        contentType: "text/plain; charset=utf-8",
-        contentDisposition: `attachment; filename="${safeName}"`,
-      },
-      customMetadata: {
-        file_id: fileId,
-        file_name: safeName,
-        stored_at: new Date().toISOString(),
-      },
-    });
+    if (c.env?.apogee_private) {
+      try {
+        await c.env.apogee_private.put(key, body, {
+          httpMetadata: {
+            contentType: "text/plain; charset=utf-8",
+            contentDisposition: `attachment; filename="${safeName}"`,
+          },
+          customMetadata: {
+            file_id: fileId,
+            file_name: safeName,
+            stored_at: new Date().toISOString(),
+          },
+        });
+      } catch (err: any) {
+        console.warn("[FileStorageService] R2 put warning:", err?.message);
+      }
+    }
 
     return { key };
   }
 
   static async getPrivateObjectByKey(c: Context, key: string) {
+    if (!c.env?.apogee_private) return null;
     return c.env.apogee_private.get(key);
   }
 

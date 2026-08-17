@@ -13,7 +13,7 @@ APP_VERSION = "v1"
 ASSISTANT_NAME = "CHATBOT ASSISTANT"
 ASSISTANT_DOMAIN_HINT = "Customer support for your organization."
 FALLBACK_MESSAGE = "I’m sorry — I don’t have enough information to answer that."
-ALLOWED_ORIGINS = "http://localhost:3000"
+ALLOWED_ORIGINS = "https://chatbot-admin-6o1.pages.dev,http://localhost:4200,http://localhost:3000"
 ENABLE_RERANK_LLM = "true"
 ENABLE_GATE_LLM = "false"
 ENABLE_GATE = "true"
@@ -73,13 +73,14 @@ id = "f192ebb3713b426c8e6885f04779299a"
 binding = "CACHE"
 id = "14f7a24502994f1aaca780f1a7a2347e"
 
-[[r2_buckets]]
-binding = "apogee_public"
-bucket_name = "chatbot-public-dev"
+# To enable R2 bucket storage when activated on your Cloudflare account, uncomment:
+# [[r2_buckets]]
+# binding = "apogee_public"
+# bucket_name = "chatbot-public-dev"
 
-[[r2_buckets]]
-binding = "apogee_private"
-bucket_name = "chatbot-private-dev"
+# [[r2_buckets]]
+# binding = "apogee_private"
+# bucket_name = "chatbot-private-dev"
 
 [[vectorize]]
 binding = "VECTORIZE"
