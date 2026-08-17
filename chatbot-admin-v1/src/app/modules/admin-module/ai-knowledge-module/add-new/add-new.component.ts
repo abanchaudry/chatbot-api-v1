@@ -752,12 +752,10 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pageImages: Array<{ pageNum: number; dataUrl: string }> = [];
 
-      const maxPages = pdf.numPages; // No page limit: rasterize all pages in the PDF
+      const maxPages = Math.min(pdf.numPages, 10);
       for (let i = 1; i <= maxPages; i++) {
-
-
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.0 }); // 300 DPI scale
+        const viewport = page.getViewport({ scale: 1.2 });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
         canvas.height = viewport.height;
@@ -767,7 +765,7 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
           await page.render({ canvasContext: context, viewport }).promise;
           pageImages.push({
             pageNum: i,
-            dataUrl: canvas.toDataURL("image/png"),
+            dataUrl: canvas.toDataURL("image/jpeg", 0.75),
           });
         }
       }

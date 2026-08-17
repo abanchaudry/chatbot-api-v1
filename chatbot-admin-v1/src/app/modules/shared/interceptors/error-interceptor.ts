@@ -55,10 +55,7 @@ export class HttpErrorInterceptor implements HttpInterceptor {
                         // this.router.navigateByUrl('/user/login')
                     }
                     // this.alert.responseAlert(errorMessage, 'error');
-                    // window.alert(errorMessage);
-                    // return throwError(error);
-                    return throwError(() => new Error('test'))
-                    // return throwError(errorMessage);
+                    return throwError(() => error);
                 })
             )
     }
