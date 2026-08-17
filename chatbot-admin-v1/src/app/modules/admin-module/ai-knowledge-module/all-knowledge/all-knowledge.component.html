@@ -14,7 +14,7 @@
               <span>Total Files: {{ aiKnowledgeData.length }}</span>
             </div>
             <div class="ai-stat-item">
-              <span>Total Chunks: {{ totalChunks }}</span>
+              <span>Total Chunks: {{ totalChunksCount }}</span>
             </div>
           </div>
         </div>
@@ -72,7 +72,8 @@
                         let item of aiKnowledgeData
                           | searchFilter : searchText
                           | paginate : { itemsPerPage: entries, currentPage: page };
-                        let i = index
+                        let i = index;
+                        trackBy: trackByFileId
                       "
                     >
                       <td>

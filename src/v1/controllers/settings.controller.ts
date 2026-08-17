@@ -3,6 +3,8 @@ import type { Env } from "../types/env";
 import { SettingsDbService } from "../services/db/settings.db";
 import { ChatOpenAI } from "@langchain/openai";
 import { PromptTemplate } from "@langchain/core/prompts";
+import { StringOutputParser } from "@langchain/core/output_parsers";
+import { getOpenAIKey } from "../utils/keys";
 
 const domainGeneratorPrompt = PromptTemplate.fromTemplate(`
 You are an expert AI prompt engineer specializing in enterprise RAG chatbots.
@@ -60,7 +62,7 @@ export const settingsController = {
         return c.json({ ok: false, error: "rawDescription is required to generate domain prompt" }, 400);
       }
 
-      const apiKey = c.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+      const apiKey = getOpenAIKey(c.env);
       if (!apiKey) {
         return c.json({ ok: false, error: "OPENAI_API_KEY is not configured" }, 500);
       }

@@ -82,21 +82,25 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let file of allFiles">
+                <tr *ngFor="let file of allFiles; trackBy: trackByFileId">
                   <td class="line-height-16px">{{ file.file_name }}</td>
                   <td>{{ file.file_size }}</td>
                   <td>{{ file.usage_bytes }}</td>
                   <td><span class="badge badge-success">{{ file.status }}</span></td>
                   <td>{{ file.created_at | date }}</td>
                   <td class="d-flex align-items-center">
-                    <a mat-icon-button  style="color: #006666;" (click)="downloadFile(file.file_path)">
+                    <button type="button" mat-icon-button aria-label="View file" style="color: #006666;" (click)="downloadFile(file.file_path)">
                       <mat-icon>visibility</mat-icon>
-                    </a>
-                    <a mat-icon-button color="warn" (click)="confirmDeleteFile(file)">
+                    </button>
+                    <button type="button" mat-icon-button color="warn" aria-label="Delete file" (click)="confirmDeleteFile(file)">
                       <mat-icon>delete</mat-icon>
-                    </a>
+                    </button>
                   </td>
-                  
+                </tr>
+                <tr *ngIf="!allFiles || allFiles.length === 0">
+                  <td colspan="6" class="text-center py-4 text-muted">
+                    No files found for this assistant.
+                  </td>
                 </tr>
               </tbody>
             </table>

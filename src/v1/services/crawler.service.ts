@@ -1,6 +1,5 @@
-// src/v1/services/crawler.service.ts
-
 import type { Env } from "../types/env";
+import { CRAWLER_CONFIG } from "../constants";
 
 export type CrawledPageResult = {
   url: string;
@@ -76,8 +75,9 @@ export async function crawlWebPage(
   // Check if Cloudflare Browser Run (Puppeteer) is available
   if (env.MY_BROWSER) {
     try {
-      const puppeteer = await import("@cloudflare/puppeteer");
-      const browser = await puppeteer.default.launch(env.MY_BROWSER);
+      const puppeteerModuleName = "@cloudflare/puppeteer";
+      const puppeteer = await (import(puppeteerModuleName as any) as Promise<any>);
+      const browser = await (puppeteer.default || puppeteer).launch(env.MY_BROWSER);
       const page = await browser.newPage();
 
       await page.goto(url, { waitUntil: "networkidle0", timeout: 30000 });
@@ -111,6 +111,18 @@ export async function crawlWebPage(
     });
 
     if (res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      if (
+        !contentType.includes("text/html") &&
+        !contentType.includes("text/plain") &&
+        !contentType.includes("application/xhtml+xml")
+      ) {
+        throw new Error(`Unsupported Content-Type: ${contentType}. Only web HTML/text pages are supported.`);
+      }
+      const contentLength = parseInt(res.headers.get("content-length") || "0", 10);
+      if (contentLength > CRAWLER_CONFIG.MAX_PAGE_CONTENT_BYTES) {
+        throw new Error(`Page size exceeds maximum allowed limit (${(contentLength / 1024 / 1024).toFixed(1)}MB).`);
+      }
       html = await res.text();
     } else {
       console.warn(`Direct fetch returned status ${res.status}, trying Jina reader proxy...`);
@@ -267,10 +279,10 @@ export async function discoverLinks(
       }
     }
 
-    // Fast HTML title fetcher (2.5s max timeout per request, no Jina proxy for discovery speed)
+    // Fast HTML title fetcher
     async function fetchPageTitleFast(url: string): Promise<string> {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), CRAWLER_CONFIG.DEFAULT_FETCH_TIMEOUT_MS);
       try {
         const res = await fetch(url, {
           redirect: "follow",
@@ -300,9 +312,9 @@ export async function discoverLinks(
     // 1. Fetch Root Page (Depth 0)
     visited.add(cleanRootUrl);
     
-    // Root fetch gets 4 seconds timeout
+    // Root fetch
     const rootController = new AbortController();
-    const rootTimeout = setTimeout(() => rootController.abort(), 4000);
+    const rootTimeout = setTimeout(() => rootController.abort(), CRAWLER_CONFIG.FALLBACK_FETCH_TIMEOUT_MS);
     let rootHtml = "";
     let rootTitle = titleFromUrl(cleanRootUrl);
 

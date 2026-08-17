@@ -26,22 +26,26 @@ export type Env = {
     // -----------------------------
     apogee_public: R2Bucket;
     apogee_private: R2Bucket;
+    DOCUMENTS?: R2Bucket;
 
     // -----------------------------
-    // OpenAI
+    // OpenAI & AI Gateway
     // -----------------------------
     OPENAI_API_KEY: string;
     OPENAI_CHAT_MODEL?: string;   // e.g. gpt-4o-mini
     OPENAI_RERANK_MODEL?: string; // e.g. gpt-4o-mini
     OPENAI_GATE_MODEL?: string;   // e.g. gpt-4o-mini
+    AI_GATEWAY_URL?: string;
 
     // -----------------------------
     // Assistant config
     // -----------------------------
     ASSISTANT_NAME?: string;
     ASSISTANT_DOMAIN_HINT?: string;
+    COMPANY_NAME?: string;
     FALLBACK_MESSAGE?: string;
     APP_VERSION?: string;
+    SCALABLE_RAG_URL?: string;
 
     // -----------------------------
     // Feature flags & Browser

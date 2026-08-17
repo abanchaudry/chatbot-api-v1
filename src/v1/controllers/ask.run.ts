@@ -598,6 +598,7 @@ export async function runAsk(
         isGreetingOnly: false,
         isFollowUp: false,
         rewrittenQuestion: "",
+        subQueries: [],
         reason: "preflight_failed",
       };
 

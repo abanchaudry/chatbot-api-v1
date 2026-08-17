@@ -17,7 +17,12 @@ const SECTION_RE =
 const extractSection = (text?: string | null) =>
   (text?.match(SECTION_RE)?.[0] || null)?.toUpperCase().replace(/\s+/g, " ") ?? null;
 
+const ALLOWED_TABLES = new Set(["files", "chunks", "threads", "messages", "ingest_jobs", "ingest_logs", "auth"]);
+
 async function safeCount(db: D1Database, table: string): Promise<number> {
+  if (!ALLOWED_TABLES.has(table)) {
+    throw new Error(`Invalid table name: ${table}`);
+  }
   try {
     const row = await db.prepare(`SELECT COUNT(*) AS total FROM ${table}`).first();
     return (row as any)?.total || 0;
@@ -26,8 +31,10 @@ async function safeCount(db: D1Database, table: string): Promise<number> {
   }
 }
 
-
 async function ensureColumn(db: D1Database, table: string, column: string, ddl: string) {
+  if (!ALLOWED_TABLES.has(table)) {
+    throw new Error(`Invalid table name: ${table}`);
+  }
   const columns = await db.prepare(`PRAGMA table_info(${table})`).all();
   const has = (columns.results || []).some((c: any) => c.name === column);
   if (!has) {
@@ -35,17 +42,25 @@ async function ensureColumn(db: D1Database, table: string, column: string, ddl: 
   }
 }
 
+let _filesSchemaEnsured = false;
+
 export const fileDb = {
   async ensureFilesSchema(db: D1Database) {
-    await ensureColumn(db, "files", "file_path", `ALTER TABLE files ADD COLUMN file_path TEXT`);
-    await ensureColumn(db, "files", "chunk_count", `ALTER TABLE files ADD COLUMN chunk_count INTEGER`);
-    await ensureColumn(db, "files", "error_message", `ALTER TABLE files ADD COLUMN error_message TEXT`);
-    await ensureColumn(db, "files", "source", `ALTER TABLE files ADD COLUMN source TEXT`);
-    await ensureColumn(db, "files", "version", `ALTER TABLE files ADD COLUMN version TEXT`);
-    await ensureColumn(db, "files", "checksum", `ALTER TABLE files ADD COLUMN checksum TEXT`);
-    await ensureColumn(db, "files", "upload_id", `ALTER TABLE files ADD COLUMN upload_id TEXT`);
-    await ensureColumn(db, "files", "chunk_method", `ALTER TABLE files ADD COLUMN chunk_method TEXT`);
-    await ensureColumn(db, "files", "embedding_model", `ALTER TABLE files ADD COLUMN embedding_model TEXT`);
+    if (_filesSchemaEnsured) return;
+    try {
+      await ensureColumn(db, "files", "file_path", `ALTER TABLE files ADD COLUMN file_path TEXT`);
+      await ensureColumn(db, "files", "chunk_count", `ALTER TABLE files ADD COLUMN chunk_count INTEGER`);
+      await ensureColumn(db, "files", "error_message", `ALTER TABLE files ADD COLUMN error_message TEXT`);
+      await ensureColumn(db, "files", "source", `ALTER TABLE files ADD COLUMN source TEXT`);
+      await ensureColumn(db, "files", "version", `ALTER TABLE files ADD COLUMN version TEXT`);
+      await ensureColumn(db, "files", "checksum", `ALTER TABLE files ADD COLUMN checksum TEXT`);
+      await ensureColumn(db, "files", "upload_id", `ALTER TABLE files ADD COLUMN upload_id TEXT`);
+      await ensureColumn(db, "files", "chunk_method", `ALTER TABLE files ADD COLUMN chunk_method TEXT`);
+      await ensureColumn(db, "files", "embedding_model", `ALTER TABLE files ADD COLUMN embedding_model TEXT`);
+      _filesSchemaEnsured = true;
+    } catch (e) {
+      console.warn("Schema initialization check warning:", e);
+    }
   },
 
   async saveFile(db: D1Database, name: string, size: number, status: string, uuid: string, path: string) {
@@ -139,11 +154,26 @@ export const fileDb = {
   async updateFile(db: D1Database, fileId: string, patch: Record<string, any>) {
     await this.ensureFilesSchema(db);
 
-    const keys = Object.keys(patch);
-    if (!keys.length) return;
+    const ALLOWED_FILE_COLUMNS = new Set([
+      "file_name",
+      "file_size",
+      "file_status",
+      "file_path",
+      "chunk_count",
+      "error_message",
+      "source",
+      "version",
+      "checksum",
+      "upload_id",
+      "chunk_method",
+      "embedding_model",
+    ]);
 
-    const sets = keys.map((k) => `${k} = ?`).join(", ");
-    const vals = keys.map((k) => patch[k]);
+    const validEntries = Object.entries(patch).filter(([k]) => ALLOWED_FILE_COLUMNS.has(k));
+    if (!validEntries.length) return;
+
+    const sets = validEntries.map(([k]) => `${k} = ?`).join(", ");
+    const vals = validEntries.map(([, v]) => v);
 
     await db
       .prepare(`UPDATE files SET ${sets}, updated_at = datetime() WHERE file_id = ?`)

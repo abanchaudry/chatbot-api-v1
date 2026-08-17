@@ -71,7 +71,7 @@ function normalizeText(raw: string) {
 
 export class ChunkingServiceV2 {
   private openai: OpenAI;
-  private opts: Required<ChunkerOptions>;
+  private opts: Required<Omit<ChunkerOptions, "cacheKV">> & { cacheKV?: KVNamespace };
 
   constructor(apiKey: string, options?: ChunkerOptions) {
     this.openai = new OpenAI({ apiKey });

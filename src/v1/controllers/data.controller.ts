@@ -15,8 +15,10 @@ import { ChunkValidator } from "../utils/chunk-validator";
 import { ContentCleaner } from "../utils/content-cleaner";
 import { ScalableRagClient } from "../services/ingestion/scalable-rag.client";
 import { purgeAllQueryCache } from "../services/cache.service";
+import { INGEST_CONFIG } from "../constants";
+import { sleep, backoff } from "../utils/retry";
 
-const BATCH_SIZE = 50;
+const BATCH_SIZE = INGEST_CONFIG.DEFAULT_VECTOR_UPSERT_BATCH_SIZE;
 
 const SECTION_RE =
   /\b(?:NAC|NRS)?\s*624\.\d{1,5}(?:\([^)]+\))?(?:\s*[–-]\s*624\.\d{1,5})?\b/i;
@@ -196,6 +198,13 @@ export const DataController = {
 
       const results: any[] = [];
       for (const file of files) {
+        if (file.size > INGEST_CONFIG.MAX_TEXT_SIZE_BYTES) {
+          const error = `File ${file.name} exceeds 10MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
+          if (uploadId) await pt.fail(uploadId, error);
+          results.push({ file: file.name, error });
+          continue;
+        }
+
         const rawText = await file.text();
         const fileName = file.name;
         const version = `v${Date.now()}`;
@@ -785,6 +794,9 @@ export const DataController = {
 
     if (!fileName) return c.json({ ok: false, message: "fileName is required." }, 400);
     if (!rawText.trim()) return c.json({ ok: false, message: "rawText is required." }, 400);
+    if (rawText.length > INGEST_CONFIG.MAX_TEXT_SIZE_BYTES) {
+      return c.json({ ok: false, message: `File text exceeds 10MB limit (${(rawText.length / 1024 / 1024).toFixed(1)}MB)` }, 400);
+    }
 
     const fileId = crypto.randomUUID();
     const size = rawText.length;
@@ -1118,26 +1130,57 @@ getAllChunks: async (c: Context) => {
       }
 
       // 3. Delete from D1 tables (chunks, files, and optional document_chunks tables)
-      try { await fileDb.deleteChunksByFileId(c.env.DB, fileId); } catch {}
-      try { await c.env.DB.prepare(`DELETE FROM files WHERE file_id = ?`).bind(fileId).run(); } catch {}
-      try { await c.env.DB.prepare(`DELETE FROM document_chunks WHERE document_id = ? OR id = ?`).bind(fileId, fileId).run(); } catch {}
-      try { await c.env.DB.prepare(`DELETE FROM documents WHERE id = ?`).bind(fileId).run(); } catch {}
-
+      try {
+        await fileDb.deleteChunksByFileId(c.env.DB, fileId);
+      } catch (err: any) {
+        console.warn("[DataController] deleteChunksByFileId warning:", err?.message);
+      }
+      try {
+        await c.env.DB.prepare(`DELETE FROM files WHERE file_id = ?`).bind(fileId).run();
+      } catch (err: any) {
+        console.warn("[DataController] files delete warning:", err?.message);
+      }
+      try {
+        await c.env.DB.prepare(`DELETE FROM document_chunks WHERE document_id = ? OR id = ?`).bind(fileId, fileId).run();
+      } catch (err: any) {
+        console.warn("[DataController] document_chunks delete warning:", err?.message);
+      }
+      try {
+        await c.env.DB.prepare(`DELETE FROM documents WHERE id = ?`).bind(fileId).run();
+      } catch (err: any) {
+        console.warn("[DataController] documents delete warning:", err?.message);
+      }
 
       // 4. Delete R2 files if any
       if (fileObj.file_path) {
-        try { await FileStorageService.deleteFromR2(c, fileObj.file_path); } catch {}
+        try {
+          await FileStorageService.deleteFromR2(c, fileObj.file_path);
+        } catch (err: any) {
+          console.warn("[DataController] R2 delete file_path warning:", err?.message);
+        }
       }
       if (fileObj.r2_key) {
-        try { await c.env.DOCUMENTS?.delete(fileObj.r2_key); } catch {}
+        try {
+          await c.env.DOCUMENTS?.delete(fileObj.r2_key);
+        } catch (err: any) {
+          console.warn("[DataController] DOCUMENTS delete r2_key warning:", err?.message);
+        }
       }
       if (fileObj.extracted_r2_key) {
-        try { await c.env.DOCUMENTS?.delete(fileObj.extracted_r2_key); } catch {}
+        try {
+          await c.env.DOCUMENTS?.delete(fileObj.extracted_r2_key);
+        } catch (err: any) {
+          console.warn("[DataController] DOCUMENTS delete extracted_r2_key warning:", err?.message);
+        }
       }
 
       // 5. Purge query cache to invalidate stale cached answers
       if (c.env.CACHE) {
-        try { await purgeAllQueryCache(c.env.CACHE); } catch {}
+        try {
+          await purgeAllQueryCache(c.env.CACHE);
+        } catch (err: any) {
+          console.warn("[DataController] Cache purge warning:", err?.message);
+        }
       }
 
       await ingestDb.log(c.env.DB, jobId, fileId, "INFO", "D1 & R2 delete ok: file + chunks removed");

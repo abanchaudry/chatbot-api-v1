@@ -27,7 +27,9 @@ export class ApiService {
 
     // auth token if present
     const token = localStorage.getItem(environment.token_label);
-    if (token) headers["Authorization"] = token;
+    if (token) {
+      headers["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+    }
 
     // allow caller to override/extend
     if (extra) Object.assign(headers, extra);

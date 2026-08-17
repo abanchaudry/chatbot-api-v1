@@ -20,6 +20,7 @@ export class AllAIKnowledgeComponent implements OnInit {
   entries = 10;
   itemPerPage = 10;
   aiKnowledgeData: any[] = [];
+  totalChunksCount: number = 0;
   isLoading = false;
   searchText: string = "";
 
@@ -46,6 +47,10 @@ export class AllAIKnowledgeComponent implements OnInit {
       .subscribe({
         next: (res: any) => {
           this.aiKnowledgeData = res?.files || [];
+          this.totalChunksCount = this.aiKnowledgeData.reduce(
+            (total, item) => total + (Number(item.chunk_count) || 0),
+            0
+          );
         },
         error: (err) => {
           console.error("Fetch AI knowledge list failed:", err);
@@ -53,11 +58,8 @@ export class AllAIKnowledgeComponent implements OnInit {
       });
   }
 
-  get totalChunks(): number {
-    return (this.aiKnowledgeData || []).reduce(
-      (total, item) => total + (Number(item.chunk_count) || 0),
-      0
-    );
+  trackByFileId(index: number, item: any): string {
+    return item?.file_id || String(index);
   }
 
   canDownload(row: any): boolean {

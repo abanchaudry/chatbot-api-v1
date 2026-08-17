@@ -211,9 +211,11 @@
 // }
 
 
-import { Component, OnInit, ChangeDetectorRef } from "@angular/core";
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from "@angular/core";
 import { Router } from "@angular/router";
 import { MatDialog } from "@angular/material/dialog";
+import { Subject } from "rxjs";
+import { takeUntil } from "rxjs/operators";
 import Swal from "sweetalert2";
 import { nanoid } from "nanoid";
 import { AiKnowledgeService } from "../../../shared/services/ai-knowledge.service";
@@ -224,7 +226,9 @@ import { UploadProgressComponent } from "../../../shared/popup/upload-progress/u
   templateUrl: "./add-new.component.html",
   styleUrls: ["./add-new.component.css"],
 })
-export class AddNewKnowledgeComponent implements OnInit {
+export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subject<void>();
+
   showForm = true;
   showTable = false;
 
@@ -309,6 +313,26 @@ export class AddNewKnowledgeComponent implements OnInit {
     private router: Router
   ) {}
 
+  ngOnInit(): void {
+    this.model.id = nanoid();
+    this.model.version = `v${Date.now()}`;
+    this.uploadId = nanoid();
+    this.model.fileId = this.uploadId;
+  }
+
+  ngOnDestroy(): void {
+    this.stopStepProgress();
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private stopStepProgress(): void {
+    if (this.progressTimer) {
+      clearInterval(this.progressTimer);
+      this.progressTimer = null;
+    }
+  }
+
   onCrawlSubmit(): void {
     if (!this.crawlUrl) {
       Swal.fire("Error", "Please enter a valid website URL", "error");
@@ -318,7 +342,10 @@ export class AddNewKnowledgeComponent implements OnInit {
     this.inProcess = true;
     this.startCrawlStepProgress();
 
-    this.aiService.crawlWebUrl({ url: this.crawlUrl, crawlSchedule: this.crawlSchedule }).subscribe({
+    this.aiService
+      .crawlWebUrl({ url: this.crawlUrl, crawlSchedule: this.crawlSchedule })
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: (res: any) => {
         this.completeStepProgress();
         this.inProcess = false;
@@ -551,11 +578,6 @@ export class AddNewKnowledgeComponent implements OnInit {
     this.isDiscovering = false;
     this.isCrawlingSelected = false;
     this.crawlResults = [];
-  }
-
-  ngOnInit(): void {
-    this.uploadId = nanoid();
-    this.model.fileId = this.uploadId;
   }
 
   resetProcessingSteps() {

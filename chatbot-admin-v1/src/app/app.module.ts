@@ -14,11 +14,6 @@ import { AuthLayoutComponent } from "./modules/layouts/auth/auth-layout.componen
 import { interceptorProviders } from "./modules/shared/interceptors/interceptor.module";
 
 @NgModule({
-  exports: [],
-})
-export class MaterialModule {}
-
-@NgModule({
   imports: [
     CommonModule,
     ToastrModule.forRoot(),
@@ -26,7 +21,6 @@ export class MaterialModule {}
     FormsModule,
     RouterModule.forRoot(AppRoutes, { useHash: true }),
     HttpClientModule,
-    MaterialModule,
     SharedModule,
   ],
   declarations: [AppComponent, AdminLayoutComponent, AuthLayoutComponent],

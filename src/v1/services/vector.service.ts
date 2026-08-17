@@ -25,15 +25,12 @@ export type VectorHit = {
   rawScore: number;  // underlying score from store
 };
 
-const DEFAULT_UPSERT_BATCH_SIZE = 50;
+import { INGEST_CONFIG, RETRY_CONFIG } from "../constants";
+import { sleep, backoff } from "../utils/retry";
+
+const DEFAULT_UPSERT_BATCH_SIZE = INGEST_CONFIG.DEFAULT_VECTOR_UPSERT_BATCH_SIZE;
 const MAX_UPSERT_BATCH_SIZE = 200;
-const DEFAULT_RETRY_LIMIT = 3;
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function jitterBackoff(attempt: number) {
-  return 500 * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
-}
+const DEFAULT_RETRY_LIMIT = RETRY_CONFIG.DEFAULT_MAX_ATTEMPTS;
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -136,7 +133,7 @@ export const vectorService = {
             console.error(`vectorService.storeChunks failed after ${attempt} attempts:`, err?.message || err);
             throw err;
           }
-          const delay = jitterBackoff(attempt);
+          const delay = backoff(attempt);
           console.warn(`vectorService.storeChunks retry ${attempt} in ${delay}ms:`, err?.message || err);
           await sleep(delay);
         }

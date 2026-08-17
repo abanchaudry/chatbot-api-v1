@@ -57,4 +57,18 @@ export class FileStorageService {
       },
     });
   }
+
+  static async deleteFromR2(c: Context, key?: string | null): Promise<void> {
+    if (!key) return;
+    try {
+      if (c.env?.apogee_private) {
+        await c.env.apogee_private.delete(key);
+      }
+      if (c.env?.apogee_public) {
+        await c.env.apogee_public.delete(key);
+      }
+    } catch (err: any) {
+      console.warn(`[FileStorageService] Failed to delete key from R2: ${key}`, err?.message);
+    }
+  }
 }

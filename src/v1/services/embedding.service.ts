@@ -1,22 +1,20 @@
-// File: src/v3/services/embedding.service.ts
+// File: src/v1/services/embedding.service.ts
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { progressTracker } from "../utils/progress-tracker";
+import { INGEST_CONFIG } from "../constants";
+import { sleep, backoff } from "../utils/retry";
 
 type GenOpts = {
   model?: string;          // default: "text-embedding-3-small"
-  batchSize?: number;      // default: 100
+  batchSize?: number;      // default: 50
   maxRetries?: number;     // default: 3
 };
 
 const DEFAULTS: Required<GenOpts> = {
   model: "text-embedding-3-small",
-  batchSize: 100,
+  batchSize: INGEST_CONFIG.DEFAULT_EMBEDDING_BATCH_SIZE,
   maxRetries: 3,
 };
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const backoff = (attempt: number, base = 400) =>
-  base * Math.pow(2, attempt) + Math.floor(Math.random() * 200);
 
 function sanitizeTexts(texts: string[]) {
   // Ensure every input is a non-empty string; preserve order/length.

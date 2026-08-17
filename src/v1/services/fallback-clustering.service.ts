@@ -93,7 +93,7 @@ Respond ONLY with raw JSON matching:
 }
 
 export async function runFallbackClustering(
-  env: Env,
+  env: Env["Bindings"],
   opts: ClusteringOptions | "daily" | "weekly" | "monthly" | "manual" = "weekly"
 ): Promise<{ success: boolean; message: string; clustersCount: number; queriesProcessed: number }> {
   const options: ClusteringOptions = typeof opts === "string" ? { period: opts } : opts || {};

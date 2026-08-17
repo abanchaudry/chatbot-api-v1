@@ -36,7 +36,7 @@ export class HttpConfigInterceptor implements HttpInterceptor {
                 return event;
             }),
             catchError((error: HttpErrorResponse) => {            
-                return throwError(() => new Error('test'))
+                return throwError(() => error);
             }));
     }
 

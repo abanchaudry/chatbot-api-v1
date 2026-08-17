@@ -317,7 +317,7 @@ async function runSharedAskLogic(
     });
 
     const isDirectFallback =
-      prep.route === "OUT_OF_SCOPE" ||
+      (prep.route as string) === "OUT_OF_SCOPE" ||
       prep.directRoute.answer.includes("I'm sorry") ||
       prep.directRoute.answer.includes("I’m sorry") ||
       prep.directRoute.answer.includes("can't assist") ||

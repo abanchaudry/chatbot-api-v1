@@ -46,6 +46,10 @@ export class FileUploadComponent implements OnInit {
     this.getAllAssistants();
   }
 
+  trackByFileId(index: number, item: any): string {
+    return item?.id || item?.file_id || String(index);
+  }
+
   getAllAssistants() {
     this.assistantService.getAllAssistant().subscribe((res) => {
       this.selectedAssistantId = "asst_eKIBGtoj9vAv3QgWrQiFwPmA";

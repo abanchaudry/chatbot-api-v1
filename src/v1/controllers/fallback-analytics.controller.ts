@@ -5,7 +5,7 @@ import { fallbackDb } from "../services/db/fallback.db";
 import { runFallbackClustering } from "../services/fallback-clustering.service";
 import { SettingsDbService } from "../services/db/settings.db";
 
-export async function getFallbackClustersHandler(c: Context<{ Bindings: Env }>) {
+export async function getFallbackClustersHandler(c: Context<Env>) {
   try {
     const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
     const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") || "6", 10)), 100);
@@ -37,7 +37,7 @@ export async function getFallbackClustersHandler(c: Context<{ Bindings: Env }>) 
   }
 }
 
-export async function triggerFallbackClusteringHandler(c: Context<{ Bindings: Env }>) {
+export async function triggerFallbackClusteringHandler(c: Context<Env>) {
   try {
     const body = (await c.req.json().catch(() => ({}))) as {
       period?: "daily" | "weekly" | "monthly" | "manual";
@@ -59,7 +59,7 @@ export async function triggerFallbackClusteringHandler(c: Context<{ Bindings: En
   }
 }
 
-export async function getFallbackQueryCountHandler(c: Context<{ Bindings: Env }>) {
+export async function getFallbackQueryCountHandler(c: Context<Env>) {
   try {
     const body = (await c.req.json().catch(() => ({}))) as {
       startDate?: string;
@@ -79,7 +79,7 @@ export async function getFallbackQueryCountHandler(c: Context<{ Bindings: Env }>
   }
 }
 
-export async function getClusterQueriesHandler(c: Context<{ Bindings: Env }>) {
+export async function getClusterQueriesHandler(c: Context<Env>) {
   try {
     const clusterId = c.req.param("clusterId");
     if (!clusterId) {

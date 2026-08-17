@@ -99,6 +99,10 @@ binding = "AI"
 [observability]
 enabled = true
 
+[env.staging]
+name = "chatbot-api-staging"
+workers_dev = true
+
 [env.production]
 name = "chatbot-api-production"
 route = ""
