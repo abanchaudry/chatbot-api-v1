@@ -22,12 +22,13 @@ export class AssistantComponent implements OnInit {
   models = [];
 
   settings: any = {
-    company_name: 'Nevada State Contractors Board',
-    assistant_name: 'C',
-    domain_hint: 'Nevada Revised Statutes (NRS Chapter 624) and Nevada Administrative Code (NAC Chapter 624) regulations governing contractor licensing, bond requirements, fees, classification, and consumer protection.',
+    company_name: '',
+    assistant_name: '',
+    domain_hint: '',
     brand_tone: 'professional, calm, and customer-friendly',
     primary_language: 'english'
   };
+  isLoadingSettings: boolean = true;
 
   rawBusinessDescription: string = '';
   isGeneratingDomain: boolean = false;
@@ -41,9 +42,17 @@ export class AssistantComponent implements OnInit {
   }
 
   loadBusinessSettings() {
-    this.assistantService.getSettings().subscribe((res: any) => {
-      if (res && res.ok && res.settings) {
-        this.settings = res.settings;
+    this.isLoadingSettings = true;
+    this.assistantService.getSettings().subscribe({
+      next: (res: any) => {
+        this.isLoadingSettings = false;
+        if (res && res.ok && res.settings) {
+          this.settings = res.settings;
+          this.cdr.detectChanges();
+        }
+      },
+      error: () => {
+        this.isLoadingSettings = false;
         this.cdr.detectChanges();
       }
     });
