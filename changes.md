@@ -1,6 +1,6 @@
 # Project Changes & System Changelog
 
-This document maintains a complete, chronological record of all architectural updates, bug fixes, configuration changes, performance optimizations, and benchmark evaluations made to the **Cloudflare RAG Stack** (`fervent-curie` API, `scalable-rag` microservice, and `chatbot-admin-v1` Angular admin panel).
+This document maintains a complete, chronological record of all architectural updates, bug fixes, configuration changes, performance optimizations, benchmark evaluations, and audit remediations made to the **Cloudflare RAG Stack** (`fervent-curie` API, `scalable-rag` microservice, and `chatbot-admin-v1` Angular admin panel).
 
 ---
 
@@ -226,3 +226,87 @@ This document maintains a complete, chronological record of all architectural up
 - **Admin UI Web Crawler Tab (`add-new.component.html` & `.ts`)**:
   - Added a top tab bar on **Add AI Knowledge** page (**📁 Document File Upload** vs **🌐 Cloudflare Web Crawler**).
   - Built real-time step progress modal (`Fetching Web Page` → `DOM Cleaning` → `Agentic AI 3-Tier Chunking` → `Vectorizing` → `Complete`).
+
+---
+
+## 19. Security Hardening & SQL Defense (Audit Remediation)
+
+- **SQL Dynamic Identifier Injection Prevention (`C1`, `C2`)**:
+  - Added strict `ALLOWED_FILE_COLUMNS` whitelist to `updateFile` in [files.db.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/db/files.db.ts) preventing arbitrary column writes.
+  - Added strict `ALLOWED_TABLES` whitelist to `safeCount` and `ensureColumn` in [files.db.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/db/files.db.ts) blocking SQL table injection.
+- **Unified Authentication Middleware (`C3`, `H2`, `M4`)**:
+  - Implemented [unifiedAuth.middleware.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/middleware/unifiedAuth.middleware.ts) (`requireAuthOrApiKey`) supporting either standard JWT Bearer token authentication or `x-api-key`/`x-admin-key` header verification.
+  - Protected all crawler routes (`/crawler/*`), QA routes (`/qa/*`), settings routes (`/settings/*`), and data routes (`/data/*`).
+- **JWT Token Expiration (`C4`)**:
+  - Configured explicit `.setExpirationTime("24h")` for all signed tokens in [auth.controller.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/controllers/auth.controller.ts) preventing indefinite token reuse.
+- **Distributed KV Rate Limiter (`C5`, `H3`)**:
+  - Upgraded [rateLimit.middleware.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/middleware/rateLimit.middleware.ts) from volatile in-memory isolate storage to Cloudflare KV-backed sliding window keys with 120s TTL, protecting authentication and public endpoints from brute-force DDoS.
+- **Removed Hardcoded Credentials (`C6`)**:
+  - Cleared hardcoded `admin_api_key` default in Angular [environment.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/environments/environment.ts), ensuring production deployments enforce authentic API tokens.
+- **Asynchronous Password Hashing & Sanitization (`L5`, `L6`, `H4`)**:
+  - Switched from synchronous `bcrypt.compareSync`/`hashSync` to non-blocking async `bcrypt.compare`/`hash` in [auth.controller.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/controllers/auth.controller.ts).
+  - Omitted password hash column (`password`) from `getAllAuthUsers` select query in [auth.db.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/db/auth.db.ts).
+  - Sanitized internal error traces in HTTP 500 error responses across all controllers.
+- **Strong Typing & Schema Cache (`M3`, `M11`)**:
+  - Added `AuthUser` and `SafeAuthUser` TypeScript interfaces.
+  - Implemented `_filesSchemaEnsured` in-memory cached flag in [files.db.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/db/files.db.ts) to eliminate redundant `PRAGMA table_info` DDL queries on every read.
+
+---
+
+## 20. Crawler Resilience, Ingestion Safety & Error Handling (Audit Remediation)
+
+- **Centralized System Constants (`L1`)**:
+  - Created [src/v1/constants/index.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/constants/index.ts) defining standard `CRAWLER_CONFIG`, `INGEST_CONFIG`, `CACHE_CONFIG`, and `RETRY_CONFIG`.
+- **Reusable Exponential Backoff & Retry Utility (`L2`)**:
+  - Created [src/v1/utils/retry.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/utils/retry.ts) providing `sleep(ms)` and `backoff(attempt, base, max)` with randomized jitter.
+  - Integrated into `embedding.service.ts`, `vector.service.ts`, and `data.controller.ts`.
+- **Web Crawler Payload & Content-Type Validation (`H6`)**:
+  - Added MIME type verification and `5MB` response payload cap in [crawler.service.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/crawler.service.ts) to reject binary downloads and oversized pages.
+- **Crawler Controller Deduplication (`H8`)**:
+  - Extracted shared helper `crawlAndIndexUrl` in [crawler.controller.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/controllers/crawler.controller.ts), eliminating ~150 lines of duplicate crawl/index code across single-page and batch endpoints.
+- **Upload File Size Protection (`H7`)**:
+  - Added `10MB` file size validations before parsing text payloads into memory in `getFileChunks` and `saveNewFile` in [data.controller.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/controllers/data.controller.ts).
+- **Structured Error Logging (`H5`)**:
+  - Replaced silent `catch {}` blocks with descriptive `console.warn` log messages during database and R2 storage deletions.
+- **Cloudflare Worker Secrets Compliance (`H10`)**:
+  - Replaced `process.env.OPENAI_API_KEY` in [settings.controller.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/controllers/settings.controller.ts) with `getOpenAIKey(c.env)`.
+- **R2 Storage Service & Environment Bindings (`M9`, `M10`, `M14`)**:
+  - Added `deleteFromR2(c, key)` method in [fileStorage.service.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/fileStorage.service.ts).
+  - Added `DOCUMENTS?: R2Bucket`, `AI_GATEWAY_URL?: string`, `COMPANY_NAME?: string`, and `SCALABLE_RAG_URL?: string` to `Env["Bindings"]` in [env.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/types/env.ts).
+
+---
+
+## 21. Cloudflare Infrastructure, API Versioning & Tracing (Audit Remediation)
+
+- **Environment-Driven CORS (`H1`)**:
+  - Updated [index.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/index.ts) to read allowed domains from `c.env.ALLOWED_ORIGINS` with automatic fallback for local development.
+- **Cloudflare Workers Unbound Execution (`H9`, `M12`)**:
+  - Configured `usage_model = "unbound"` in [wrangler.toml](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/wrangler.toml) to prevent CPU limit timeouts during multi-pass RAG queries and large batch embeddings.
+  - Added `[env.staging]` environment configuration profile in `wrangler.toml`.
+- **Package Dependency Consistency (`M2`)**:
+  - Explicitly added `"nanoid": "^5.0.9"` in [package.json](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/package.json).
+- **Request ID Generation & Tracing (`M5`, `M13`)**:
+  - Moved `x-request-id` header assignment to occur prior to calling `await next()` in [index.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/index.ts).
+  - Standardized JSON error response format to include `requestId`.
+- **RESTful Endpoints & Route Mounting (`M6`, `M7`, `M8`)**:
+  - Registered `DELETE /files/:fileId` in [data.routes.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/routes/data.routes.ts) and removed dead deprecated routes (`/deleteDocumentData`, `/saveDocument`, etc.).
+  - Configured [index.routes.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/routes/index.routes.ts) to mount routes under both standard `/v1/` prefix and root for full backward compatibility.
+- **Dead Code Cleanup (`L7`, `L8`)**:
+  - Removed ~300 lines of obsolete commented trace code in [trace.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/utils/trace.ts).
+  - Corrected file header comments in [embedding.service.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/src/v1/services/embedding.service.ts).
+
+---
+
+## 22. Frontend Quality, Performance & Accessibility (Audit Remediation)
+
+- **Memory Leak & Timer Cleanup (`H11`)**:
+  - Implemented `OnDestroy` lifecycle hook and `clearInterval(this.progressTimer)` in [add-new.component.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/admin-module/ai-knowledge-module/add-new/add-new.component.ts) to terminate background intervals on component teardown.
+- **Change Detection Performance (`H12`, `M17`)**:
+  - Replaced continuous array reduction getter `totalChunks` with cached state property `totalChunksCount` in [all-knowledge.component.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/admin-module/ai-knowledge-module/all-knowledge/all-knowledge.component.ts).
+  - Added `trackBy: trackByFileId` to `*ngFor` in [all-knowledge.component.html](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/admin-module/ai-knowledge-module/all-knowledge/all-knowledge.component.html) and [file-upload.component.html](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/admin-module/file-upload/file-upload.component.html).
+- **Empty States & Accessibility (`L9`, `L10`, `L11`, `L12`)**:
+  - Added empty state table message when no files exist in [file-upload.component.html](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/admin-module/file-upload/file-upload.component.html).
+  - Replaced non-semantic `<a>` buttons with accessible `<button type="button" mat-icon-button>` elements containing explicit `aria-label` attributes.
+  - Removed unused empty `MaterialModule` from [app.module.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/app.module.ts).
+- **HTTP Interceptor Error Propagation**:
+  - Fixed [config.interceptors.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/shared/interceptors/config.interceptors.ts) line 39 to pass original `HttpErrorResponse` through rather than masking real errors with `new Error('test')`.
