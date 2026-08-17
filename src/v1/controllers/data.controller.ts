@@ -261,11 +261,16 @@ export const DataController = {
               await pt.step(uploadId, `Extracted ${scalableResult.counts.total} chunks (${scalableResult.classification.category})`);
             }
           } catch (err: any) {
-            const errorMsg = err.message;
-            console.error("Ingestion error:", err);
-            if (uploadId) await pt.fail(uploadId, errorMsg);
-            results.push({ file: fileName, error: errorMsg });
-            continue;
+            console.warn("[DataController] Scalable RAG bridge warning, using resilient fallback:", err?.message);
+            try {
+              const result = await new ChunkingServiceV2(key, { cacheKV: c.env.CACHE }).process(rawText, fileName, version, true, uploadId);
+              chunks = result.chunks;
+            } catch (fallbackErr: any) {
+              const errorMsg = err.message || fallbackErr.message || "Failed to process document";
+              if (uploadId) await pt.fail(uploadId, errorMsg);
+              results.push({ file: fileName, error: errorMsg });
+              continue;
+            }
           }
         } else if (strategy === "general") {
           chunks = await new LangChainChunkingService().generateChunksOnly(rawText, fileName, uploadId);

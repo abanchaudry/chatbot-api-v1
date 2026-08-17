@@ -190,7 +190,7 @@ export const CrawlerController = {
       }
 
       const openAiKey = getOpenAIKey(c.env);
-      const client = new ScalableRagClient();
+      const client = new ScalableRagClient(c.env.SCALABLE_RAG_URL);
 
       console.log(`[Crawler] Starting crawl for: ${targetUrl} (Schedule: ${crawlSchedule})`);
       const result = await crawlAndIndexUrl(c.env, targetUrl, client, openAiKey);
@@ -293,7 +293,7 @@ export const CrawlerController = {
       let crawled = 0;
 
       const openAiKey = getOpenAIKey(c.env);
-      const client = new ScalableRagClient();
+      const client = new ScalableRagClient(c.env.SCALABLE_RAG_URL);
 
       const batchSize = CRAWLER_CONFIG.CONCURRENT_CRAWL_BATCH_SIZE;
       for (let i = 0; i < pages.length; i += batchSize) {

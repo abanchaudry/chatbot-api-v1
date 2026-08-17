@@ -4,7 +4,7 @@ import type { Ai, Fetcher } from "@cloudflare/workers-types";
 
 export interface Env {
   DB: D1Database;
-  DOCUMENTS: R2Bucket;
+  DOCUMENTS?: R2Bucket;
   INGESTION_QUEUE: Queue;
   AI: Ai;
   ASSETS: Fetcher;

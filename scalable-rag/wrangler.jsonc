@@ -25,11 +25,11 @@
     }
   ],
 
-  // R2 — raw file + extracted markdown storage
-  "r2_buckets": [
+  // Cloudflare Vectorize — 1536-dim vector search index
+  "vectorize": [
     {
-      "binding": "DOCUMENTS",
-      "bucket_name": "scalable-rag-docs"
+      "binding": "VECTORIZE",
+      "index_name": "document-chunks"
     }
   ],
 
@@ -49,15 +49,6 @@
       }
     ]
   },
-
-  // Cloudflare Vectorize — 1536-dim vector search index
-  "vectorize": [
-    {
-      "binding": "VECTORIZE",
-      "index_name": "document-chunks",
-      "remote": true
-    }
-  ],
 
   // Secrets (set via `wrangler secret put OPENAI_API_KEY`)
   "vars": {}

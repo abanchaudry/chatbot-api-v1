@@ -22,9 +22,10 @@ export class HttpConfigInterceptor implements HttpInterceptor {
 
         const token = localStorage.getItem(environment.token_label);
         if (token) {
+            const cleanToken = token.replace(/^Bearer\s+/i, '');
             request = request.clone({
                 setHeaders: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${cleanToken}`
                 }
             });
         }
