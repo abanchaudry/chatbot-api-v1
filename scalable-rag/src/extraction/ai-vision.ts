@@ -237,6 +237,49 @@ export async function extractDocumentFullVision(
     return response.choices[0]?.message?.content ?? baseText;
   }
 
+  if (pageImages.length > 0) {
+    const pageMarkdowns: string[] = [];
+    const batchSize = 2; // Process 2 pages per batch for maximum Vision OCR fidelity & full detail
+    for (let i = 0; i < pageImages.length; i += batchSize) {
+      const batch = pageImages.slice(i, i + batchSize);
+      const batchContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+        {
+          type: "text",
+          text: `Document: ${filename}\n\nTranscribe pages ${batch.map(p => p.pageNum).join(", ")} with 100% EXHAUSTIVE VERBATIM OCR. Do NOT summarize or shorten:`,
+        },
+      ];
+      for (const pImg of batch) {
+        batchContent.push({
+          type: "text",
+          text: `\n--- [PAGE #${pImg.pageNum} VISUAL CANVAS] ---`,
+        });
+        batchContent.push({
+          type: "image_url",
+          image_url: { url: pImg.dataUrl, detail: "high" },
+        });
+      }
+
+      try {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: batchContent },
+          ],
+          max_tokens: 16384,
+        });
+        const pageText = response.choices[0]?.message?.content ?? "";
+        if (pageText) pageMarkdowns.push(pageText);
+      } catch (err) {
+        console.warn(`Vision OCR error on page batch starting at ${i}:`, err);
+      }
+    }
+
+    if (pageMarkdowns.length > 0) {
+      return pageMarkdowns.join("\n\n---\n\n");
+    }
+  }
+
   const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
     {
       type: "text",
@@ -244,18 +287,7 @@ export async function extractDocumentFullVision(
     },
   ];
 
-  if (pageImages.length > 0) {
-    for (const pImg of pageImages) {
-      userContent.push({
-        type: "text",
-        text: `\n[Page #${pImg.pageNum}]:`,
-      });
-      userContent.push({
-        type: "image_url",
-        image_url: { url: pImg.dataUrl, detail: "high" },
-      });
-    }
-  } else if (embeddedImages.length > 0) {
+  if (embeddedImages.length > 0) {
     for (let i = 0; i < embeddedImages.length; i++) {
       const img = embeddedImages[i];
 
