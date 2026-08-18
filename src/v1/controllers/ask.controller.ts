@@ -60,40 +60,54 @@ function getDistinctWords(text: string): Set<string> {
 
 function formatRetrievedSources(
   pieces: any[],
-  answerText?: string
+  answerText?: string,
+  outcome?: string
 ): Array<{ fileName: string; section: string; topic?: string; score: number | null; isWeb?: boolean; url?: string }> {
+  // RULE 1: Never attach sources/citations to fallback responses
+  if (outcome === "FALLBACK" || outcome === "FALLBACK_TRIGGERED") return [];
+
+  const text = String(answerText || "").trim();
+  if (!text) return [];
+
+  const lowerAnswer = text.toLowerCase();
+  const isFallbackText =
+    lowerAnswer.includes("sorry") ||
+    lowerAnswer.includes("don't have enough info") ||
+    lowerAnswer.includes("don't have info") ||
+    lowerAnswer.includes("do not have enough info") ||
+    lowerAnswer.includes("do not have info") ||
+    lowerAnswer.includes("couldn't find info") ||
+    lowerAnswer.includes("could not find info") ||
+    lowerAnswer.includes("no information available") ||
+    lowerAnswer.includes("cannot find specific details");
+
+  if (isFallbackText) return [];
   if (!Array.isArray(pieces) || !pieces.length) return [];
 
-  // Filter pieces by answer token overlap if answerText is provided
-  let activePieces = pieces;
-  if (answerText && answerText.trim().length > 0) {
-    const answerWords = getDistinctWords(answerText);
-    const scoredPieces = pieces.map((p) => {
-      const rawFileName = p.file_name || p.meta?.file_name || p.fileName || "";
-      const content = p.content || p.text || p.meta?.content || "";
-      const topic = p.topic || p.meta?.topic || "";
+  // RULE 2: Only show sources/documents that the LLM actually used/cited to construct the answer
+  const answerWords = getDistinctWords(text);
+  const scoredPieces = pieces.map((p) => {
+    const rawFileName = p.file_name || p.meta?.file_name || p.fileName || "";
+    const content = p.content || p.text || p.meta?.content || "";
+    const topic = p.topic || p.meta?.topic || "";
 
-      const contentWords = getDistinctWords(content + " " + rawFileName + " " + topic);
-      let matchCount = 0;
-      for (const w of contentWords) {
-        if (answerWords.has(w)) {
-          matchCount++;
-        }
+    const contentWords = getDistinctWords(content + " " + rawFileName + " " + topic);
+    let matchCount = 0;
+    for (const w of contentWords) {
+      if (answerWords.has(w)) {
+        matchCount++;
       }
-      return { piece: p, matchCount };
-    });
-
-    const matched = scoredPieces.filter((sp) => sp.matchCount >= 2).map((sp) => sp.piece);
-    if (matched.length > 0) {
-      activePieces = matched;
-    } else {
-      activePieces = [pieces[0]];
     }
-  }
+    return { piece: p, matchCount };
+  });
+
+  // Strict match threshold: chunk must share at least 2 distinct key content words with the answer
+  const matched = scoredPieces.filter((sp) => sp.matchCount >= 2).map((sp) => sp.piece);
+  if (!matched.length) return [];
 
   const docMap = new Map<string, any>();
 
-  for (const p of activePieces) {
+  for (const p of matched) {
     const rawFileName =
       p.file_name ||
       p.meta?.file_name ||
@@ -494,7 +508,7 @@ async function runSharedAskLogic(
     tokensUsed: executed.tokensUsed,
     source: executed.source,
     startedAt: prep.startedAt,
-    sources: formatRetrievedSources(retrieve?.pieces, executed.answer),
+    sources: formatRetrievedSources(retrieve?.pieces, executed.answer, executed.outcome),
   };
 }
 
@@ -844,7 +858,7 @@ export const askController = {
             ok: true,
             tokensUsed: executed.tokensUsed,
             timing: { ms: now() - prep.startedAt },
-            sources: formatRetrievedSources(retrieve?.pieces, answer),
+            sources: formatRetrievedSources(retrieve?.pieces, answer, executed?.outcome),
           });
         } catch (streamError: any) {
           logError("stream_generation_error", streamError);
