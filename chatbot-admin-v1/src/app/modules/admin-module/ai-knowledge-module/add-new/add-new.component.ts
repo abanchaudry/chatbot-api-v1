@@ -627,7 +627,12 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       } else if (elapsedSec === 10) {
         this.updateProcessingStep(4, "Building 3-Tier Tree Chunks", "Generating Large, Medium & Small parent-child nodes...", 85);
       } else if (elapsedSec === 14) {
-        this.updateProcessingStep(5, "Finalizing Preview Table", "Tagging metadata and preparing review table...", 95);
+        this.updateProcessingStep(5, "Finalizing Preview Table", "Synthesizing 3-tier hierarchy & metadata tags...", 92);
+      } else if (elapsedSec > 14) {
+        if (this.processingPercent < 99) {
+          this.processingPercent = Math.min(99, 92 + Math.floor((elapsedSec - 14) / 3));
+          this.cdr.detectChanges();
+        }
       }
     }, 1000);
   }
