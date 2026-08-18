@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { throwError } from 'rxjs';
 import { catchError, map } from "rxjs/operators";
 import { ApiService } from '../../core/services';
 
@@ -13,55 +14,60 @@ export class AssistantService {
     return this._api.get(`${"assistant/all"}`)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
   getAssistant(assistantId:string) {
-    return this._api.get(`${"assistant/detail/" + assistantId}`)
+    return this._api.get(`${"assistant/" + assistantId}`)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
-  getAssistantModels() {
-    return this._api.get(`${"assistant/models"}`)
+  createAssistant(data:any) {
+    return this._api.post(`${"assistant"}`, data)
+
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
-  updateAssistant(id: string, data) {
-    return this._api.put(`${"assistant/update/" + id}`, data)
+  updateAssistant(assistantId: string, data: any) {
+    return this._api.put(`${"assistant/" + assistantId}`, data)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
-  askAssistant(data) {
-    return this._api.post(`${"assistant/ask"}`, data)
+  deleteAssistant(assistantId: string) {
+    return this._api.delete(`${"assistant/" + assistantId}`)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
+      );
+  }
+
+  getVectorStoreFiles(vectorStoreId: string) {
+    return this._api.get(`${"assistant/vector-store/" + vectorStoreId + "/files"}`)
+      .pipe(
+        map((res: any) => res),
+        catchError((error: any) => throwError(() => error))
       );
   }
 
   getVectorStoreAndFiles(vectorStoreId: string) {
-    return this._api.get(`${"assistant/vector-store/" + vectorStoreId + "/files"}`)
-      .pipe(
-        map((res: any) => res),
-        catchError((error: any) => error)
-      );
+    return this.getVectorStoreFiles(vectorStoreId);
   }
 
   deleteVectorStoreFile(vectorStoreId: string, fileId: string) {
     return this._api.delete(`${"assistant/vector-store/" + vectorStoreId + "/files/" + fileId}`)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
@@ -69,7 +75,7 @@ export class AssistantService {
     return this._api.get("settings")
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
@@ -77,7 +83,7 @@ export class AssistantService {
     return this._api.post("settings", data)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
@@ -85,7 +91,7 @@ export class AssistantService {
     return this._api.post("settings/generate-domain", data)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 }
