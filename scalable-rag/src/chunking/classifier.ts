@@ -54,16 +54,19 @@ Respond ONLY with raw JSON matching this schema:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Filename: ${filename}\n\nDocument Sample:\n${sample}` },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0,
-      max_tokens: 256,
-    });
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Filename: ${filename}\n\nDocument Sample:\n${sample}` },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0,
+        max_tokens: 256,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Classification timeout")), 5000))
+    ]);
 
     const content = response.choices[0]?.message?.content ?? "{}";
     const parsed = JSON.parse(content);
