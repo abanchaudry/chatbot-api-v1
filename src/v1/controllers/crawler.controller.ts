@@ -46,29 +46,70 @@ async function crawlAndIndexUrl(
   // 2. Process Markdown into 3-Tier Agentic AI Chunks via Scalable RAG
   const mockBlob = new Blob([markdownText], { type: "text/plain" });
 
-  let scalableResult: any;
+  let ferventChunks: any[] = [];
   try {
-    scalableResult = await client.processDocument(mockBlob, "offline", "ai", undefined, `${fileName}.txt`);
-  } catch (procErr: any) {
-    console.warn(`[Crawler] Scalable RAG error for ${targetUrl}, fallback to adaptive:`, procErr?.message);
-    scalableResult = await client.processDocument(mockBlob, "offline", "adaptive", undefined, `${fileName}.txt`);
+    let scalableResult: any;
+    try {
+      scalableResult = await client.processDocument(mockBlob, "offline", "ai", undefined, `${fileName}.txt`);
+    } catch (procErr: any) {
+      console.warn(`[Crawler] Scalable RAG error for ${targetUrl}, fallback to adaptive:`, procErr?.message);
+      scalableResult = await client.processDocument(mockBlob, "offline", "adaptive", undefined, `${fileName}.txt`);
+    }
+    if (scalableResult) {
+      ferventChunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
+    }
+  } catch (err: any) {
+    console.warn(`[Crawler] Scalable RAG failed for ${targetUrl}:`, err?.message);
   }
 
-  const ferventChunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
+  // Fallback to local chunking if Scalable RAG returned no chunks
+  if (!ferventChunks || ferventChunks.length === 0) {
+    console.log(`[Crawler] Using fallback chunking for ${targetUrl}`);
+    try {
+      if (openAiKey) {
+        const { ChunkingServiceV2 } = await import("../services/chunkingv2.service");
+        const res = await new ChunkingServiceV2(openAiKey, { cacheKV: env.CACHE }).process(markdownText, fileName, "v1", true);
+        ferventChunks = (res.chunks || []).map((c: any) => ({
+          section: c.section || "Web Ingestion",
+          content: c.content,
+          topic: c.topic || "Web Ingestion",
+          tags: c.tags || [],
+          tier: "small",
+          parentId: null,
+        }));
+      }
+    } catch (fallbackErr: any) {
+      console.warn(`[Crawler] ChunkingServiceV2 fallback failed:`, fallbackErr?.message);
+    }
+  }
+
+  // Final deterministic fallback if still empty:
+  if (!ferventChunks || ferventChunks.length === 0) {
+    const paragraphs = markdownText.split(/\n\n+/).filter((p: string) => p.trim().length > 30);
+    const parts = paragraphs.length > 0 ? paragraphs : [markdownText];
+    ferventChunks = parts.map((p: string, i: number) => ({
+      section: `Page Content Part ${i + 1}`,
+      content: p.trim(),
+      topic: "Web Ingestion",
+      tags: ["web-crawl"],
+      tier: "small",
+      parentId: null,
+    }));
+  }
 
   // 3. Format Chunks
   const formattedChunks = ferventChunks.map((ch, idx) => ({
     chunk_id: `chk_${nanoid(12)}`,
     file_id: fileId,
-    section: ch.section,
+    section: ch.section || "Web Content",
     section_number: null,
     topic: ch.topic || "Web Ingestion",
-    first_sentence: ch.content.slice(0, 100).replace(/\n/g, " "),
-    content: ch.content,
-    tags: ch.tags,
+    first_sentence: (ch.content || "").slice(0, 100).replace(/\n/g, " "),
+    content: ch.content || "",
+    tags: Array.isArray(ch.tags) ? ch.tags : [],
     chunk_index: idx,
-    tier: ch.tier,
-    parentId: ch.parentId,
+    tier: ch.tier || "small",
+    parentId: ch.parentId || null,
   }));
 
   // 4. Save to `chunks` table
@@ -190,7 +231,8 @@ export const CrawlerController = {
       }
 
       const openAiKey = getOpenAIKey(c.env);
-      const client = new ScalableRagClient(c.env.SCALABLE_RAG_URL);
+      const scalableTarget = (c.env as any).SCALABLE_RAG || c.env.SCALABLE_RAG_URL || "https://scalable-rag.hassanwaqar475.workers.dev";
+      const client = new ScalableRagClient(scalableTarget);
 
       console.log(`[Crawler] Starting crawl for: ${targetUrl} (Schedule: ${crawlSchedule})`);
       const result = await crawlAndIndexUrl(c.env, targetUrl, client, openAiKey);
@@ -293,7 +335,8 @@ export const CrawlerController = {
       let crawled = 0;
 
       const openAiKey = getOpenAIKey(c.env);
-      const client = new ScalableRagClient(c.env.SCALABLE_RAG_URL);
+      const scalableTarget = (c.env as any).SCALABLE_RAG || c.env.SCALABLE_RAG_URL || "https://scalable-rag.hassanwaqar475.workers.dev";
+      const client = new ScalableRagClient(scalableTarget);
 
       const batchSize = CRAWLER_CONFIG.CONCURRENT_CRAWL_BATCH_SIZE;
       for (let i = 0; i < pages.length; i += batchSize) {
