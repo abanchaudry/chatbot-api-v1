@@ -142,6 +142,8 @@ function formatRetrievedSources(
 
     const section = p.section || p.meta?.section || p.meta?.section_number || "";
     const topic = p.topic || p.meta?.topic || "";
+    const rawDataset = String(p.meta?.dataset || p.dataset || "").toLowerCase();
+    const dataset = rawDataset === "pdf" ? "pdf" : rawDataset === "web" || isWeb ? "web" : "admin";
 
     if (!docMap.has(fileName) || scoreInt > (docMap.get(fileName).score || 0)) {
       docMap.set(fileName, {
@@ -149,6 +151,7 @@ function formatRetrievedSources(
         section,
         topic,
         score: scoreInt > 0 ? scoreInt : null,
+        dataset,
         isWeb,
         url,
       });
@@ -265,28 +268,38 @@ async function runSharedAskLogic(
   const rawMessage = String(payload?.message || payload?.question || "").trim();
   const userId = String(payload?.userId || "anonymous").trim();
 
+  const prep = await preparePipeline(c, payload);
+
+  if (!prep.ok) {
+    console.error("[ask] Prepare failed:", prep.error);
+    return {
+      ok: false,
+      status: 400 as StatusCode,
+      error: prep.error || "Preparation failed",
+    };
+  }
+
   /* ------------------------------------------------------------------ */
   /* FAST-PATH CACHE CHECK: Layer 1 (KV Exact Match)                     */
-  /* Executed BEFORE LLM Preflight & Embedding for sub-15ms response!   */
+  /* Signature-aware: immediately misses if dataset settings changed!   */
   /* ------------------------------------------------------------------ */
-  if (c.env.CACHE && rawMessage && !payload?.bypassCache) {
+  if (c.env.CACHE && rawMessage && !payload?.bypassCache && !prep.directRoute) {
     try {
-      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage);
+      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature);
       if (cached) {
-        const threadId = String(payload?.threadId || `${userId}_${new Date().toISOString().slice(0, 10)}_${Math.random().toString(36).slice(2, 8)}`).trim();
         console.log(JSON.stringify({ level: "INFO", label: "fast_cache_hit_L1_exact", latencyMs: cached.latencyMs, query: rawMessage.slice(0, 80) }));
 
         const db = c.env.DB as unknown as D1Database;
         if (db) {
           c.executionCtx.waitUntil(
-            persist(db, userId, threadId, rawMessage, cached.answer, cached.context || "", 0, true, "{}")
+            persist(db, prep.userId, prep.threadId, rawMessage, cached.answer, cached.context || "", 0, true, "{}")
               .catch((e) => logError("persist_fast_cache_hit_failed", e))
           );
         }
 
         return {
           ok: true,
-          threadId,
+          threadId: prep.threadId,
           route: "ANSWER_WITH_RAG",
           answer: cached.answer,
           outcome: "local_rag_success",
@@ -299,17 +312,6 @@ async function runSharedAskLogic(
     } catch (e: any) {
       logError("fast_cache_L1_check_failed", e);
     }
-  }
-
-  const prep = await preparePipeline(c, payload);
-
-  if (!prep.ok) {
-    console.error("[ask] Prepare failed:", prep.error);
-    return {
-      ok: false,
-      status: 400 as StatusCode,
-      error: prep.error || "Preparation failed",
-    };
   }
 
   if (prep.directRoute) {
@@ -411,7 +413,9 @@ async function runSharedAskLogic(
       prep.limits,
       prep.embedding,
       prep.query,
-      prep.historyPreview
+      prep.historyPreview,
+      prep.activeDatasets,
+      prep.datasetWeights
     );
   } catch (retrieveError: any) {
     console.error("[ask] Retrieve failed:", retrieveError?.message || retrieveError);
@@ -474,12 +478,12 @@ async function runSharedAskLogic(
             tokensUsed: executed.tokensUsed,
           };
 
-          // Writeback Layer 1: KV Exact (save under raw message AND rewritten query)
+          // Writeback Layer 1: KV Exact (save under raw message AND rewritten query with dataset signature)
           if (prep.message) {
-            await saveQueryResponseToCache(c.env.CACHE, prep.message, cachePayload);
+            await saveQueryResponseToCache(c.env.CACHE, prep.message, cachePayload, prep.datasetSignature);
           }
           if (prep.query && prep.query !== prep.message) {
-            await saveQueryResponseToCache(c.env.CACHE, prep.query, cachePayload);
+            await saveQueryResponseToCache(c.env.CACHE, prep.query, cachePayload, prep.datasetSignature);
           }
 
           // Writeback Layer 2: Semantic Vectorize
@@ -487,7 +491,7 @@ async function runSharedAskLogic(
             const normalized = normalizeQuery(prep.message || prep.query);
             if (normalized.length > 3) {
               const hash = await generateSha256Hash(normalized);
-              await saveSemanticCacheEntry(c.env.VECTORIZE_CACHE, c.env.CACHE, hash, prep.embedding, cachePayload);
+              await saveSemanticCacheEntry(c.env.VECTORIZE_CACHE, c.env.CACHE, hash, prep.embedding, cachePayload, undefined, prep.datasetSignature);
             }
           }
 
@@ -530,34 +534,30 @@ async function runStreamingPreparation(
   c: Context<Env>,
   payload: any
 ): Promise<StreamingAskSuccess | StreamingAskFailure> {
+  const prep = await preparePipeline(c, payload);
+
+  if (!prep.ok) {
+    return {
+      ok: false,
+      status: 400 as StatusCode,
+      error: prep.error || "Preparation failed",
+    };
+  }
+
   const rawMessage = String(payload?.message || payload?.question || "").trim();
 
-  // Fast-path Layer 1 KV Exact Cache check BEFORE LLM Preflight
-  if (c.env.CACHE && rawMessage && !payload?.bypassCache) {
+  // Signature-aware Layer 1 KV Exact Cache check
+  if (c.env.CACHE && rawMessage && !payload?.bypassCache && !prep.directRoute) {
     try {
-      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage);
+      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature);
       if (cached) {
         console.log(JSON.stringify({ level: "INFO", label: "stream_fast_cache_hit_L1", latencyMs: cached.latencyMs }));
-        const userId = String(payload?.userId || "anonymous").trim();
-        const threadId = String(payload?.threadId || `${userId}_${new Date().toISOString().slice(0, 10)}_${Math.random().toString(36).slice(2, 8)}`).trim();
-        
-        const dummyPrep: any = {
-          ok: true,
-          userId,
-          threadId,
-          route: "ANSWER_WITH_RAG",
-          message: rawMessage,
-          startedAt: now(),
-          trace: {},
-        };
-        return { ok: true, prep: dummyPrep, cachedAnswer: cached.answer, cacheLayer: "L1_KV_EXACT" };
+        return { ok: true, prep, cachedAnswer: cached.answer, cacheLayer: "L1_KV_EXACT" };
       }
     } catch (e: any) {
       logError("stream_fast_cache_L1_failed", e);
     }
   }
-
-  const prep = await preparePipeline(c, payload);
 
   if (!prep.ok) {
     return {
@@ -596,7 +596,9 @@ async function runStreamingPreparation(
       prep.limits,
       prep.embedding,
       prep.query,
-      prep.historyPreview
+      prep.historyPreview,
+      prep.activeDatasets,
+      prep.datasetWeights
     );
 
     traceLogFinalContextDetail(prep.trace, retrieve.status, retrieve.context, retrieve.pieces);
@@ -821,15 +823,15 @@ export const askController = {
                 const rawMsg = prep.message;
                 const rewrittenQuery = prep.query;
 
-                await saveQueryResponseToCache(c.env.CACHE, rawMsg, cachePayload);
+                await saveQueryResponseToCache(c.env.CACHE, rawMsg, cachePayload, prep.datasetSignature);
 
                 if (rewrittenQuery && rewrittenQuery.toLowerCase().trim() !== rawMsg.toLowerCase().trim()) {
-                  await saveQueryResponseToCache(c.env.CACHE, rewrittenQuery, cachePayload);
+                  await saveQueryResponseToCache(c.env.CACHE, rewrittenQuery, cachePayload, prep.datasetSignature);
                 }
 
                 if (c.env.VECTORIZE_CACHE && prep.embedding) {
                   const hash = await generateSha256Hash(normalizeQuery(rewrittenQuery || rawMsg));
-                  await saveSemanticCacheEntry(c.env.VECTORIZE_CACHE, c.env.CACHE, hash, prep.embedding, cachePayload, rawMsg);
+                  await saveSemanticCacheEntry(c.env.VECTORIZE_CACHE, c.env.CACHE, hash, prep.embedding, cachePayload, rawMsg, prep.datasetSignature);
                 }
 
                 console.log(JSON.stringify({ level: "INFO", label: "stream_cache_writeback_success", rawMsg, query: rewrittenQuery }));

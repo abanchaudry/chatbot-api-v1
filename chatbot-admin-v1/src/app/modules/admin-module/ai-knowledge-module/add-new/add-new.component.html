@@ -85,7 +85,9 @@
         </div>
         <div class="d-flex justify-content-end mt-4">
           <button class="btn btn-outline-secondary mr-2" (click)="onBack()">Back</button>
-          <button class="btn button-primary" (click)="onProceed()" [disabled]="inProcess || !chunkData?.length">Upload Document</button>
+          <button class="btn button-primary" (click)="onProceed()" [disabled]="inProcess || !chunkData?.length">
+            {{ activeIngestTab === 'pdf' ? 'Upload to PDF Reference Library' : 'Upload to Admin Knowledge' }}
+          </button>
         </div>
       </div>
 
@@ -96,10 +98,13 @@
               <h4 class="card-title pl-10 mb-1">Add Knowledge Source</h4>
               <p class="color-sec text-sec mb-0" style="font-size: 13px;">Upload documents or crawl website URLs into your AI assistant's knowledge base.</p>
             </div>
-            <!-- Ingestion Mode Tabs -->
+            <!-- Ingestion Mode Tabs (3 Datasets) -->
             <div class="btn-group p-1 bg-light border rounded">
               <button type="button" class="btn btn-sm mr-1" [class.btn-primary]="activeIngestTab === 'file'" [class.btn-outline-secondary]="activeIngestTab !== 'file'" (click)="activeIngestTab = 'file'" style="font-size: 13px; font-weight: 600; padding: 6px 14px;">
-                📁 Document File Upload
+                📁 Admin Knowledge Upload
+              </button>
+              <button type="button" class="btn btn-sm mr-1" [class.btn-primary]="activeIngestTab === 'pdf'" [class.btn-outline-secondary]="activeIngestTab !== 'pdf'" (click)="activeIngestTab = 'pdf'" style="font-size: 13px; font-weight: 600; padding: 6px 14px;">
+                📚 PDF Reference Library
               </button>
               <button type="button" class="btn btn-sm" [class.btn-primary]="activeIngestTab === 'web'" [class.btn-outline-secondary]="activeIngestTab !== 'web'" (click)="activeIngestTab = 'web'" style="font-size: 13px; font-weight: 600; padding: 6px 14px;">
                 🌐 Cloudflare Web Crawler
@@ -108,8 +113,18 @@
           </div>
           <div class="card-body" style="position: relative;">
 
-            <!-- Tab 1: Document File Upload -->
-            <form *ngIf="activeIngestTab === 'file'" #uploadForm="ngForm" (ngSubmit)="onSubmit(uploadForm)">
+            <!-- Tab 1 & 2: Document File Upload (Admin Knowledge or PDF Reference Library) -->
+            <form *ngIf="activeIngestTab === 'file' || activeIngestTab === 'pdf'" #uploadForm="ngForm" (ngSubmit)="onSubmit(uploadForm)">
+              <!-- Dataset Informational Notice -->
+              <div *ngIf="activeIngestTab === 'pdf'" class="alert alert-info border d-flex align-items-center mb-3" style="background: #eef2ff; color: #3730a3; border-color: #c7d2fe !important;">
+                <mat-icon class="mr-2">menu_book</mat-icon>
+                <span><strong>PDF Reference Library Ingestion:</strong> Documents uploaded here will be indexed into the dedicated <strong>PDF Reference Library index</strong> with a 1.10x priority multiplier for technical specs and manuals. All formats (.pdf, .docx, .txt, .xlsx, .csv, .png, .jpg) supported.</span>
+              </div>
+              <div *ngIf="activeIngestTab === 'file'" class="alert alert-info border d-flex align-items-center mb-3" style="background: #faf5ff; color: #6b21a8; border-color: #e9d5ff !important;">
+                <mat-icon class="mr-2">folder_shared</mat-icon>
+                <span><strong>Admin Knowledge Ingestion:</strong> Documents uploaded here will be indexed into the primary <strong>Admin Knowledge index</strong> with the highest priority (1.25x) for authoritative company handbook & policy answers.</span>
+              </div>
+
               <div class="row">
                 <div class="col-md-6">
                   <div class="form-group">
@@ -139,7 +154,7 @@
                 <div class="col-12">
                   <div class="modals">
                     <div class="content">
-                      <span class="title">Upload a Document</span>
+                      <span class="title">{{ activeIngestTab === 'pdf' ? 'Upload Reference Document' : 'Upload a Document' }}</span>
                       <p class="message">Drag & drop your document here, or click to select a file from your device.</p>
                       <div class="actions">
                         <label for="file" class="button upload-btn">
@@ -178,7 +193,9 @@
               </div>
               <div class="d-flex justify-content-end mt-4">
                 <button type="button" class="btn btn-cancel-delete mr-3" (click)="onCancel()">Cancel</button>
-                <button type="submit" class="btn button-primary" [disabled]="inProcess">Upload Document</button>
+                <button type="submit" class="btn button-primary" [disabled]="inProcess">
+                  {{ activeIngestTab === 'pdf' ? 'Process PDF Reference Document' : 'Process Admin Document' }}
+                </button>
               </div>
             </form>
 

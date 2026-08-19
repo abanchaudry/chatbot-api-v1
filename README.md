@@ -53,19 +53,34 @@ chatbot-api-v1 (branch: version-2)
 
 ## 🌟 Key Capabilities & Architectural Features
 
-### 🌐 1. Cloudflare Browser Run Web Crawler Engine
-- **Headless Chrome Rendering**: Uses `@cloudflare/puppeteer` (`env.MY_BROWSER`) to render JavaScript SPAs, execute dynamic DOM scripts, and clean HTML to structured Markdown.
-- **Anti-Bot Bypass Fallback**: Automatically routes around Akamai/Cloudflare anti-bot blocks (e.g. Tesla, energy sites) via Jina Reader Proxy fallback (`https://r.jina.ai/`).
-- **Auto-Sync Schedule Selector**: Supports `Manual Only`, `Daily Every 24h`, `Weekly Every 7 Days`, and `Monthly Every 30 Days` with automated D1 `nextCrawlAt` scheduling.
-- **Instant 3-Tier Ingestion**: Crawled web markdown is processed through 3-tier hierarchical chunking and embedded into 1536-dimensional Vectorize vectors in seconds.
+### 🗄️ 1. 3-Physical Dataset Architecture & Priority Hierarchy
+- **3 Dedicated Cloudflare Vectorize Indexes**:
+  - `VECTORIZE_ADMIN` (`chatbot-admin-index-dev`): Directly uploaded executive manuals, corporate policies, and administrative files. Highest truth authority (Weight: 1.25x).
+  - `VECTORIZE_PDF` (`chatbot-pdf-index-dev`): Technical engineering datasheets, hardware manuals, and electrical schematics (Weight: 1.10x).
+  - `VECTORIZE_WEB` (`chatbot-web-index-dev`): Public websites and crawled educational content (Weight: 1.00x).
+- **Dynamic Dataset Toggling & Weighting**:
+  - Administrators can enable/disable any knowledge base live from the Admin Panel or customize weighted Reciprocal Rank Fusion (RRF) priority multipliers.
+  - Inactive datasets are automatically excluded from Vectorize, SQLite FTS5 lexical, and metadata queries.
 
-### 🎯 2. Strict LLM Citation Filtering & Source Badging
+### 🌐 2. Recursive Multi-Depth Web Crawler Engine
+- **Recursive BFS Multi-Page Discovery**: Discovers all sub-links across domain variations (e.g. `www.` vs non-`www.`) up to customizable depth levels.
+- **Automated XML Sitemap Ingestion**: Automatically detects `/sitemap.xml`, `/sitemap_index.xml`, and `/wp-sitemap.xml` for site-wide page discovery.
+- **Headless Chrome & Anti-Bot Bypass**: Uses `@cloudflare/puppeteer` (`env.MY_BROWSER`) with automated Jina Reader Proxy fallback for blocked domains.
+- **Auto-Sync Schedule Selector**: Supports `Manual Only`, `Daily Every 24h`, `Weekly Every 7 Days`, and `Monthly Every 30 Days`.
+
+### 🛡️ 3. Resilient Multi-Signal Evidence Gate & Cache Partitioning
+- **Multi-Signal Grounding Evaluation**: Evaluates substantive text length ($\ge 40$ chars), semantic reranker coverage ($\ge 40\%$), exact entity/phrase matches, and vector score thresholds ($\ge 40$) to prevent false negative fallbacks on conversational queries.
+- **Signature-Aware Cache Partitioning**: Every cache key is bound to the active dataset signature (e.g. `qcache:a1_p1_w1:<hash>`), ensuring $0\text{ms}$ instantaneous cache invalidation when any dataset toggle or weight is modified.
+- **Automatic Deep KV Cache Purging**: System settings modifications, file deletions, and chunk updates automatically trigger deep key purges across Cloudflare KV.
+
+### 🎯 4. Strict LLM Citation Filtering & Source Badging
 - **Answer-Driven Filtering**: `formatRetrievedSources(pieces, answerText)` token-matches candidate chunks against the **actual generated LLM answer**, filtering out unreferenced documents.
 - **Visual Source Badges**:
-  - **`🌐 Web Crawled`**: Blue badge with a globe icon (`🌐 Clean Energy Careers Grow Here`). Clicking opens the live website URL directly in a new browser tab.
-  - **`📄 Uploaded Doc`**: Purple badge with a document icon (`📄 Policy_Manual.pdf`). Clicking navigates to the AI Knowledge manager.
+  - **`📄 Admin Doc`**: Purple badge with document icon for executive policy uploads.
+  - **`📚 PDF Reference`**: Indigo badge with book icon for technical hardware datasheets.
+  - **`🌐 Web Crawled`**: Blue badge with globe icon linking to live web sources.
 
-### ✏️ 3. Linked 3-Tier Multi-Tier Knowledge Chunk Editor
+### ✏️ 5. Linked 3-Tier Multi-Tier Knowledge Chunk Editor
 - **3-Tier Hierarchy**:
   - 📄 **Large Tier (~3000 tokens)**: High-level overview & structural context.
   - 📝 **Medium Tier (~1200 tokens)**: Section policies & standard context.
@@ -73,19 +88,9 @@ chatbot-api-v1 (branch: version-2)
 - **In-Place Tabbed Modal**: Editing any chunk opens a 960px tabbed editor showing linked parent/child chunks for that section.
 - **Bulk D1 & Vectorize Re-Indexing**: Updating chunk text or tags automatically re-embeds vectors in Cloudflare Vectorize and updates D1 SQLite in a single transaction.
 
-### 🔍 4. Dual Hybrid Search & RRF Reranking
-- **Vector Search (Cloudflare Vectorize)**: 1536-dimensional OpenAI embeddings (`text-embedding-3-small`) with cosine distance matching.
-- **Lexical Search (SQLite FTS5 BM25)**: Native `chunks_fts` virtual table searching `content`, `section`, `topic`, and `tags` in `< 2 ms`.
-- **Reciprocal Rank Fusion (RRF)**: Merges vector and lexical ranks using `score = 1 / (60 + rank)`.
-
-### 📊 5. Developer Trace Inspector & Observability
+### 📊 6. Developer Trace Inspector & Observability
 - Access real-time execution logs for any user message at `/dashboard/threads/detail-page/:id`.
 - Inspect step timings (`history_load`, `preflight`, `embed_speculative`, `rag_query`), planner intent parsing, RRF fusion scores, and raw JSON traces.
-
-### 🚀 6. 3-Layer Speed & Semantic Caching Engine
-- **Layer 1 — KV Exact Cache (< 10 ms)**: Hashed query lookup using Web Crypto SHA-256 in Cloudflare KV.
-- **Layer 2 — Semantic Cache (< 50 ms)**: `VECTORIZE_CACHE` checks cosine similarity (threshold ≥ 0.95) against past answered queries.
-- **Layer 3 — Full RAG Pipeline (Fallback)**: Executes Dual Hybrid Retrieval, LLM reflection, and streams/returns the answer, writing back to KV and Vectorize caches.
 
 ---
 

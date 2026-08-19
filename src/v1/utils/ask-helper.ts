@@ -207,28 +207,20 @@ export function validateContentQuality(
     return { valid: false, issues };
   }
 
-  // Check for too many very short pieces (likely metadata)
-  const shortPieces = pieces.filter((p) => String(p.text || "").length < 50);
-  if (shortPieces.length > pieces.length * 0.5) {
-    issues.push(
-      `Too many short pieces (${shortPieces.length}/${pieces.length}): likely metadata without substance`
-    );
+  // Check for substantive pieces (content length >= 40 characters)
+  const substantivePieces = pieces.filter((p) => String(p.text || "").trim().length >= 40);
+  if (substantivePieces.length === 0) {
+    issues.push("No substantive pieces: all pieces under 40 characters");
   }
 
-  // Check for duplicate content (malformed retrieval)
-  const uniqueTexts = new Set(pieces.map((p) => p.text.slice(0, 100)));
-  if (uniqueTexts.size < pieces.length * 0.7) {
-    issues.push(
-      `High duplication: only ${uniqueTexts.size}/${pieces.length} unique pieces`
-    );
-  }
-
-  // Check average score distribution
+  // Check relevance scores
+  const topScore = Number(pieces[0]?.score || 0);
   const avgScore =
-    pieces.reduce((sum, p) => sum + (p.score || 0), 0) / pieces.length;
-  if (avgScore < 20) {
+    pieces.reduce((sum, p) => sum + Number(p.score || 0), 0) / pieces.length;
+
+  if (avgScore < 15 && topScore < 30) {
     issues.push(
-      `Low average relevance score: ${Math.round(avgScore)} (should be > 30)`
+      `Low relevance scores: top score ${topScore}, avg score ${Math.round(avgScore)}`
     );
   }
 
@@ -473,18 +465,16 @@ export async function retrieveVector(
   env: Env["Bindings"],
   apiKey: string,
   embedding: number[],
-  topK: number
+  topK: number,
+  activeDatasets: Array<"admin" | "pdf" | "web"> = ["admin", "pdf", "web"]
 ): Promise<Piece[]> {
-  if (!env?.VECTORIZE) {
-    console.warn("retrieveVector: env.VECTORIZE not active in local dev — skipping dense vector search");
-    return [];
-  }
   try {
-    const hits: VectorHit[] = await vectorService.searchChunks(
+    const hits: VectorHit[] = await vectorService.searchMultiIndex(
       embedding,
       apiKey,
-      env.VECTORIZE,
-      topK
+      env,
+      activeDatasets,
+      Math.max(10, Math.ceil(topK / (activeDatasets.length || 1)))
     );
 
     return (hits || []).map((h, i) => ({
@@ -492,11 +482,14 @@ export async function retrieveVector(
       sourceId: String(h?.metadata?.chunk_id || h?.metadata?.id || `vec_${i}`),
       score: clamp100(h?.score100 ?? 0),
       rawScore: clamp01(h?.score01 ?? 0),
-      title: String(h?.metadata?.title || h?.metadata?.first_sentence || ""),
+      title: String(h?.metadata?.title || h?.metadata?.file_name || h?.metadata?.first_sentence || ""),
       url: String(h?.metadata?.url || ""),
       section: String(h?.metadata?.section_number || h?.metadata?.section || ""),
       text: String(h?.text || ""),
-      meta: h?.metadata || {},
+      meta: {
+        ...(h?.metadata || {}),
+        dataset: h?.metadata?.dataset || "admin",
+      },
     }));
   } catch (err: any) {
     console.warn("retrieveVector warning (non-blocking):", err.message);
@@ -530,8 +523,10 @@ export function dedupeByKeyKeepOrder(pieces: Piece[]) {
 export function buildGroupedContextFromPieces(pieces: Piece[]) {
   return (pieces || [])
     .map((p) => {
+      const dataset = String(p.meta?.dataset || (p.sourceType === "web" ? "web" : "admin")).toUpperCase();
       const header = [
         `TYPE=${p.sourceType.toUpperCase()}`,
+        `DATASET=${dataset}`,
         `SCORE=${p.score ?? 0}`,
         p.title ? `TITLE=${p.title}` : "",
         p.url ? `URL=${p.url}` : "",

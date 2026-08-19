@@ -21,6 +21,171 @@
       </div>
     </div>
 
+    <!-- 3 Knowledge Datasets Executive Cards -->
+    <div class="row dataset-cards-row">
+      <!-- Card 1: Admin Knowledge -->
+      <div class="col-lg-4 col-md-6 col-12 mb-3">
+        <div class="dataset-card" [class.is-disabled]="!datasetSettings.dataset_admin_enabled">
+          <div>
+            <div class="dataset-card-header">
+              <h5 class="dataset-card-title">
+                <i class="ri-file-text-line" style="color: #6b21a8; font-size: 18px;"></i>
+                Admin Knowledge
+              </h5>
+              <label class="switch-custom" title="Toggle Admin Knowledge">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="datasetSettings.dataset_admin_enabled"
+                  (change)="saveDatasetSettings()"
+                />
+                <span class="slider-custom"></span>
+              </label>
+            </div>
+            <p class="dataset-card-desc">
+              Directly uploaded corporate docs, handbook policies, and manual entries.
+            </p>
+          </div>
+
+          <div>
+            <div class="dataset-card-stats">
+              <span class="dataset-stat-pill">
+                <i class="ri-file-list-line"></i> {{ adminFilesCount }} Files
+              </span>
+              <span class="dataset-stat-pill">
+                <i class="ri-database-2-line"></i> {{ adminChunksCount }} Chunks
+              </span>
+            </div>
+
+            <div class="dataset-card-controls">
+              <span class="dataset-weight-label">Priority Weight:</span>
+              <div class="dataset-weight-wrapper">
+                <input
+                  type="number"
+                  class="dataset-weight-input"
+                  min="1.00"
+                  max="1.50"
+                  step="0.05"
+                  [(ngModel)]="datasetSettings.dataset_admin_weight"
+                  (change)="saveDatasetSettings()"
+                />
+                <span style="font-size: 12px; font-weight: 600; color: #64748b;">x</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: PDF Reference Library -->
+      <div class="col-lg-4 col-md-6 col-12 mb-3">
+        <div class="dataset-card" [class.is-disabled]="!datasetSettings.dataset_pdf_enabled">
+          <div>
+            <div class="dataset-card-header">
+              <h5 class="dataset-card-title">
+                <i class="ri-book-open-line" style="color: #3730a3; font-size: 18px;"></i>
+                PDF Reference Library
+              </h5>
+              <label class="switch-custom" title="Toggle PDF Reference Library">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="datasetSettings.dataset_pdf_enabled"
+                  (change)="saveDatasetSettings()"
+                />
+                <span class="slider-custom"></span>
+              </label>
+            </div>
+            <p class="dataset-card-desc">
+              Official reference manuals, technical specification PDFs, and regulatory sheets.
+            </p>
+          </div>
+
+          <div>
+            <div class="dataset-card-stats">
+              <span class="dataset-stat-pill">
+                <i class="ri-file-list-line"></i> {{ pdfFilesCount }} Files
+              </span>
+              <span class="dataset-stat-pill">
+                <i class="ri-database-2-line"></i> {{ pdfChunksCount }} Chunks
+              </span>
+            </div>
+
+            <div class="dataset-card-controls">
+              <span class="dataset-weight-label">Priority Weight:</span>
+              <div class="dataset-weight-wrapper">
+                <input
+                  type="number"
+                  class="dataset-weight-input"
+                  min="1.00"
+                  max="1.50"
+                  step="0.05"
+                  [(ngModel)]="datasetSettings.dataset_pdf_weight"
+                  (change)="saveDatasetSettings()"
+                />
+                <span style="font-size: 12px; font-weight: 600; color: #64748b;">x</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Web Crawled Knowledge -->
+      <div class="col-lg-4 col-md-12 col-12 mb-3">
+        <div class="dataset-card" [class.is-disabled]="!datasetSettings.dataset_web_enabled">
+          <div>
+            <div class="dataset-card-header">
+              <h5 class="dataset-card-title">
+                <i class="ri-global-line" style="color: #0369a1; font-size: 18px;"></i>
+                Web Crawled Knowledge
+              </h5>
+              <label class="switch-custom" title="Toggle Web Crawled Knowledge">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="datasetSettings.dataset_web_enabled"
+                  (change)="saveDatasetSettings()"
+                />
+                <span class="slider-custom"></span>
+              </label>
+            </div>
+            <p class="dataset-card-desc">
+              Live domain pages, scraped sub-URLs, and public website documentation.
+            </p>
+          </div>
+
+          <div>
+            <div class="dataset-card-stats">
+              <span class="dataset-stat-pill">
+                <i class="ri-file-list-line"></i> {{ webFilesCount }} Files
+              </span>
+              <span class="dataset-stat-pill">
+                <i class="ri-database-2-line"></i> {{ webChunksCount }} Chunks
+              </span>
+            </div>
+
+            <div class="dataset-card-controls">
+              <span class="dataset-weight-label">Priority Weight:</span>
+              <div class="dataset-weight-wrapper">
+                <input
+                  type="number"
+                  class="dataset-weight-input"
+                  min="1.00"
+                  max="1.50"
+                  step="0.05"
+                  [(ngModel)]="datasetSettings.dataset_web_weight"
+                  (change)="saveDatasetSettings()"
+                />
+                <span style="font-size: 12px; font-weight: 600; color: #64748b;">x</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Success Feedback Alert -->
+    <div *ngIf="settingsSavedMessage" class="alert alert-success d-flex align-items-center gap-2 py-2 px-3 mb-3" style="border-radius: 8px; font-size: 13px;">
+      <i class="ri-checkbox-circle-line" style="font-size: 16px;"></i>
+      <span>Dataset settings and priority weights saved successfully! Semantic query cache refreshed.</span>
+    </div>
+
     <div class="row">
       <div class="col-12">
         <div class="card">
@@ -40,6 +205,15 @@
 
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <select class="form-select dataset-filter-select" [(ngModel)]="selectedDatasetFilter">
+                  <option value="all">🌐 All Datasets ({{ aiKnowledgeData.length }})</option>
+                  <option value="admin">📄 Admin Knowledge ({{ adminFilesCount }})</option>
+                  <option value="pdf">📚 PDF Reference Library ({{ pdfFilesCount }})</option>
+                  <option value="web">🌐 Web Crawled Knowledge ({{ webFilesCount }})</option>
+                </select>
+              </div>
+
               <div class="form-group mb-0 position-relative search-wrapper">
                 <i class="ri-search-2-line search-icon"></i>
                 <input
@@ -69,12 +243,13 @@
                   <tbody>
                     <tr
                       *ngFor="
-                        let item of aiKnowledgeData
+                        let item of filteredKnowledgeData
                           | searchFilter : searchText
                           | paginate : { itemsPerPage: entries, currentPage: page };
                         let i = index;
                         trackBy: trackByFileId
                       "
+                      [class.row-disabled]="!isDatasetEnabled(getDatasetType(item))"
                     >
                       <td>
                         <span class="index-cell">
@@ -84,22 +259,38 @@
 
                       <td>
                         <span
-                          *ngIf="item.file_id?.startsWith('web_') || item.file_path?.startsWith('http') || !item.file_name?.includes('.'); else docBadge"
+                          *ngIf="getDatasetType(item) === 'admin'"
+                          class="badge d-inline-flex align-items-center gap-1"
+                          style="background-color: #f3e8ff; color: #6b21a8; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #e9d5ff;"
+                          title="Admin Knowledge Doc"
+                        >
+                          <i class="ri-file-text-line"></i> Admin Doc
+                        </span>
+                        <span
+                          *ngIf="getDatasetType(item) === 'pdf'"
+                          class="badge d-inline-flex align-items-center gap-1"
+                          style="background-color: #e0e7ff; color: #3730a3; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #c7d2fe;"
+                          title="PDF Reference Library"
+                        >
+                          <i class="ri-book-open-line"></i> PDF Library
+                        </span>
+                        <span
+                          *ngIf="getDatasetType(item) === 'web'"
                           class="badge d-inline-flex align-items-center gap-1"
                           style="background-color: #e0f2fe; color: #0369a1; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #bae6fd;"
                           title="Web Crawled Source"
                         >
                           <i class="ri-global-line"></i> Web Crawled
                         </span>
-                        <ng-template #docBadge>
-                          <span
-                            class="badge d-inline-flex align-items-center gap-1"
-                            style="background-color: #f3e8ff; color: #6b21a8; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #e9d5ff;"
-                            title="Uploaded Document File"
-                          >
-                            <i class="ri-file-text-line"></i> Uploaded Doc
-                          </span>
-                        </ng-template>
+
+                        <span
+                          *ngIf="!isDatasetEnabled(getDatasetType(item))"
+                          class="badge d-inline-flex align-items-center gap-1 ml-1"
+                          style="background-color: #f1f5f9; color: #64748b; padding: 3px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; border: 1px solid #cbd5e1;"
+                          title="Dataset is currently disabled in settings"
+                        >
+                          Disabled
+                        </span>
                       </td>
 
                       <td class="d-flex align-items-center" style="gap: 6px">

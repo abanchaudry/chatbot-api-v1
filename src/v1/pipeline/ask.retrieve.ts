@@ -253,6 +253,8 @@ async function executeSingleRetrievalPass(args: {
   finalEvidenceMax: number;
   passLabel: string; // "pass1" | "pass2" for logging
   policy: AskPolicy;
+  activeDatasets?: Array<"admin" | "pdf" | "web">;
+  datasetWeights?: Record<string, number>;
 }): Promise<RetrievalPassResult> {
   const {
     c,
@@ -267,6 +269,8 @@ async function executeSingleRetrievalPass(args: {
     rerankMaxItems,
     finalEvidenceMax,
     passLabel,
+    activeDatasets = ["admin", "pdf", "web"],
+    datasetWeights = { admin: 1.25, pdf: 1.10, web: 1.00 },
   } = args;
 
   const plan = planQuery(question, historyPreview || "");
@@ -297,6 +301,7 @@ async function executeSingleRetrievalPass(args: {
         vectorTopK: topK,
         lexicalTopK: Math.min(Math.max(topK, 18), 24),
         metadataTopK: 12,
+        activeDatasets,
       });
     },
     {
@@ -364,6 +369,8 @@ async function executeSingleRetrievalPass(args: {
     metadataPieces,
     finalMax: Math.max(24, finalEvidenceMax * 2),
     rrfK: 50,
+    datasetWeights,
+    activeDatasets,
   });
 
   traceEvent(trace, "fusion", `${passLabel}_candidate_fusion`, {
@@ -570,7 +577,9 @@ export async function retrievePipeline(
   limits: RuntimeLimits,
   embedding: number[] | null,
   question: string,
-  historyPreview = ""
+  historyPreview = "",
+  activeDatasets: Array<"admin" | "pdf" | "web"> = ["admin", "pdf", "web"],
+  datasetWeights: Record<string, number> = { admin: 1.25, pdf: 1.10, web: 1.00 }
 ): Promise<RetrieveResult> {
   // ==== PASS 1: Initial Retrieval ====
   const pass1 = await executeSingleRetrievalPass({
@@ -587,6 +596,8 @@ export async function retrievePipeline(
     finalEvidenceMax: limits.finalEvidenceMax,
     passLabel: "pass1",
     policy,
+    activeDatasets,
+    datasetWeights,
   });
 
   traceStepEnd(trace, "pass1_complete", 0, {
@@ -668,6 +679,8 @@ export async function retrievePipeline(
     finalEvidenceMax: limits.finalEvidenceMax,
     passLabel: "pass2",
     policy,
+    activeDatasets,
+    datasetWeights,
   });
 
   traceStepEnd(trace, "pass2_complete", 0, {

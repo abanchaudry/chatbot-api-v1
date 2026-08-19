@@ -8,6 +8,12 @@ export interface SystemSettings {
   brand_tone: string;
   primary_language: string;
   fallback_schedule?: 'daily' | 'weekly' | 'monthly';
+  dataset_admin_enabled?: number;
+  dataset_admin_weight?: number;
+  dataset_pdf_enabled?: number;
+  dataset_pdf_weight?: number;
+  dataset_web_enabled?: number;
+  dataset_web_weight?: number;
   updated_at?: string;
 }
 
@@ -19,13 +25,29 @@ export const DEFAULT_SETTINGS: SystemSettings = {
   brand_tone: "professional, calm, and customer-friendly",
   primary_language: "english",
   fallback_schedule: "weekly",
+  dataset_admin_enabled: 1,
+  dataset_admin_weight: 1.25,
+  dataset_pdf_enabled: 1,
+  dataset_pdf_weight: 1.10,
+  dataset_web_enabled: 1,
+  dataset_web_weight: 1.00,
 };
+
+export function getDatasetSignature(settings?: Partial<SystemSettings>): string {
+  const a = settings?.dataset_admin_enabled !== undefined ? Number(settings.dataset_admin_enabled) : (DEFAULT_SETTINGS.dataset_admin_enabled ?? 1);
+  const p = settings?.dataset_pdf_enabled !== undefined ? Number(settings.dataset_pdf_enabled) : (DEFAULT_SETTINGS.dataset_pdf_enabled ?? 1);
+  const w = settings?.dataset_web_enabled !== undefined ? Number(settings.dataset_web_enabled) : (DEFAULT_SETTINGS.dataset_web_enabled ?? 1);
+  const aw = Math.round((settings?.dataset_admin_weight !== undefined ? Number(settings.dataset_admin_weight) : 1.25) * 100);
+  const pw = Math.round((settings?.dataset_pdf_weight !== undefined ? Number(settings.dataset_pdf_weight) : 1.10) * 100);
+  const ww = Math.round((settings?.dataset_web_weight !== undefined ? Number(settings.dataset_web_weight) : 1.00) * 100);
+  return `a${a}_${aw}_p${p}_${pw}_w${w}_${ww}`;
+}
 
 export class SettingsDbService {
   async getSettings(db: D1Database): Promise<SystemSettings> {
     try {
       const row = await db
-        .prepare("SELECT id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, updated_at FROM system_settings WHERE id = 'default' LIMIT 1")
+        .prepare("SELECT id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at FROM system_settings WHERE id = 'default' LIMIT 1")
         .first<SystemSettings>();
 
       return row ? { ...DEFAULT_SETTINGS, ...row } : DEFAULT_SETTINGS;
@@ -42,11 +64,17 @@ export class SettingsDbService {
     const tone = String(settings.brand_tone || DEFAULT_SETTINGS.brand_tone).trim();
     const lang = String(settings.primary_language || DEFAULT_SETTINGS.primary_language).trim();
     const schedule = String(settings.fallback_schedule || DEFAULT_SETTINGS.fallback_schedule).trim();
+    const adminEnabled = settings.dataset_admin_enabled !== undefined ? Number(settings.dataset_admin_enabled) : (DEFAULT_SETTINGS.dataset_admin_enabled ?? 1);
+    const adminWeight = settings.dataset_admin_weight !== undefined ? Number(settings.dataset_admin_weight) : (DEFAULT_SETTINGS.dataset_admin_weight ?? 1.25);
+    const pdfEnabled = settings.dataset_pdf_enabled !== undefined ? Number(settings.dataset_pdf_enabled) : (DEFAULT_SETTINGS.dataset_pdf_enabled ?? 1);
+    const pdfWeight = settings.dataset_pdf_weight !== undefined ? Number(settings.dataset_pdf_weight) : (DEFAULT_SETTINGS.dataset_pdf_weight ?? 1.10);
+    const webEnabled = settings.dataset_web_enabled !== undefined ? Number(settings.dataset_web_enabled) : (DEFAULT_SETTINGS.dataset_web_enabled ?? 1);
+    const webWeight = settings.dataset_web_weight !== undefined ? Number(settings.dataset_web_weight) : (DEFAULT_SETTINGS.dataset_web_weight ?? 1.00);
 
     await db
       .prepare(
-        `INSERT INTO system_settings (id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, updated_at)
-         VALUES ('default', ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `INSERT INTO system_settings (id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at)
+         VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(id) DO UPDATE SET
            company_name = excluded.company_name,
            assistant_name = excluded.assistant_name,
@@ -54,9 +82,15 @@ export class SettingsDbService {
            brand_tone = excluded.brand_tone,
            primary_language = excluded.primary_language,
            fallback_schedule = excluded.fallback_schedule,
+           dataset_admin_enabled = excluded.dataset_admin_enabled,
+           dataset_admin_weight = excluded.dataset_admin_weight,
+           dataset_pdf_enabled = excluded.dataset_pdf_enabled,
+           dataset_pdf_weight = excluded.dataset_pdf_weight,
+           dataset_web_enabled = excluded.dataset_web_enabled,
+           dataset_web_weight = excluded.dataset_web_weight,
            updated_at = CURRENT_TIMESTAMP`
       )
-      .bind(company, assistant, domain, tone, lang, schedule)
+      .bind(company, assistant, domain, tone, lang, schedule, adminEnabled, adminWeight, pdfEnabled, pdfWeight, webEnabled, webWeight)
       .run();
 
     return this.getSettings(db);

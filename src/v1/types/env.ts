@@ -19,6 +19,9 @@ export type Env = {
     // Vector
     // -----------------------------
     VECTORIZE: VectorizeIndex;
+    VECTORIZE_ADMIN?: VectorizeIndex;
+    VECTORIZE_PDF?: VectorizeIndex;
+    VECTORIZE_WEB?: VectorizeIndex;
     VECTORIZE_CACHE?: VectorizeIndex;
 
     // -----------------------------

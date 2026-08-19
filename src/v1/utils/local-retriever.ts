@@ -17,6 +17,7 @@ type LocalChunkRow = {
   section?: string;
   file_id?: string;
   file_name?: string;
+  dataset?: string;
   tags?: string[] | string | null;
   matchMode?: string;
 };
@@ -85,6 +86,7 @@ function buildLocalDbPiece(
     meta: {
       fileId: row.file_id || null,
       file_name: row.file_name || null,
+      dataset: row.dataset || "admin",
       tags,
       first_sentence: row.first_sentence || null,
       section_number: row.section_number || null,
@@ -116,6 +118,7 @@ function enrichVectorPiece(piece: Piece, plan: QueryPlan): Piece {
     ...piece,
     meta: {
       ...(piece.meta || {}),
+      dataset: piece.meta?.dataset || "admin",
       __origin: "vector",
       __exactEntityMatch: exactEntityMatch,
       __exactPhraseMatch: exactPhraseMatch,
@@ -134,6 +137,7 @@ export async function retrieveLocalCandidates(args: {
   vectorTopK: number;
   lexicalTopK: number;
   metadataTopK: number;
+  activeDatasets?: Array<"admin" | "pdf" | "web">;
 }): Promise<LocalRetrievalResult> {
   const {
     db,
@@ -145,24 +149,26 @@ export async function retrieveLocalCandidates(args: {
     vectorTopK,
     lexicalTopK,
     metadataTopK,
+    activeDatasets = ["admin", "pdf", "web"],
   } = args;
 
   const [vectorPieces, lexicalRows, metadataRows] = await Promise.all([
-    embedding?.length ? retrieveVector(env, apiKey, embedding, vectorTopK).catch((e) => { console.warn("vectorSearch error:", e.message); return []; }) : Promise.resolve([] as Piece[]),
+    embedding?.length ? retrieveVector(env, apiKey, embedding, vectorTopK, activeDatasets).catch((e) => { console.warn("vectorSearch error:", e.message); return []; }) : Promise.resolve([] as Piece[]),
     chunkDb.lexicalSearch(db, {
       query: plan.searchQuery || question,
       terms: plan.keywords,
       exactPhrases: plan.exactPhrases,
       maxResults: lexicalTopK,
+      datasets: activeDatasets,
     }).catch((e) => { console.warn("lexicalSearch error:", e.message); return []; }),
     chunkDb.metadataSearch(db, {
       entities: plan.entities,
       exactPhrases: plan.exactPhrases,
       sectionRef: plan.sectionRef,
       maxResults: metadataTopK,
+      datasets: activeDatasets,
     }).catch((e) => { console.warn("metadataSearch error:", e.message); return []; }),
   ]);
-
 
   return {
     vectorPieces: vectorPieces.map((piece) => enrichVectorPiece(piece, plan)),

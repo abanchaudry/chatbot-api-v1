@@ -310,3 +310,30 @@ This document maintains a complete, chronological record of all architectural up
   - Removed unused empty `MaterialModule` from [app.module.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/app.module.ts).
 - **HTTP Interceptor Error Propagation**:
   - Fixed [config.interceptors.ts](file:///c:/Users/HASSAN/Documents/antigravity/fervent-curie/chatbot-admin-v1/src/app/modules/shared/interceptors/config.interceptors.ts) line 39 to pass original `HttpErrorResponse` through rather than masking real errors with `new Error('test')`.
+
+---
+
+## 23. Physical Multi-Dataset Architecture, Recursive Crawler & Cache Invalidation
+
+- **3 Physical Cloudflare Vectorize Datasets (`Option A`)**:
+  - Provisioned 3 dedicated 1536-dimensional Vectorize indexes:
+    - `VECTORIZE_ADMIN` (`chatbot-admin-index-dev`): Directly uploaded executive manuals and corporate policies (Weight: 1.25x).
+    - `VECTORIZE_PDF` (`chatbot-pdf-index-dev`): Technical engineering datasheets and hardware manuals (Weight: 1.10x).
+    - `VECTORIZE_WEB` (`chatbot-web-index-dev`): Public websites and crawled educational content (Weight: 1.00x).
+  - Applied remote D1 database migration `0015_knowledge_datasets.sql` adding `dataset` column to `files` and `chunks` tables, plus dataset toggles (`dataset_admin_enabled`, etc.) and priority weights in `system_settings`.
+- **Recursive Multi-Depth Web Crawler Engine (`crawler.service.ts`)**:
+  - Upgraded link discovery with domain normalization (`isSameDomain`) resolving `www.` vs non-`www.` host mismatches.
+  - Implemented automatic XML sitemap discovery (`/sitemap.xml`, `/sitemap_index.xml`, `/wp-sitemap.xml`) for site-wide page discovery.
+  - Added recursive breadth-first search (BFS) queue crawling sub-links up to Depth 2.
+  - Added Jina Reader Proxy fallback for blocked domains.
+- **Resilient Multi-Signal Evidence Gate (`local-evidence-gate.ts` & `ask-helper.ts`)**:
+  - Refactored `validateContentQuality` to evaluate substantive text length ($\ge 40$ chars) and score distribution rather than naive string prefix deduplication, preventing false fallback alarms on multi-page policy manuals.
+  - Implemented multi-signal grounding evaluation in `decideLocalEvidence` recognizing exact matches, high fusion scores ($\ge 40$), LLM reranker confirmation, and semantic topic coverage ($\ge 40\%$).
+- **Signature-Aware Real-Time Cache Partitioning (`cache.service.ts` & `ask.controller.ts`)**:
+  - Partitioned all Layer 1 KV and Layer 2 Semantic cache keys by active dataset configuration signatures (e.g. `qcache:a1_p1_w1:<hash>`), ensuring instantaneous $0\text{ms}$ cache miss when any dataset is disabled.
+  - Fixed `purgeAllQueryCache` to execute full non-blocking key purges across Cloudflare KV when settings, files, or chunks are modified.
+- **Angular Admin Panel Dataset Controls (`all-knowledge.component.ts`)**:
+  - Added live executive dataset cards showing document/chunk counts, priority weight adjusters, and toggle switches.
+  - Added visual greyed-out state (`opacity: 0.45` and `(Disabled)` badge) for files belonging to disabled datasets.
+  - Fixed settings unpacking in `loadSettings()` so toggle states persist across page refreshes.
+

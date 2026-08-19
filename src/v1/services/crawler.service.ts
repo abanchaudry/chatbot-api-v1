@@ -177,56 +177,250 @@ export type DiscoveredPage = {
   depth: number;
 };
 
-function extractInternalLinks(html: string, currentUrl: string, origin: string): string[] {
+/**
+ * Normalizes hostnames by stripping leading "www." for flexible domain matching.
+ */
+function normalizeHostname(hostname: string): string {
+  return hostname.toLowerCase().replace(/^www\./, "");
+}
+
+/**
+ * Checks if two URLs belong to the same root domain or subdomains.
+ */
+function isSameDomain(urlA: string, urlB: string): boolean {
+  try {
+    const hostA = normalizeHostname(new URL(urlA).hostname);
+    const hostB = normalizeHostname(new URL(urlB).hostname);
+    return hostA === hostB || hostA.endsWith(`.${hostB}`) || hostB.endsWith(`.${hostA}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Decodes standard HTML entities in page titles.
+ */
+function decodeEntities(text: string): string {
+  return (text || "")
+    .replace(/&#8211;/g, "–")
+    .replace(/&#8212;/g, "—")
+    .replace(/&#8230;/g, "…")
+    .replace(/&#8217;/g, "'")
+    .replace(/&#8216;/g, "'")
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#\d+;/g, "");
+}
+
+/**
+ * Infers a clean human-readable title from URL pathname when <title> is missing.
+ */
+function titleFromUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const parts = u.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+    if (parts.length === 0) return u.hostname.replace(/^www\./, "");
+    const lastPart = parts[parts.length - 1];
+    return decodeEntities(
+      lastPart
+        .replace(/[-_]/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Extract all internal HTTP/HTTPS links from HTML or Markdown text.
+ */
+function extractInternalLinks(htmlOrMarkdown: string, currentUrl: string, rootUrl: string): string[] {
   const links: string[] = [];
-  const regex = /href=["']([^"'#?]+)/gi;
-  let match;
-  
-  const badExts = ['.pdf', '.jpg', '.png', '.css', '.js', '.svg', '.ico', '.xml', '.json', '.zip', '.gz', '.mp4', '.mp3', '.woff', '.woff2', '.ttf', '.eot'];
+  const badExts = [
+    ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".ico",
+    ".css", ".js", ".xml", ".json", ".zip", ".gz", ".tar", ".mp4",
+    ".mp3", ".wav", ".woff", ".woff2", ".ttf", ".eot"
+  ];
 
-  while ((match = regex.exec(html)) !== null) {
-    const href = match[1];
+  // 1. Standard HTML href regex (double quotes, single quotes, unquoted)
+  const hrefRegex = /href\s*=\s*["']?([^"'>\s#]+)["']?/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = hrefRegex.exec(htmlOrMarkdown)) !== null) {
+    const rawHref = match[1].trim();
+    if (!rawHref || rawHref.startsWith("javascript:") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) {
+      continue;
+    }
+
     try {
-      const urlObj = new URL(href, currentUrl);
-      
-      if (urlObj.origin !== origin || (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:')) {
-        continue;
-      }
-      
-      const lowerPath = urlObj.pathname.toLowerCase();
-      if (badExts.some(ext => lowerPath.endsWith(ext))) {
-        continue;
-      }
+      const urlObj = new URL(rawHref, currentUrl);
+      if (urlObj.protocol !== "http:" && urlObj.protocol !== "https:") continue;
+      if (!isSameDomain(urlObj.toString(), rootUrl)) continue;
 
-      // Filter out non-content utility paths
+      const lowerPath = urlObj.pathname.toLowerCase();
+      if (badExts.some((ext) => lowerPath.endsWith(ext))) continue;
+
       if (
-        lowerPath.includes('/wp-json') ||
-        lowerPath.includes('/xmlrpc') ||
-        lowerPath.includes('/feed') ||
-        lowerPath.includes('/wp-admin') ||
-        lowerPath.includes('/wp-includes') ||
-        lowerPath.includes('/cart') ||
-        lowerPath.includes('/checkout')
+        lowerPath.includes("/wp-json") ||
+        lowerPath.includes("/xmlrpc") ||
+        lowerPath.includes("/feed") ||
+        lowerPath.includes("/wp-admin") ||
+        lowerPath.includes("/wp-includes") ||
+        lowerPath.includes("/cart") ||
+        lowerPath.includes("/checkout")
       ) {
         continue;
       }
-      
-      urlObj.hash = '';
-      urlObj.search = '';
+
+      urlObj.hash = "";
+      urlObj.search = "";
       let cleanUrl = urlObj.toString();
-      if (cleanUrl.endsWith('/')) {
+      if (cleanUrl.endsWith("/")) {
         cleanUrl = cleanUrl.slice(0, -1);
       }
-      
+
       links.push(cleanUrl);
-    } catch (e) {
-      // Invalid URL, skip
+    } catch {
+      // Invalid URL
     }
   }
-  
+
+  // 2. Markdown link regex [text](https://...)
+  const mdRegex = /\[([^\]]*)\]\((https?:\/\/[^\s\)]+)\)/gi;
+  while ((match = mdRegex.exec(htmlOrMarkdown)) !== null) {
+    const rawUrl = match[2].trim();
+    try {
+      const urlObj = new URL(rawUrl, currentUrl);
+      if (isSameDomain(urlObj.toString(), rootUrl)) {
+        urlObj.hash = "";
+        urlObj.search = "";
+        let cleanUrl = urlObj.toString();
+        if (cleanUrl.endsWith("/")) cleanUrl = cleanUrl.slice(0, -1);
+        links.push(cleanUrl);
+      }
+    } catch {}
+  }
+
   return [...new Set(links)];
 }
 
+/**
+ * Attempts to fetch XML sitemaps to quickly discover all indexed URLs.
+ */
+async function tryFetchSitemaps(origin: string, rootUrl: string, maxPages: number): Promise<DiscoveredPage[]> {
+  const sitemapCandidates = [
+    `${origin}/sitemap.xml`,
+    `${origin}/sitemap_index.xml`,
+    `${origin}/wp-sitemap.xml`,
+  ];
+
+  for (const sitemapUrl of sitemapCandidates) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(sitemapUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+          Accept: "application/xml,text/xml,*/*",
+        },
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        const text = await res.text();
+        const locMatches = text.match(/<loc>(https?:\/\/[^<]+)<\/loc>/gi);
+        if (locMatches && locMatches.length > 1) {
+          const results: DiscoveredPage[] = [];
+          for (const locTag of locMatches) {
+            const locUrl = locTag.replace(/<\/?loc>/gi, "").trim();
+            if (isSameDomain(locUrl, rootUrl)) {
+              let clean = locUrl.split("#")[0].split("?")[0];
+              if (clean.endsWith("/")) clean = clean.slice(0, -1);
+              if (!clean.endsWith(".xml")) {
+                results.push({
+                  url: clean,
+                  title: titleFromUrl(clean),
+                  depth: clean === rootUrl ? 0 : 1,
+                });
+              }
+            }
+            if (results.length >= maxPages) break;
+          }
+
+          if (results.length >= 2) {
+            console.log(`[Crawler] Discovered ${results.length} URLs via sitemap: ${sitemapUrl}`);
+            return results;
+          }
+        }
+      }
+    } catch {
+      // Continue to next sitemap candidate
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Fetches HTML or falls back to Jina proxy if blocked.
+ */
+async function fetchPageHtmlWithFallback(url: string): Promise<{ html: string; title: string }> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  let html = "";
+  let title = titleFromUrl(url);
+
+  try {
+    const res = await fetch(url, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+      },
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/html") || contentType.includes("application/xhtml+xml")) {
+        html = await res.text();
+        const tm = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (tm && tm[1].trim()) title = decodeEntities(tm[1].trim());
+      }
+    }
+  } catch {
+    clearTimeout(timeoutId);
+  }
+
+  // Jina proxy fallback if blocked or empty
+  if (!html || html.includes("Access Denied") || html.includes("errors.edgesuite.net")) {
+    try {
+      const jinaRes = await fetch(`https://r.jina.ai/${url}`, {
+        headers: { Accept: "text/html, application/json", "X-No-Cache": "true" },
+      });
+      if (jinaRes.ok) {
+        html = await jinaRes.text();
+        const tm = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (tm && tm[1].trim()) title = decodeEntities(tm[1].trim());
+      }
+    } catch {}
+  }
+
+  return { html, title };
+}
+
+/**
+ * RECURSIVE MULTI-DEPTH LINK DISCOVERY
+ * Discovers sub-pages up to maxDepth and maxPages.
+ */
 export async function discoverLinks(
   env: Env["Bindings"],
   rootUrl: string,
@@ -236,131 +430,85 @@ export async function discoverLinks(
   try {
     const rootUrlObj = new URL(rootUrl);
     const origin = rootUrlObj.origin;
-    
-    rootUrlObj.hash = '';
-    rootUrlObj.search = '';
+
+    rootUrlObj.hash = "";
+    rootUrlObj.search = "";
     let cleanRootUrl = rootUrlObj.toString();
-    if (cleanRootUrl.endsWith('/')) {
+    if (cleanRootUrl.endsWith("/")) {
       cleanRootUrl = cleanRootUrl.slice(0, -1);
     }
 
     const visited = new Set<string>();
     const resultsMap = new Map<string, DiscoveredPage>();
 
-    function decodeEntities(text: string): string {
-      return (text || "")
-        .replace(/&#8211;/g, "–")
-        .replace(/&#8212;/g, "—")
-        .replace(/&#8230;/g, "…")
-        .replace(/&#8217;/g, "'")
-        .replace(/&#8216;/g, "'")
-        .replace(/&#8220;/g, '"')
-        .replace(/&#8221;/g, '"')
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&#\d+;/g, "");
+    // 1. Try Sitemap Discovery First (fastest & most comprehensive)
+    const sitemapPages = await tryFetchSitemaps(origin, cleanRootUrl, maxPages);
+    if (sitemapPages.length >= 3) {
+      sitemapPages.forEach((p) => resultsMap.set(p.url, p));
+      const sitemapResults = Array.from(resultsMap.values()).slice(0, maxPages);
+      sitemapResults.sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.url.localeCompare(b.url)));
+      return sitemapResults;
     }
 
-    // Infer human-readable title from URL pathname
-    function titleFromUrl(url: string): string {
-      try {
-        const u = new URL(url);
-        const parts = u.pathname.replace(/\/$/, "").split("/").filter(Boolean);
-        if (parts.length === 0) return u.hostname;
-        const lastPart = parts[parts.length - 1];
-        return decodeEntities(lastPart
-          .replace(/[-_]/g, " ")
-          .replace(/\b\w/g, c => c.toUpperCase()));
-      } catch {
-        return url;
-      }
+    // 2. Fetch Root Page (Depth 0)
+    visited.add(cleanRootUrl);
+    const rootPageData = await fetchPageHtmlWithFallback(cleanRootUrl);
+    resultsMap.set(cleanRootUrl, { url: cleanRootUrl, title: rootPageData.title, depth: 0 });
+
+    if (!rootPageData.html) {
+      return Array.from(resultsMap.values());
     }
 
-    // Fast HTML title fetcher
-    async function fetchPageTitleFast(url: string): Promise<string> {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), CRAWLER_CONFIG.DEFAULT_FETCH_TIMEOUT_MS);
-      try {
-        const res = await fetch(url, {
-          redirect: "follow",
-          signal: controller.signal,
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-            Accept: "text/html,application/xhtml+xml",
-          },
-        });
-        clearTimeout(timeoutId);
-        if (res.ok) {
-          const contentType = res.headers.get("content-type") || "";
-          if (contentType.includes("text/html")) {
-            const text = await res.text();
-            const titleMatch = text.match(/<title[^>]*>([^<]+)<\/title>/i);
-            if (titleMatch && titleMatch[1].trim()) {
-              return decodeEntities(titleMatch[1].trim());
+    // 3. Extract Depth 1 Links
+    const depth1Links = extractInternalLinks(rootPageData.html, cleanRootUrl, cleanRootUrl)
+      .filter((u) => u !== cleanRootUrl && !visited.has(u))
+      .slice(0, maxPages - 1);
+
+    depth1Links.forEach((u) => visited.add(u));
+
+    // Parallel title fetching for Depth 1 links
+    const depth1Results = await Promise.all(
+      depth1Links.map(async (u) => {
+        const data = await fetchPageHtmlWithFallback(u);
+        return { url: u, title: data.title, html: data.html, depth: 1 };
+      })
+    );
+
+    depth1Results.forEach((item) => {
+      resultsMap.set(item.url, { url: item.url, title: item.title, depth: 1 });
+    });
+
+    // 4. If maxDepth >= 2 and results are under maxPages, crawl Depth 2 from the top Depth 1 pages
+    if (maxDepth >= 2 && resultsMap.size < maxPages && depth1Results.length > 0) {
+      const crawlSubset = depth1Results.slice(0, 6); // Take first 6 sub-pages
+      const depth2Candidates: string[] = [];
+
+      for (const d1Page of crawlSubset) {
+        if (resultsMap.size + depth2Candidates.length >= maxPages) break;
+        if (d1Page.html) {
+          const linksFromD1 = extractInternalLinks(d1Page.html, d1Page.url, cleanRootUrl);
+          for (const u of linksFromD1) {
+            if (!visited.has(u) && !resultsMap.has(u)) {
+              visited.add(u);
+              depth2Candidates.push(u);
+              if (resultsMap.size + depth2Candidates.length >= maxPages) break;
             }
           }
         }
-      } catch {
-        clearTimeout(timeoutId);
       }
-      return titleFromUrl(url);
-    }
 
-    // 1. Fetch Root Page (Depth 0)
-    visited.add(cleanRootUrl);
-    
-    // Root fetch
-    const rootController = new AbortController();
-    const rootTimeout = setTimeout(() => rootController.abort(), CRAWLER_CONFIG.FALLBACK_FETCH_TIMEOUT_MS);
-    let rootHtml = "";
-    let rootTitle = titleFromUrl(cleanRootUrl);
+      if (depth2Candidates.length > 0) {
+        const depth2Results = await Promise.all(
+          depth2Candidates.slice(0, maxPages - resultsMap.size).map(async (u) => {
+            const data = await fetchPageHtmlWithFallback(u);
+            return { url: u, title: data.title, depth: 2 };
+          })
+        );
 
-    try {
-      const rootRes = await fetch(cleanRootUrl, {
-        redirect: "follow",
-        signal: rootController.signal,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml",
-        },
-      });
-      clearTimeout(rootTimeout);
-      if (rootRes.ok) {
-        rootHtml = await rootRes.text();
-        const tm = rootHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
-        if (tm && tm[1].trim()) rootTitle = decodeEntities(tm[1].trim());
+        depth2Results.forEach((item) => {
+          resultsMap.set(item.url, item);
+        });
       }
-    } catch {
-      clearTimeout(rootTimeout);
-    }
-
-    resultsMap.set(cleanRootUrl, { url: cleanRootUrl, title: rootTitle, depth: 0 });
-
-    // 2. Extract links from root page HTML
-    if (rootHtml) {
-      const allExtractedLinks = extractInternalLinks(rootHtml, cleanRootUrl, origin);
-
-      // Separate into direct level 1 links (depth 1)
-      const targetLinks = allExtractedLinks
-        .filter(u => u !== cleanRootUrl && !visited.has(u))
-        .slice(0, Math.min(maxPages - 1, 40));
-
-      targetLinks.forEach(u => visited.add(u));
-
-      // Fetch titles for all Depth 1 links IN PARALLEL in a single pass
-      const titleResults = await Promise.all(
-        targetLinks.map(async (u) => {
-          const t = await fetchPageTitleFast(u);
-          return { url: u, title: t };
-        })
-      );
-
-      titleResults.forEach(item => {
-        resultsMap.set(item.url, { url: item.url, title: item.title, depth: 1 });
-      });
     }
 
     const results = Array.from(resultsMap.values()).slice(0, maxPages);
@@ -369,6 +517,7 @@ export async function discoverLinks(
       return a.url.localeCompare(b.url);
     });
 
+    console.log(`[Crawler] Discovered total ${results.length} pages for ${cleanRootUrl}`);
     return results;
   } catch (err) {
     console.error("Error in discoverLinks:", err);

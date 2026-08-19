@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { fileDb } from "../services/db/files.db";
 import { chunkDb } from "../services/db/chunk.db";
 import { ingestDb } from "../services/db/ingest.db";
-import { vectorService } from "../services/vector.service";
+import { vectorService, getVectorIndexForDataset } from "../services/vector.service";
 import { ChunkingServiceV2 } from "../services/chunkingv2.service";
 import { EmbeddingService } from "../services/embedding.service";
 import { LangChainChunkingService } from "../services/langChain.service";
@@ -131,8 +131,10 @@ async function buildVectorizeBatch(args: {
   vectors: number[][];
   offset: number; // offset into chunks/vectors arrays
   size: number;   // batch size
+  dataset?: string;
 }) {
   const batchChunks = args.chunks.slice(args.offset, args.offset + args.size);
+  const dataset = args.dataset || "admin";
 
   return Promise.all(
     batchChunks.map(async (ch, relIdx) => {
@@ -156,6 +158,7 @@ async function buildVectorizeBatch(args: {
           file_id: args.fileId,
           file_name: args.fileName,
           version: args.version,
+          dataset,
           embedding_model: args.embeddingModel,
           chunk_method: args.chunkMethod,
           section_code: sectionNumber,
@@ -409,6 +412,7 @@ export const DataController = {
 
     const chunkMethod = (form.get("chunkMethod")?.toString() as "semantic" | "general") || "semantic";
     const embeddingModel = form.get("embeddingModel")?.toString() || "text-embedding-3-small";
+    const dataset = (form.get("dataset")?.toString() as "admin" | "pdf") || "admin";
 
     const jobId = await ingestDb.startJob(c.env.DB, "admin", files.length);
     const results: any[] = [];
@@ -449,11 +453,12 @@ export const DataController = {
           continue;
         }
 
-        // 2) Now insert file metadata WITH correct file_path
+        // 2) Now insert file metadata WITH correct file_path & dataset
         await fileDb.insertFile(c.env.DB, {
           id: fileId,
           name: fileName,
           source: "admin",
+          dataset,
           version,
           size_bytes: size,
           checksum,
@@ -511,10 +516,12 @@ export const DataController = {
           chunks,
           embeddingModel,
           chunkMethod,
+          dataset,
           source: "admin",
         });
 
-        // 6) Save to Vectorize in stable batches (IDs MUST match D1)
+        // 6) Save to Vectorize in stable batches (target specific dataset index)
+        const targetVectorIndex = (getVectorIndexForDataset(c.env, dataset) || c.env.VECTORIZE) as any;
         for (let offset = 0; offset < chunks.length; offset += BATCH_SIZE) {
           const batch = await buildVectorizeBatch({
             fileId,
@@ -526,12 +533,13 @@ export const DataController = {
             vectors,
             offset,
             size: BATCH_SIZE,
+            dataset,
           });
 
           let attempt = 0;
           for (;;) {
             try {
-              await vectorService.storeChunks(batch, key, c.env.VECTORIZE, { embeddingModel });
+              await vectorService.storeChunks(batch, key, targetVectorIndex, { embeddingModel });
               break;
             } catch (e: any) {
               attempt++;
@@ -595,6 +603,7 @@ export const DataController = {
         embeddingModel = "text-embedding-3-small",
         rawText, // OPTIONAL: recommended for exact download later
         enrich = true, // Auto-enrich for finalize (always use enhanced metadata)
+        dataset = "admin",
       } = body as any;
 
       if (!fileName) return c.json({ ok: false, message: "fileName is required." }, 400);
@@ -679,11 +688,12 @@ export const DataController = {
         return c.json({ ok: false, message: errorMsg }, 500);
       }
 
-      // Insert file with guaranteed file_path (never null)
+      // Insert file with guaranteed file_path & dataset (never null)
       await fileDb.insertFile(c.env.DB, {
         id: fileId,
         name: fileName,
         source: "admin",
+        dataset,
         version,
         size_bytes: totalSize,
         checksum,
@@ -720,10 +730,12 @@ export const DataController = {
         chunks: normalized,
         embeddingModel,
         chunkMethod,
+        dataset,
         source: "admin",
       });
 
-      // Save to Vectorize
+      // Save to Vectorize (route to dataset index)
+      const targetVectorIndex = (getVectorIndexForDataset(c.env, dataset) || c.env.VECTORIZE) as any;
       for (let offset = 0; offset < normalized.length; offset += BATCH_SIZE) {
         const batch = await buildVectorizeBatch({
           fileId,
@@ -735,12 +747,13 @@ export const DataController = {
           vectors,
           offset,
           size: BATCH_SIZE,
+          dataset,
         });
 
         let attempt = 0;
         for (;;) {
           try {
-            await vectorService.storeChunks(batch, key, c.env.VECTORIZE, { embeddingModel });
+            await vectorService.storeChunks(batch, key, targetVectorIndex, { embeddingModel });
             break;
           } catch (err: any) {
             attempt++;

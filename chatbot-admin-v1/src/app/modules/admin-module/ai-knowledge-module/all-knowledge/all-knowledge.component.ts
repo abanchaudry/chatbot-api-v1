@@ -1,6 +1,7 @@
 import { Component, OnInit } from "@angular/core";
 import { finalize } from "rxjs";
 import { AiKnowledgeService } from "src/app/modules/shared/services/ai-knowledge.service";
+import { AssistantService } from "src/app/modules/shared/services/assistant.service";
 
 type DeletingState = {
   open: boolean;
@@ -23,6 +24,18 @@ export class AllAIKnowledgeComponent implements OnInit {
   totalChunksCount: number = 0;
   isLoading = false;
   searchText: string = "";
+  selectedDatasetFilter: string = "all";
+
+  datasetSettings = {
+    dataset_admin_enabled: true,
+    dataset_admin_weight: 1.25,
+    dataset_pdf_enabled: true,
+    dataset_pdf_weight: 1.10,
+    dataset_web_enabled: true,
+    dataset_web_weight: 1.00,
+  };
+  isSavingSettings = false;
+  settingsSavedMessage = false;
 
   deleting: DeletingState = {
     open: false,
@@ -32,10 +45,109 @@ export class AllAIKnowledgeComponent implements OnInit {
     error: null,
   };
 
-  constructor(private aiKnowledgeService: AiKnowledgeService) {}
+  constructor(
+    private aiKnowledgeService: AiKnowledgeService,
+    private assistantService: AssistantService
+  ) {}
 
   ngOnInit(): void {
     this.getAiKnowledgeData();
+    this.loadSettings();
+  }
+
+  loadSettings() {
+    this.assistantService.getSettings().subscribe({
+      next: (res: any) => {
+        const s = res?.settings || res?.data || res || {};
+        this.datasetSettings = {
+          dataset_admin_enabled: s.dataset_admin_enabled !== undefined ? Number(s.dataset_admin_enabled) !== 0 : true,
+          dataset_admin_weight: s.dataset_admin_weight !== undefined ? Number(s.dataset_admin_weight) : 1.25,
+          dataset_pdf_enabled: s.dataset_pdf_enabled !== undefined ? Number(s.dataset_pdf_enabled) !== 0 : true,
+          dataset_pdf_weight: s.dataset_pdf_weight !== undefined ? Number(s.dataset_pdf_weight) : 1.10,
+          dataset_web_enabled: s.dataset_web_enabled !== undefined ? Number(s.dataset_web_enabled) !== 0 : true,
+          dataset_web_weight: s.dataset_web_weight !== undefined ? Number(s.dataset_web_weight) : 1.00,
+        };
+      },
+      error: (err) => console.warn("Load settings warning:", err),
+    });
+  }
+
+  saveDatasetSettings() {
+    this.isSavingSettings = true;
+    this.settingsSavedMessage = false;
+
+    const payload = {
+      dataset_admin_enabled: this.datasetSettings.dataset_admin_enabled ? 1 : 0,
+      dataset_admin_weight: Number(this.datasetSettings.dataset_admin_weight) || 1.25,
+      dataset_pdf_enabled: this.datasetSettings.dataset_pdf_enabled ? 1 : 0,
+      dataset_pdf_weight: Number(this.datasetSettings.dataset_pdf_weight) || 1.10,
+      dataset_web_enabled: this.datasetSettings.dataset_web_enabled ? 1 : 0,
+      dataset_web_weight: Number(this.datasetSettings.dataset_web_weight) || 1.00,
+    };
+
+    this.assistantService
+      .saveSettings(payload)
+      .pipe(finalize(() => (this.isSavingSettings = false)))
+      .subscribe({
+        next: () => {
+          this.settingsSavedMessage = true;
+          setTimeout(() => (this.settingsSavedMessage = false), 4000);
+        },
+        error: (err) => {
+          console.error("Save dataset settings failed:", err);
+        },
+      });
+  }
+
+  getDatasetType(item: any): "admin" | "pdf" | "web" {
+    if (!item) return "admin";
+    const ds = String(item.dataset || item.source || "").toLowerCase();
+    if (ds === "pdf") return "pdf";
+    if (ds === "web" || item.file_id?.startsWith("web_") || item.file_path?.startsWith("http")) return "web";
+    return "admin";
+  }
+
+  isDatasetEnabled(dataset: string): boolean {
+    const ds = (dataset || "admin").toLowerCase();
+    if (ds === "pdf") return this.datasetSettings.dataset_pdf_enabled;
+    if (ds === "web") return this.datasetSettings.dataset_web_enabled;
+    return this.datasetSettings.dataset_admin_enabled;
+  }
+
+  get adminFilesCount(): number {
+    return this.aiKnowledgeData.filter((i) => this.getDatasetType(i) === "admin").length;
+  }
+  get adminChunksCount(): number {
+    return this.aiKnowledgeData
+      .filter((i) => this.getDatasetType(i) === "admin")
+      .reduce((s, i) => s + (Number(i.chunk_count) || 0), 0);
+  }
+
+  get pdfFilesCount(): number {
+    return this.aiKnowledgeData.filter((i) => this.getDatasetType(i) === "pdf").length;
+  }
+  get pdfChunksCount(): number {
+    return this.aiKnowledgeData
+      .filter((i) => this.getDatasetType(i) === "pdf")
+      .reduce((s, i) => s + (Number(i.chunk_count) || 0), 0);
+  }
+
+  get webFilesCount(): number {
+    return this.aiKnowledgeData.filter((i) => this.getDatasetType(i) === "web").length;
+  }
+  get webChunksCount(): number {
+    return this.aiKnowledgeData
+      .filter((i) => this.getDatasetType(i) === "web")
+      .reduce((s, i) => s + (Number(i.chunk_count) || 0), 0);
+  }
+
+  get filteredKnowledgeData(): any[] {
+    if (!this.selectedDatasetFilter || this.selectedDatasetFilter === "all") {
+      return this.aiKnowledgeData;
+    }
+    return this.aiKnowledgeData.filter(
+      (item) => this.getDatasetType(item) === this.selectedDatasetFilter
+    );
   }
 
   getAiKnowledgeData() {

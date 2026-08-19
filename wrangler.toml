@@ -88,6 +88,18 @@ binding = "VECTORIZE"
 index_name = "chatbot-index-dev"
 
 [[vectorize]]
+binding = "VECTORIZE_ADMIN"
+index_name = "chatbot-admin-index-dev"
+
+[[vectorize]]
+binding = "VECTORIZE_PDF"
+index_name = "chatbot-pdf-index-dev"
+
+[[vectorize]]
+binding = "VECTORIZE_WEB"
+index_name = "chatbot-web-index-dev"
+
+[[vectorize]]
 binding = "VECTORIZE_CACHE"
 index_name = "chatbot-query-cache-dev"
 

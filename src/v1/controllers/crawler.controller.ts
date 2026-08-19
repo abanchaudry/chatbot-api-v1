@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { crawlWebPage, discoverLinks, DiscoveredPage } from "../services/crawler.service";
 import { fileDb } from "../services/db/files.db";
-import { vectorService } from "../services/vector.service";
+import { vectorService, getVectorIndexForDataset } from "../services/vector.service";
 import { EmbeddingService } from "../services/embedding.service";
 import { getOpenAIKey } from "../utils/keys";
 import { purgeAllQueryCache } from "../services/cache.service";
@@ -40,7 +40,8 @@ async function crawlAndIndexUrl(
     markdownText.length,
     "processing",
     fileId,
-    targetUrl
+    targetUrl,
+    "web"
   );
 
   // 2. Process Markdown into 3-Tier Agentic AI Chunks via Scalable RAG
@@ -112,7 +113,7 @@ async function crawlAndIndexUrl(
     parentId: ch.parentId || null,
   }));
 
-  // 4. Save to `chunks` table
+  // 4. Save to `chunks` table with dataset = 'web'
   await fileDb.saveChunksBatch(env.DB, {
     fileId: fileId,
     fileName: fileName,
@@ -128,6 +129,7 @@ async function crawlAndIndexUrl(
     })),
     embeddingModel: "text-embedding-3-small",
     chunkMethod: "ai",
+    dataset: "web",
     source: "admin",
   });
 
@@ -154,10 +156,11 @@ async function crawlAndIndexUrl(
 
   await fileDb.updateFileStatus(env.DB, fileId, "completed", formattedChunks.length);
 
-  // 6. Vector Embeddings
+  // 6. Vector Embeddings (target VECTORIZE_WEB)
   let vectorsUpserted = 0;
+  const webVectorIndex = (getVectorIndexForDataset(env, "web") || env.VECTORIZE) as any;
 
-  if (openAiKey && env.VECTORIZE) {
+  if (openAiKey && webVectorIndex) {
     try {
       const detailChunks = formattedChunks.filter(c => c.tier === "small" || !c.tier);
       const chunkToEmbed = detailChunks.length > 0 ? detailChunks : formattedChunks;
@@ -180,12 +183,13 @@ async function crawlAndIndexUrl(
             file_name: fileName,
             section_title: ch.section,
             topic: ch.topic,
+            dataset: "web",
             source_type: "web",
             url: targetUrl,
           },
         })),
         openAiKey,
-        env.VECTORIZE
+        webVectorIndex
       );
       vectorsUpserted = chunkToEmbed.length;
     } catch (vErr: any) {

@@ -42,6 +42,7 @@ import {
 
 import { messagesdb } from "../services/db/messages.db";
 import { threaddb } from "../services/db/thread.db";
+import { getDatasetSignature } from "../services/db/settings.db";
 
 import {
   newTrace,
@@ -107,6 +108,9 @@ export type PrepareResult = {
   assistantName: string;
   domainHint: string;
   fallbackMessage: string;
+  activeDatasets: Array<"admin" | "pdf" | "web">;
+  datasetWeights: Record<string, number>;
+  datasetSignature?: string;
 
   // Timing
   startedAt: number;
@@ -442,16 +446,38 @@ export async function preparePipeline(
   let assistantName = String(payload?.assistantName || "").trim();
   let domainHint = String(payload?.domainHint || "").trim();
 
+  let activeDatasets: Array<"admin" | "pdf" | "web"> = ["admin", "pdf", "web"];
+  let datasetWeights: Record<string, number> = {
+    admin: 1.25,
+    pdf: 1.10,
+    web: 1.00,
+  };
+
+  let datasetSignature: string = getDatasetSignature();
+
   // D1 System Settings take FIRST priority over wrangler.toml defaults
   try {
     const db = c.env.DB as any;
     if (db) {
       const { SettingsDbService } = await import("../services/db/settings.db");
       const settings = await new SettingsDbService().getSettings(db);
-      if (settings && settings.company_name) {
-        companyName = settings.company_name;
+      if (settings) {
+        datasetSignature = getDatasetSignature(settings);
+        if (settings.company_name) companyName = settings.company_name;
         if (!assistantName) assistantName = settings.assistant_name;
         if (!domainHint) domainHint = settings.domain_hint;
+
+        const dsList: Array<"admin" | "pdf" | "web"> = [];
+        if (settings.dataset_admin_enabled !== 0) dsList.push("admin");
+        if (settings.dataset_pdf_enabled !== 0) dsList.push("pdf");
+        if (settings.dataset_web_enabled !== 0) dsList.push("web");
+        activeDatasets = dsList.length > 0 ? dsList : ["admin", "pdf", "web"];
+
+        datasetWeights = {
+          admin: Number(settings.dataset_admin_weight) || 1.25,
+          pdf: Number(settings.dataset_pdf_weight) || 1.10,
+          web: Number(settings.dataset_web_weight) || 1.00,
+        };
       }
     }
   } catch {}
@@ -506,6 +532,9 @@ export async function preparePipeline(
         assistantName,
         domainHint,
         fallbackMessage,
+        activeDatasets,
+        datasetWeights,
+        datasetSignature,
         startedAt: t0,
       };
     }
@@ -576,6 +605,9 @@ export async function preparePipeline(
         assistantName,
         domainHint,
         fallbackMessage,
+        activeDatasets,
+        datasetWeights,
+        datasetSignature,
         startedAt: t0,
       };
     }
@@ -609,6 +641,9 @@ export async function preparePipeline(
       assistantName,
       domainHint,
       fallbackMessage,
+      activeDatasets,
+      datasetWeights,
+      datasetSignature,
       startedAt: t0,
     };
   } catch (e: any) {
@@ -634,6 +669,9 @@ export async function preparePipeline(
       assistantName,
       domainHint,
       fallbackMessage,
+      activeDatasets,
+      datasetWeights,
+      datasetSignature,
       startedAt: t0,
     };
   }

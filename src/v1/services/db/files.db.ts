@@ -48,6 +48,7 @@ export const fileDb = {
   async ensureFilesSchema(db: D1Database) {
     if (_filesSchemaEnsured) return;
     try {
+      await ensureColumn(db, "files", "dataset", `ALTER TABLE files ADD COLUMN dataset TEXT`);
       await ensureColumn(db, "files", "file_path", `ALTER TABLE files ADD COLUMN file_path TEXT`);
       await ensureColumn(db, "files", "chunk_count", `ALTER TABLE files ADD COLUMN chunk_count INTEGER`);
       await ensureColumn(db, "files", "error_message", `ALTER TABLE files ADD COLUMN error_message TEXT`);
@@ -63,12 +64,12 @@ export const fileDb = {
     }
   },
 
-  async saveFile(db: D1Database, name: string, size: number, status: string, uuid: string, path: string) {
+  async saveFile(db: D1Database, name: string, size: number, status: string, uuid: string, path: string, dataset: string = "admin") {
     await this.ensureFilesSchema(db);
     await db.prepare(
-      `INSERT INTO files (file_name, file_size, file_status, file_id, file_path, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, datetime(), datetime())`
-    ).bind(name, size, status, uuid, path).run();
+      `INSERT INTO files (file_name, file_size, file_status, file_id, file_path, dataset, source, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime(), datetime())`
+    ).bind(name, size, status, uuid, path, dataset, dataset).run();
     return uuid;
   },
 
@@ -82,10 +83,11 @@ export const fileDb = {
          f.file_status,
          f.created_at,
          f.file_path,
+         COALESCE(f.dataset, f.source, 'admin') AS dataset,
          COUNT(c.chunk_id) AS chunk_count
        FROM files f
        LEFT JOIN chunks c ON c.file_id = f.file_id
-       GROUP BY f.file_id, f.file_name, f.file_size, f.file_status, f.created_at, f.file_path
+       GROUP BY f.file_id, f.file_name, f.file_size, f.file_status, f.created_at, f.file_path, f.dataset
        ORDER BY f.created_at DESC`
     ).all();
     return result.results || [];
@@ -110,6 +112,7 @@ export const fileDb = {
       id: string;
       name: string;
       source: "admin" | "cron" | "wp";
+      dataset?: "admin" | "pdf" | "web";
       version: string;
       size_bytes: number;
       checksum: string;
@@ -128,15 +131,18 @@ export const fileDb = {
 
     if (existing) return existing;
 
+    const dataset = f.dataset || (f.source === "admin" ? "admin" : "web");
+
     await db.prepare(
       `INSERT INTO files (
          file_id, file_name, file_size, file_status, created_at, updated_at,
-         source, version, checksum, file_path, upload_id, chunk_method, embedding_model, chunk_count
-       ) VALUES (?, ?, ?, 'received', datetime(), datetime(), ?, ?, ?, ?, ?, ?, ?, ?)`
+         dataset, source, version, checksum, file_path, upload_id, chunk_method, embedding_model, chunk_count
+       ) VALUES (?, ?, ?, 'received', datetime(), datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       f.id,
       f.name,
       f.size_bytes,
+      dataset,
       f.source,
       f.version,
       f.checksum,
@@ -159,6 +165,7 @@ export const fileDb = {
       "file_size",
       "file_status",
       "file_path",
+      "dataset",
       "chunk_count",
       "error_message",
       "source",
@@ -193,6 +200,7 @@ export const fileDb = {
       topic: string;
       firstSentence: string;
       sectionTitle: string;
+      dataset?: "admin" | "pdf" | "web" | string;
       chunkIndex: number;
       sectionNumber: string | null;
       embedding_model?: string | null;
@@ -202,17 +210,19 @@ export const fileDb = {
   ) {
     const sectionNumber = args.sectionNumber || extractSection(args.sectionTitle) || extractSection(args.content);
     const content_hash = args.content_hash || (await sha256Hex(args.content));
+    const dataset = args.dataset || (args.source === "admin" ? "admin" : "web");
 
     await db.prepare(
       `INSERT INTO chunks (
-         chunk_id, file_id, source, content, version, created_at,
+         chunk_id, file_id, dataset, source, content, version, created_at,
          tags, topic, first_sentence, section, chunk_index,
          section_number, section_keywords, priority_level,
          content_hash, embedding_model, chunk_method
-       ) VALUES (?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       args.chunkId,
       args.fileId,
+      dataset,
       args.source,
       args.content,
       args.version,
@@ -304,10 +314,12 @@ export const fileDb = {
       chunks: Array<{ index: number; content: string; section?: string; tags?: string[]; topic?: string; tier?: string; parentId?: string | null }>;
       embeddingModel: string;
       chunkMethod: string;
+      dataset?: "admin" | "pdf" | "web" | string;
       source?: "admin" | "cron" | "wp";
     }
   ) {
     const origin = args.source || "admin";
+    const dataset = args.dataset || (origin === "admin" ? "admin" : "web");
 
     for (const ch of args.chunks) {
       const chunk_id = await makeStableChunkId(args.fileId, ch.index, ch.section);
@@ -317,15 +329,16 @@ export const fileDb = {
 
       await db.prepare(
         `INSERT OR IGNORE INTO chunks (
-           chunk_id, file_id, source, content, version, created_at,
+           chunk_id, file_id, dataset, source, content, version, created_at,
            tags, topic, first_sentence, section, chunk_index,
            section_number, section_keywords, priority_level,
            content_hash, embedding_model, chunk_method,
            tier, parent_id
-         ) VALUES (?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         chunk_id,
         args.fileId,
+        dataset,
         origin,
         ch.content,
         args.version,

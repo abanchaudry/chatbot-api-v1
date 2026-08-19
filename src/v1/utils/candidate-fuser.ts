@@ -23,6 +23,8 @@ type FusionInput = {
   metadataPieces: Piece[];
   finalMax: number;
   rrfK?: number;
+  datasetWeights?: Record<string, number>;
+  activeDatasets?: string[];
 };
 
 function clamp100(n: number) {
@@ -85,12 +87,30 @@ export function fuseCandidatePool(input: FusionInput): CandidateFusionResult {
     metadataPieces,
     finalMax,
     rrfK = 50,
+    datasetWeights = {
+      admin: 1.25,
+      pdf: 1.10,
+      web: 1.00,
+    },
+    activeDatasets,
   } = input;
 
+  const activeSet = Array.isArray(activeDatasets) && activeDatasets.length > 0
+    ? new Set(activeDatasets.map((d) => String(d).toLowerCase()))
+    : null;
+
+  const filterDisabled = (pieces: Piece[]) =>
+    (pieces || []).filter((p) => {
+      const ds = String(p?.meta?.dataset || "admin").toLowerCase();
+      if (activeSet && !activeSet.has(ds)) return false;
+      if (datasetWeights[ds] === 0) return false;
+      return true;
+    });
+
   const rankedLists: Array<{ origin: "vector" | "lexical" | "metadata"; items: Piece[] }> = [
-    { origin: "vector", items: dedupeByChunkId(vectorPieces || []) },
-    { origin: "lexical", items: dedupeByChunkId(lexicalPieces || []) },
-    { origin: "metadata", items: dedupeByChunkId(metadataPieces || []) },
+    { origin: "vector", items: dedupeByChunkId(filterDisabled(vectorPieces)) },
+    { origin: "lexical", items: dedupeByChunkId(filterDisabled(lexicalPieces)) },
+    { origin: "metadata", items: dedupeByChunkId(filterDisabled(metadataPieces)) },
   ];
 
   const merged = new Map<string, Piece & { __fusionScore?: number; __origins?: string[] }>();
@@ -99,9 +119,15 @@ export function fuseCandidatePool(input: FusionInput): CandidateFusionResult {
     ranked.items.forEach((piece, index) => {
       const key = String(piece.sourceId || "");
       const existing = merged.get(key);
+
+      const pieceDataset = String(piece?.meta?.dataset || "admin").toLowerCase();
+      const datasetMultiplier = Number(datasetWeights[pieceDataset] ?? 1.0);
+
+      // Weighted RRF Contribution: base RRF * originMultiplier * datasetPriorityWeight
       const fusionContribution =
         rrf(index + 1, rrfK) *
-        (ranked.origin === "metadata" ? 1.35 : ranked.origin === "lexical" ? 1.1 : 1);
+        (ranked.origin === "metadata" ? 1.35 : ranked.origin === "lexical" ? 1.1 : 1) *
+        datasetMultiplier;
 
       const exactEntityMatch = piece?.meta?.__exactEntityMatch === true;
       const exactPhraseMatch = piece?.meta?.__exactPhraseMatch === true;
@@ -119,15 +145,30 @@ export function fuseCandidatePool(input: FusionInput): CandidateFusionResult {
         new Set([...(existing?.__origins || []), ranked.origin])
       );
 
-      const bestPiece =
-        !existing || Number(piece.score || 0) >= Number(existing.score || 0)
-          ? piece
-          : existing;
+      const existingDataset = String(existing?.meta?.dataset || "admin").toLowerCase();
+      const existingWeight = Number(datasetWeights[existingDataset] ?? 1.0);
+
+      const pieceTextLen = String(piece.text || "").trim().length;
+      const existingTextLen = String(existing?.text || "").trim().length;
+
+      let bestPiece = existing || piece;
+      if (!existing) {
+        bestPiece = piece;
+      } else if (pieceTextLen >= 50 && existingTextLen < 50) {
+        bestPiece = piece;
+      } else if (existingTextLen >= 50 && pieceTextLen < 50) {
+        bestPiece = existing;
+      } else if (datasetMultiplier > existingWeight) {
+        bestPiece = piece;
+      } else if (datasetMultiplier === existingWeight && Number(piece.score || 0) >= Number(existing.score || 0)) {
+        bestPiece = piece;
+      }
 
       merged.set(key, {
         ...bestPiece,
         meta: {
           ...((bestPiece.meta || {}) as Record<string, any>),
+          dataset: pieceDataset,
           __origin: origins.includes("metadata")
             ? "metadata"
             : origins.includes("lexical")

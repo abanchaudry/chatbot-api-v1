@@ -36,9 +36,21 @@ function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
 }
 
+export type DatasetType = "admin" | "pdf" | "web";
+
+export function getVectorIndexForDataset(env: any, dataset?: string): VectorizeIndex | undefined {
+  const ds = (dataset || "admin").toLowerCase();
+  if (ds === "pdf" && env?.VECTORIZE_PDF) return env.VECTORIZE_PDF;
+  if (ds === "web" && env?.VECTORIZE_WEB) return env.VECTORIZE_WEB;
+  if (ds === "admin" && env?.VECTORIZE_ADMIN) return env.VECTORIZE_ADMIN;
+  return env?.VECTORIZE;
+}
+
 function buildDoc(c: Chunk): Document {
   const first_sentence =
     c.firstSentence || (c.content.split(/[.!?]/)[0] || "").slice(0, 200);
+
+  const dataset = c.metadata?.dataset || "admin";
 
   return new Document({
     pageContent: c.content,
@@ -49,6 +61,7 @@ function buildDoc(c: Chunk): Document {
       section: c.section || "",
       section_number: c.sectionNumber ?? "",
       first_sentence,
+      dataset,
       tags: c.tags || [],
       ...(c.metadata || {}),
     },
@@ -168,6 +181,43 @@ export const vectorService = {
         score100: Math.round(score01 * 100),
       };
     });
+  },
+
+  async searchMultiIndex(
+    embedding: number[],
+    apiKey: string,
+    env: any,
+    activeDatasets: DatasetType[] = ["admin", "pdf", "web"],
+    topKPerIndex = 15
+  ): Promise<VectorHit[]> {
+    if (!Array.isArray(embedding) || embedding.length === 0) {
+      return [];
+    }
+
+    const uniqueDatasets = Array.from(new Set(activeDatasets.filter(Boolean)));
+    if (uniqueDatasets.length === 0) return [];
+
+    // Query active dataset indexes in parallel with Promise.all
+    const searchPromises = uniqueDatasets.map(async (ds) => {
+      const idx = getVectorIndexForDataset(env, ds);
+      if (!idx) return [];
+      try {
+        const hits = await this.searchChunks(embedding, apiKey, idx, topKPerIndex);
+        return hits.map((h) => ({
+          ...h,
+          metadata: {
+            ...(h.metadata || {}),
+            dataset: ds,
+          },
+        }));
+      } catch (err: any) {
+        console.warn(`Vector search on index for dataset [${ds}] warning:`, err?.message || err);
+        return [];
+      }
+    });
+
+    const resultsByDataset = await Promise.all(searchPromises);
+    return resultsByDataset.flat();
   },
 
   async deleteByIds(

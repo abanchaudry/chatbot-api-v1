@@ -23,7 +23,8 @@ export async function generateSha256Hash(message: string): Promise<string> {
 
 export async function getCachedQueryResponse(
   cache: KVNamespace,
-  question: string
+  question: string,
+  datasetSignature?: string
 ): Promise<CachedQueryResponse | null> {
   const start = performance.now();
   const normalized = normalizeQuery(question);
@@ -34,7 +35,7 @@ export async function getCachedQueryResponse(
 
   try {
     const hash = await generateSha256Hash(normalized);
-    const key = `qcache:${hash}`;
+    const key = datasetSignature ? `qcache:${datasetSignature}:${hash}` : `qcache:${hash}`;
     const data = await cache.get(key, 'json');
 
     if (data) {
@@ -78,7 +79,8 @@ export function doIdentifiersMatch(query1: string, query2: string): boolean {
 export async function saveQueryResponseToCache(
   cache: KVNamespace,
   question: string,
-  payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string }
+  payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string },
+  datasetSignature?: string
 ): Promise<boolean> {
   const normalized = normalizeQuery(question);
 
@@ -88,7 +90,7 @@ export async function saveQueryResponseToCache(
 
   try {
     const hash = await generateSha256Hash(normalized);
-    const key = `qcache:${hash}`;
+    const key = datasetSignature ? `qcache:${datasetSignature}:${hash}` : `qcache:${hash}`;
     const fullPayload = { ...payload, question };
     await cache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
     return true;
@@ -101,7 +103,8 @@ export async function getSemanticCacheHit(
   vectorizeCache: VectorizeIndex | undefined,
   embedding: number[] | null,
   kvCache: KVNamespace,
-  incomingQuestion?: string
+  incomingQuestion?: string,
+  datasetSignature?: string
 ): Promise<{ hit: boolean; answer?: string; score?: number; latencyMs?: number }> {
   const start = performance.now();
 
@@ -115,7 +118,7 @@ export async function getSemanticCacheHit(
       const match = results.matches[0];
       if (match.score >= 0.95) {
         const queryHash = match.id;
-        const key = `qcache:${queryHash}`;
+        const key = datasetSignature ? `qcache:${datasetSignature}:${queryHash}` : `qcache:${queryHash}`;
         const data = await kvCache.get<{ answer: string; context: string; sources: any[]; question?: string }>(key, 'json');
 
         if (data) {
@@ -153,7 +156,8 @@ export async function saveSemanticCacheEntry(
   queryHash: string,
   embedding: number[],
   payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string },
-  question?: string
+  question?: string,
+  datasetSignature?: string
 ): Promise<boolean> {
   if (!vectorizeCache || !embedding) {
     return false;
@@ -168,7 +172,7 @@ export async function saveSemanticCacheEntry(
       }
     ]);
 
-    const key = `qcache:${queryHash}`;
+    const key = datasetSignature ? `qcache:${datasetSignature}:${queryHash}` : `qcache:${queryHash}`;
     const fullPayload = { ...payload, question: question || payload.question };
     await kvCache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
 
@@ -184,15 +188,20 @@ export async function purgeAllQueryCache(cache: KVNamespace): Promise<boolean> {
     let complete = false;
 
     while (!complete) {
-      const listResult: any = await cache.list({ prefix: 'qcache:', cursor });
-      const keys: string[] = listResult.keys.map((k: any) => k.name);
+      const listOptions: any = { prefix: 'qcache:' };
+      if (cursor) {
+        listOptions.cursor = cursor;
+      }
+      const listResult: any = await cache.list(listOptions);
+      const keys: string[] = (listResult?.keys || []).map((k: any) => k.name);
 
       for (const key of keys) {
         await cache.delete(key);
       }
 
-      complete = listResult.list_complete;
-      cursor = listResult.cursor;
+      complete = listResult?.list_complete ?? true;
+      cursor = listResult?.cursor;
+      if (!cursor) break;
     }
     return true;
   } catch (error) {

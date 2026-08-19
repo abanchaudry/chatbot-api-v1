@@ -40,14 +40,13 @@ export function decideLocalEvidence(args: {
   }).length;
   const contentQuality = validateContentQuality(pieces);
   const rerankCoverage = typeof args.rerankCoverage === "number" ? args.rerankCoverage : null;
+  
   const hasExactGrounding = exactEntityMatch || exactPhraseMatch || exactSectionMatch;
-  const hasHybridGrounding = hybridHits >= 2;
-  const hasKeywordGrounding = keywordHybridHits >= 2;
-  const hasCoverageGrounding = (rerankCoverage || 0) >= 60;
+  const hasCoverageGrounding = typeof rerankCoverage === "number" && rerankCoverage >= 40;
+  const hasTopicGrounding = keywordHybridHits >= 1 && (hybridHits >= 1 || topScore >= 40);
   const isBroadQuery =
     args.plan.intent === "ambiguous" ||
-    args.plan.searchMode === "support_broad" ||
-    args.plan.searchMode === "phrase_exact";
+    args.plan.searchMode === "support_broad";
 
   const reasons: string[] = [];
   if (exactEntityMatch) reasons.push("exact_entity_match");
@@ -62,19 +61,18 @@ export function decideLocalEvidence(args: {
   const broadQueryGrounded =
     hasExactGrounding ||
     hasCoverageGrounding ||
-    (hasHybridGrounding && hasKeywordGrounding);
+    hasTopicGrounding;
 
   const sufficient =
     pieces.length > 0 &&
     contentQuality.valid &&
-    (
-      hasExactGrounding ||
-      hasHybridGrounding ||
-      hasKeywordGrounding ||
-      args.rerankKept >= 1 ||
-      topScore >= 35 ||
-      pieces.length >= 1
-    );
+    (isBroadQuery
+      ? broadQueryGrounded
+      : hasExactGrounding ||
+        hasCoverageGrounding ||
+        hasTopicGrounding ||
+        args.rerankKept >= 1 ||
+        topScore >= 35);
 
 
   const assessment: LocalEvidenceAssessment = {

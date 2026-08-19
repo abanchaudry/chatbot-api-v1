@@ -145,7 +145,7 @@
                     <ng-container *ngFor="let src of item.message.sources">
                       <!-- Web Crawled Source: Click opens original URL in new tab -->
                       <a
-                        *ngIf="src.isWeb || (src.url && src.url.startsWith('http')); else docChip"
+                        *ngIf="src.dataset === 'web' || src.isWeb || (src.url && src.url.startsWith('http')); else nonWebChip"
                         [href]="src.url"
                         target="_blank"
                         rel="noopener noreferrer"
@@ -158,18 +158,36 @@
                         <span *ngIf="src.score" class="cited-score-pill" style="background-color: #e0f2fe; color: #0284c7;">{{ src.score }}% match</span>
                       </a>
 
-                      <!-- Document File Source: Click navigates to AI Knowledge -->
-                      <ng-template #docChip>
+                      <!-- Non-Web Sources: PDF Reference Library or Admin Doc -->
+                      <ng-template #nonWebChip>
+                        <!-- PDF Reference Library -->
                         <button
+                          *ngIf="src.dataset === 'pdf'; else adminDocChip"
                           type="button"
                           class="cited-chip-btn mr-1 mb-1"
+                          style="border-color: #c7d2fe; background-color: #f5f7ff;"
                           (click)="navigateToAiKnowledge()"
-                          title="Click to view all documents in AI Knowledge"
+                          title="Click to view PDF Reference Library in AI Knowledge"
                         >
-                          <i class="ri-file-text-line text-primary mr-1"></i>
-                          <span class="cited-chip-text">📄 {{ src.fileName || 'Knowledge Document' }}</span>
-                          <span *ngIf="src.score" class="cited-score-pill">{{ src.score }}% match</span>
+                          <i class="ri-book-open-line mr-1" style="color: #4f46e5;"></i>
+                          <span class="cited-chip-text" style="color: #3730a3; font-weight: 500;">📚 {{ src.fileName || 'PDF Reference' }}</span>
+                          <span *ngIf="src.score" class="cited-score-pill" style="background-color: #e0e7ff; color: #4338ca;">{{ src.score }}% match</span>
                         </button>
+
+                        <!-- Admin Knowledge Doc -->
+                        <ng-template #adminDocChip>
+                          <button
+                            type="button"
+                            class="cited-chip-btn mr-1 mb-1"
+                            style="border-color: #e9d5ff; background-color: #faf5ff;"
+                            (click)="navigateToAiKnowledge()"
+                            title="Click to view all documents in AI Knowledge"
+                          >
+                            <i class="ri-file-text-line mr-1" style="color: #9333ea;"></i>
+                            <span class="cited-chip-text" style="color: #6b21a8; font-weight: 500;">📄 {{ src.fileName || 'Admin Doc' }}</span>
+                            <span *ngIf="src.score" class="cited-score-pill" style="background-color: #f3e8ff; color: #7e22ce;">{{ src.score }}% match</span>
+                          </button>
+                        </ng-template>
                       </ng-template>
                     </ng-container>
                   </div>

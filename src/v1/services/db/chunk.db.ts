@@ -109,6 +109,7 @@ type SearchChunkRow = {
   section?: string;
   file_id?: string;
   file_name?: string;
+  dataset?: string;
   tags?: string[] | string | null;
   matchMode?: string;
 };
@@ -198,6 +199,7 @@ export const chunkDb = {
         c.chunk_id,
         c.file_id,
         f.file_name,
+        COALESCE(c.dataset, f.dataset, 'admin') AS dataset,
         c.section,
         c.section_number,
         c.topic,
@@ -351,12 +353,22 @@ export const chunkDb = {
       terms: string[];
       exactPhrases: string[];
       maxResults: number;
+      datasets?: string[];
     }
   ): Promise<SearchChunkRow[]> {
     const terms = Array.from(new Set((args.terms || []).filter(Boolean))).slice(0, 12);
     const phrases = Array.from(new Set((args.exactPhrases || []).filter(Boolean))).slice(0, 6);
     const maxResults = Math.max(1, Math.min(args.maxResults || 12, 30));
+    const activeDatasets = (args.datasets || []).filter(Boolean);
     const hasFts = await tableExists(db, "chunks_fts");
+
+    let datasetFtsClause = "";
+    const datasetFtsArgs: string[] = [];
+    if (activeDatasets.length > 0) {
+      const placeholders = activeDatasets.map(() => "?").join(",");
+      datasetFtsClause = `AND COALESCE(ch.dataset, f.dataset, 'admin') IN (${placeholders})`;
+      datasetFtsArgs.push(...activeDatasets);
+    }
 
     if (hasFts && (terms.length || phrases.length)) {
       const ftsQuery = Array.from(
@@ -369,14 +381,15 @@ export const chunkDb = {
       if (ftsQuery) {
         try {
           const res = await db.prepare(
-            `SELECT ch.chunk_id, ch.content, ch.topic, ch.first_sentence, ch.section_number, ch.section, ch.file_id, f.file_name, ch.tags
+            `SELECT ch.chunk_id, ch.content, ch.topic, ch.first_sentence, ch.section_number, ch.section, ch.file_id, f.file_name, COALESCE(ch.dataset, f.dataset, 'admin') AS dataset, ch.tags
              FROM chunks_fts
              JOIN chunks ch ON ch.rowid = chunks_fts.rowid
              LEFT JOIN files f ON f.file_id = ch.file_id
              WHERE chunks_fts MATCH ?
+             ${datasetFtsClause}
              ORDER BY rank
              LIMIT ?`
-          ).bind(ftsQuery, maxResults * 2).all();
+          ).bind(ftsQuery, ...datasetFtsArgs, maxResults * 2).all();
 
           const rows = (res.results || []) as SearchChunkRow[];
           if (rows.length) {
@@ -404,17 +417,28 @@ export const chunkDb = {
     );
     const whereParts = [...phraseClauses, ...termClauses];
     const whereSql = whereParts.length ? whereParts.join(" OR ") : "1=0";
+
+    let datasetLikeClause = "";
+    const datasetLikeArgs: string[] = [];
+    if (activeDatasets.length > 0) {
+      const placeholders = activeDatasets.map(() => "?").join(",");
+      datasetLikeClause = `AND COALESCE(c.dataset, f.dataset, 'admin') IN (${placeholders})`;
+      datasetLikeArgs.push(...activeDatasets);
+    }
+
     const bindArgs = [
       ...phrases.flatMap((phrase) => searchColumns.map(() => normalizeSearchText(phrase))),
       ...terms.flatMap((term) => searchColumns.map(() => normalizeSearchText(term))),
+      ...datasetLikeArgs,
       maxResults,
     ];
 
     const res = await db.prepare(
-      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
+      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, COALESCE(c.dataset, f.dataset, 'admin') AS dataset, c.tags
        FROM chunks c
        LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereSql})
+         ${datasetLikeClause}
          AND LENGTH(c.content) <= 8000
        ORDER BY LENGTH(c.content) ASC, c.chunk_id ASC
        LIMIT ?`
@@ -424,20 +448,31 @@ export const chunkDb = {
 
     // Also search document_chunks table for multi-format 3-tier chunks
     try {
-      const docTermClauses = terms.map(() => `LOWER(content) LIKE '%' || ? || '%'`).join(" OR ");
+      const docTermClauses = terms.map(() => `LOWER(dc.content) LIKE '%' || ? || '%'`).join(" OR ");
       if (docTermClauses) {
+        let docDatasetClause = "";
+        const docDatasetArgs: string[] = [];
+        if (activeDatasets.length > 0) {
+          const placeholders = activeDatasets.map(() => "?").join(",");
+          docDatasetClause = `AND COALESCE(f.dataset, 'admin') IN (${placeholders})`;
+          docDatasetArgs.push(...activeDatasets);
+        }
+
         const docRes = await db.prepare(
-          `SELECT id as chunk_id, content, category as topic, tier as section, parent_id
-           FROM document_chunks
+          `SELECT dc.id as chunk_id, dc.content, dc.category as topic, dc.tier as section, dc.parent_id, COALESCE(f.dataset, 'admin') as dataset
+           FROM document_chunks dc
+           LEFT JOIN files f ON f.file_id = dc.document_id
            WHERE (${docTermClauses})
+             ${docDatasetClause}
            LIMIT ?`
-        ).bind(...terms.map((t) => normalizeSearchText(t)), maxResults).all();
+        ).bind(...terms.map((t) => normalizeSearchText(t)), ...docDatasetArgs, maxResults).all();
 
         const docRows = (docRes.results || []).map((r: any) => ({
           chunk_id: r.chunk_id,
           content: r.content,
           topic: r.topic,
           section: r.section,
+          dataset: r.dataset || "admin",
           tags: [r.topic, r.section],
           matchMode: "like_doc",
           parent_id: r.parent_id,
@@ -458,12 +493,14 @@ export const chunkDb = {
       exactPhrases: string[];
       sectionRef: string | null;
       maxResults: number;
+      datasets?: string[];
     }
   ): Promise<SearchChunkRow[]> {
     const entities = Array.from(new Set((args.entities || []).map(normalizeSearchText).filter(Boolean))).slice(0, 8);
     const phrases = Array.from(new Set((args.exactPhrases || []).map(normalizeSearchText).filter(Boolean))).slice(0, 8);
     const maxResults = Math.max(1, Math.min(args.maxResults || 10, 20));
     const sectionRef = normalizeSearchText(args.sectionRef || "");
+    const activeDatasets = (args.datasets || []).filter(Boolean);
 
     if (!entities.length && !phrases.length && !sectionRef) return [];
 
@@ -493,11 +530,19 @@ export const chunkDb = {
       bindings.push(sectionRef);
     }
 
+    let datasetMetaClause = "";
+    if (activeDatasets.length > 0) {
+      const placeholders = activeDatasets.map(() => "?").join(",");
+      datasetMetaClause = `AND COALESCE(c.dataset, f.dataset, 'admin') IN (${placeholders})`;
+      bindings.push(...activeDatasets);
+    }
+
     const res = await db.prepare(
-      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, c.tags
+      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, COALESCE(c.dataset, f.dataset, 'admin') AS dataset, c.tags
        FROM chunks c
        LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereClauses.join(" OR ")})
+         ${datasetMetaClause}
        ORDER BY
          CASE WHEN ? != '' AND LOWER(COALESCE(c.section_number, '')) = ? THEN 4 ELSE 0 END DESC,
          CASE WHEN ? != '' AND LOWER(COALESCE(c.section, '')) LIKE '%' || ? || '%' THEN 3 ELSE 0 END DESC,
@@ -525,20 +570,32 @@ export const chunkDb = {
     try {
       const allTerms = [...entities, ...phrases];
       if (allTerms.length > 0) {
-        const docClauses = allTerms.map(() => `LOWER(content) LIKE '%' || ? || '%' OR LOWER(category) LIKE '%' || ? || '%'`).join(" OR ");
+        const docClauses = allTerms.map(() => `LOWER(dc.content) LIKE '%' || ? || '%' OR LOWER(dc.category) LIKE '%' || ? || '%'`).join(" OR ");
         const bindValues = allTerms.flatMap((t) => [t, t]);
+
+        let docDatasetClause = "";
+        const docDatasetArgs: string[] = [];
+        if (activeDatasets.length > 0) {
+          const placeholders = activeDatasets.map(() => "?").join(",");
+          docDatasetClause = `AND COALESCE(f.dataset, 'admin') IN (${placeholders})`;
+          docDatasetArgs.push(...activeDatasets);
+        }
+
         const docRes = await db.prepare(
-          `SELECT id as chunk_id, content, category as topic, tier as section, parent_id
-           FROM document_chunks
+          `SELECT dc.id as chunk_id, dc.content, dc.category as topic, dc.tier as section, dc.parent_id, COALESCE(f.dataset, 'admin') as dataset
+           FROM document_chunks dc
+           LEFT JOIN files f ON f.file_id = dc.document_id
            WHERE (${docClauses})
+             ${docDatasetClause}
            LIMIT ?`
-        ).bind(...bindValues, maxResults).all();
+        ).bind(...bindValues, ...docDatasetArgs, maxResults).all();
 
         const docRows = (docRes.results || []).map((r: any) => ({
           chunk_id: r.chunk_id,
           content: r.content,
           topic: r.topic,
           section: r.section,
+          dataset: r.dataset || "admin",
           tags: [r.topic, r.section],
           matchMode: "metadata_doc",
           parent_id: r.parent_id,

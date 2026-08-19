@@ -232,7 +232,7 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
   showForm = true;
   showTable = false;
 
-  activeIngestTab: "file" | "web" = "file";
+  activeIngestTab: "file" | "pdf" | "web" = "file";
   crawlUrl = "";
   crawlSchedule = "manual";
 
@@ -925,12 +925,14 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
     }
 
     const rawText = this.fileToUpload ? await this.fileToUpload.text() : "";
+    const dataset = this.activeIngestTab === "pdf" ? "pdf" : "admin";
 
     const payload = {
       fileName: this.fileName || `manual-${new Date().toISOString()}.txt`,
       version: this.model.version || `v${Date.now()}`,
       fileId: this.fileId,
       uploadId: this.uploadId,
+      dataset,
       chunkMethod: this.model.strategy || "semantic",
       engineMode: this.model.engineMode || "",
       embeddingModel: "text-embedding-3-small",

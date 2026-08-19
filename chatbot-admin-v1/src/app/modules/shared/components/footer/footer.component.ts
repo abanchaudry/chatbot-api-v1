@@ -23,6 +23,9 @@ export type CitedSource = {
   fileName?: string;
   score?: number | null;
   snippet?: string;
+  dataset?: "admin" | "pdf" | "web" | string;
+  isWeb?: boolean;
+  url?: string;
 };
 
 type ChatMsg = {
