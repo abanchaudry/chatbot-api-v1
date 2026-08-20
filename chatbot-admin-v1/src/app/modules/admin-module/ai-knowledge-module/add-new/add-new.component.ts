@@ -757,10 +757,13 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pageImages: Array<{ pageNum: number; dataUrl: string }> = [];
 
-      const maxPages = Math.min(pdf.numPages, 30);
+      const maxPages = Math.min(pdf.numPages, 15);
+      let totalEstimatedBytes = 0;
+      const MAX_TOTAL_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB safety budget for Cloudflare 10MB limit
+
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.5 });
+        const viewport = page.getViewport({ scale: 1.0 });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
         canvas.height = viewport.height;
@@ -768,9 +771,17 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
 
         if (context) {
           await page.render({ canvasContext: context, viewport }).promise;
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.55);
+          totalEstimatedBytes += dataUrl.length;
+
+          if (totalEstimatedBytes > MAX_TOTAL_IMAGE_BYTES) {
+            console.warn(`[renderPdfPagesToImages] Reached 4MB payload cap at page ${i}. Stopping further rasterization.`);
+            break;
+          }
+
           pageImages.push({
             pageNum: i,
-            dataUrl: canvas.toDataURL("image/jpeg", 0.80),
+            dataUrl: dataUrl,
           });
         }
       }
@@ -791,11 +802,11 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
 
     const formData = new FormData();
     formData.append("files", this.fileToUpload);
-    formData.append("strategy", this.model.strategy || "semantic");
-    formData.append("engineMode", this.model.engineMode || "");
+    formData.append("strategy", this.model.strategy || "adaptive");
+    formData.append("engineMode", this.model.engineMode || "offline");
     formData.append("uploadId", this.uploadId);
 
-    // Pre-render 300 DPI page images for PDF files in AI Vision modes
+    // Pre-render page images for PDF files in AI Vision modes
     if (
       this.fileToUpload.name.toLowerCase().endsWith(".pdf") &&
       (this.model.engineMode === "ai-full" || this.model.engineMode === "hybrid")
@@ -849,7 +860,19 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
           this.stopProgressTimer();
           this.inProcess = false;
           console.error("Preview chunk error:", err);
-          Swal.fire("Error", err?.error?.message || "Failed to fetch preview chunks.", "error");
+          let errorMsg = err?.error?.message;
+          if (!errorMsg) {
+            if (err?.status === 413) {
+              errorMsg = "File or pre-rendered page payload is too large (>10MB). Please select 'Free Edge (Fast)' or reduce page count.";
+            } else if (err?.status === 504 || err?.status === 524) {
+              errorMsg = "Extraction timed out. For large PDFs, please use 'Free Edge' or 'Adaptive' chunking.";
+            } else if (typeof err?.error === "string" && err.error.length < 200) {
+              errorMsg = err.error;
+            } else {
+              errorMsg = err?.statusText || "Failed to fetch preview chunks. Please check connection.";
+            }
+          }
+          Swal.fire("Error", errorMsg, "error");
           this.cdr.detectChanges();
         },
       });
