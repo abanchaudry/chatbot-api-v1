@@ -321,41 +321,50 @@ export const fileDb = {
     const origin = args.source || "admin";
     const dataset = args.dataset || (origin === "admin" ? "admin" : "web");
 
+    const statements: any[] = [];
     for (const ch of args.chunks) {
       const chunk_id = await makeStableChunkId(args.fileId, ch.index, ch.section);
       const firstSentence = (ch.content.split(/[.!?]/)[0] || "").slice(0, 200);
       const sectionNumber = extractSection(ch.section || "") || extractSection(ch.content || "");
       const content_hash = await sha256Hex(ch.content);
 
-      await db.prepare(
-        `INSERT OR IGNORE INTO chunks (
-           chunk_id, file_id, dataset, source, content, version, created_at,
-           tags, topic, first_sentence, section, chunk_index,
-           section_number, section_keywords, priority_level,
-           content_hash, embedding_model, chunk_method,
-           tier, parent_id
-         ) VALUES (?, ?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        chunk_id,
-        args.fileId,
-        dataset,
-        origin,
-        ch.content,
-        args.version,
-        JSON.stringify(ch.tags || []),
-        ch.topic || "general",
-        firstSentence,
-        ch.section || "",
-        ch.index,
-        sectionNumber,
-        JSON.stringify([]),
-        "high",
-        content_hash,
-        args.embeddingModel,
-        args.chunkMethod,
-        ch.tier || "standard",
-        ch.parentId || null
-      ).run();
+      statements.push(
+        db.prepare(
+          `INSERT OR IGNORE INTO chunks (
+             chunk_id, file_id, dataset, source, content, version, created_at,
+             tags, topic, first_sentence, section, chunk_index,
+             section_number, section_keywords, priority_level,
+             content_hash, embedding_model, chunk_method,
+             tier, parent_id
+           ) VALUES (?, ?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          chunk_id,
+          args.fileId,
+          dataset,
+          origin,
+          ch.content,
+          args.version,
+          JSON.stringify(ch.tags || []),
+          ch.topic || "general",
+          firstSentence,
+          ch.section || "",
+          ch.index,
+          sectionNumber,
+          JSON.stringify([]),
+          "high",
+          content_hash,
+          args.embeddingModel,
+          args.chunkMethod,
+          ch.tier || "standard",
+          ch.parentId || null
+        )
+      );
+    }
+
+    // Execute in fast D1 statement batches of 50
+    for (let i = 0; i < statements.length; i += 50) {
+      const batch = statements.slice(i, i + 50);
+      await db.batch(batch);
     }
   },
 
