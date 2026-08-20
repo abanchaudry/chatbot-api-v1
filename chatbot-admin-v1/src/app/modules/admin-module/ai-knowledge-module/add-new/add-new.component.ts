@@ -947,7 +947,20 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       this.fileId = crypto.randomUUID();
     }
 
-    const rawText = this.fileToUpload ? await this.fileToUpload.text() : "";
+    const isTextDoc = /\.(txt|csv|md|json|log|sql|xml|yaml|yml)$/i.test(this.fileName || "");
+    let rawText = "";
+    try {
+      if (isTextDoc && this.fileToUpload) {
+        rawText = await this.fileToUpload.text();
+      } else if (this.rawFullMarkdown) {
+        rawText = this.rawFullMarkdown;
+      } else {
+        rawText = this.chunkData.map((c: any) => c.content || "").join("\n\n");
+      }
+    } catch {
+      rawText = this.chunkData.map((c: any) => c.content || "").join("\n\n");
+    }
+
     const dataset = this.activeIngestTab === "pdf" ? "pdf" : "admin";
 
     const payload = {
@@ -956,8 +969,8 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       fileId: this.fileId,
       uploadId: this.uploadId,
       dataset,
-      chunkMethod: this.model.strategy || "semantic",
-      engineMode: this.model.engineMode || "",
+      chunkMethod: this.model.strategy || "adaptive",
+      engineMode: this.model.engineMode || "offline",
       embeddingModel: "text-embedding-3-small",
       rawText,
       chunks: this.chunkData.map((c: any, idx: number) => ({
@@ -988,7 +1001,19 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       },
       error: (err: any) => {
         if (dialogRef) dialogRef.close();
-        Swal.fire("Error", err?.error?.message || "Failed to save chunks.", "error");
+        let errorMsg = err?.error?.message || err?.error?.error;
+        if (!errorMsg) {
+          if (err?.status === 413) {
+            errorMsg = "Payload too large for upload (>10MB).";
+          } else if (err?.status === 504 || err?.status === 524) {
+            errorMsg = "Storage timeout. Please retry.";
+          } else if (typeof err?.error === "string" && err.error.length < 200) {
+            errorMsg = err.error;
+          } else {
+            errorMsg = err?.statusText || "Failed to save chunks.";
+          }
+        }
+        Swal.fire("Error", errorMsg, "error");
       },
     });
   }
