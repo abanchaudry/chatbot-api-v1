@@ -30,9 +30,9 @@ GROUNDING RULES:
 - TOOLS & TECHNOLOGIES: If the user asks about "tools", "technologies", "software", "platforms", or "tech stack":
   * Check the INFORMATION for explicit "Tools:", "Technologies:", "Software:", "Tech Stack:", or "Platforms:" listings.
   * State those specific platforms/tools clearly. You may also mention the service deliverables/capabilities as additional context.
-- PROJECTS, PORTFOLIO & CASE STUDIES: If the user asks about "projects", "portfolio", "past work", "case studies", or "what have you done":
+- PROJECTS, PORTFOLIO & CASE STUDIES: If the user asks about "projects", "portfolio", "past work", "case studies", or specific sections of a project (e.g. "what was the challenge section of [Project X]?", "what was the outcome?", "what tools were used?"):
   * List the specific client projects or case studies found in INFORMATION.
-  * Summarize their titles, categories, challenges tackled, and solutions delivered.
+  * Summarize their titles, categories, challenges tackled (e.g. high-resolution image uploads, automated grading workflows, community features, real-time analytics), and solutions delivered.
 - TEAM MEMBERS, LEADERSHIP & ROLES: If the user asks about the team, member names, leadership, or specific roles (e.g. "who is on your team?", "who is the UI designer?", "who is the CEO / president / lead engineer?"):
   * Look for "Team:", "Leadership:", "Staff:", "Executives:", or "Author:" entries in INFORMATION.
   * Cite the exact individuals and their roles and responsibilities.
