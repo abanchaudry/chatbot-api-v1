@@ -759,11 +759,27 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       const pageImages: Array<{ pageNum: number; dataUrl: string }> = [];
 
       const safeDpi = Math.max(300, Math.min(Number(requestedDpi) || 300, 600));
-      // Scale multiplier: 300 DPI = 2.0x, 400 DPI = 2.67x, 500 DPI = 3.33x, 600 DPI = 4.0x
-      const renderScale = safeDpi / 150;
-      const maxPages = Math.min(pdf.numPages, 10);
+      // Adaptive scaling: dynamically scale resolution so long documents (up to 200 pages) process smoothly
+      const totalPages = pdf.numPages;
+      const maxPages = Math.min(totalPages, 200);
+      let renderScale = safeDpi / 150;
+      let quality = 0.55;
+
+      if (totalPages > 50) {
+        renderScale = 0.85;
+        quality = 0.35;
+      } else if (totalPages > 20) {
+        renderScale = 1.15;
+        quality = 0.40;
+      } else if (totalPages > 10) {
+        renderScale = 1.35;
+        quality = 0.45;
+      } else if (safeDpi >= 500) {
+        quality = 0.60;
+      }
+
       let totalEstimatedBytes = 0;
-      const MAX_TOTAL_IMAGE_BYTES = 3.5 * 1024 * 1024; // 3.5MB safety budget for Cloudflare HTTP payload limits
+      const MAX_TOTAL_IMAGE_BYTES = 7.5 * 1024 * 1024; // 7.5MB safety budget for Cloudflare HTTP payload limits
 
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
@@ -775,12 +791,11 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
 
         if (context) {
           await page.render({ canvasContext: context, viewport }).promise;
-          const quality = safeDpi >= 500 ? 0.60 : 0.50;
           const dataUrl = canvas.toDataURL("image/jpeg", quality);
           totalEstimatedBytes += dataUrl.length;
 
           if (totalEstimatedBytes > MAX_TOTAL_IMAGE_BYTES) {
-            console.warn(`[renderPdfPagesToImages] Reached 3.5MB payload cap at page ${i}. Stopping further rasterization.`);
+            console.warn(`[renderPdfPagesToImages] Reached 7.5MB payload cap at page ${i}. Stopping further rasterization.`);
             break;
           }
 

@@ -221,7 +221,8 @@ export async function extractDocumentFullVision(
     "3. Render all tables as neat, aligned GFM Markdown tables (| Col 1 | Col 2 |).",
     "4. MANDATORY CODE SCREENSHOT OCR RULE: If a slide contains a screenshot or picture of code (e.g. code snippets inside yellow, black, or gray boxes or output previews), you MUST perform OCR on the text INSIDE those screenshot images and transcribe all code into fenced code blocks (```html, ```css). Do NOT leave screenshot boxes un-transcribed!",
     "5. ANTI-SUMMARIZATION RULE: Do NOT summarize, explain, or paraphrase (e.g. NEVER write 'This section provides a detailed exploration of...'). Extract the raw text and code directly.",
-    "6. Output ONLY clean Markdown — no intro chatter.",
+    "6. NO FAKE URLS RULE: NEVER output placeholder markdown image tags or dummy URLs like ![...](https://example.com) or ![image](...). If you see graphic mockups, illustrations, or icons, transcribe any text or labels inside them directly. Do not emit fake image URLs.",
+    "7. Output ONLY clean Markdown — no intro chatter.",
   ].join("\n");
 
 
