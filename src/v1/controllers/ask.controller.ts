@@ -146,6 +146,7 @@ function formatRetrievedSources(
     const section = p.section || p.meta?.section || p.meta?.section_number || "";
     const topic = p.topic || p.meta?.topic || "";
     const rawDataset = String(p.meta?.dataset || p.dataset || "").toLowerCase();
+    const dataset = rawDataset === "pdf" ? "pdf" : rawDataset === "web" || isWeb ? "web" : "admin";
     const fileId = p.file_id || p.meta?.file_id || null;
 
     if (!docMap.has(fileName) || scoreInt > (docMap.get(fileName).score || 0)) {
