@@ -321,10 +321,6 @@ export class FooterComponent implements OnInit, OnDestroy {
     try {
       await this.getBotResponseStream(trimmedMessage, botMsg);
 
-      if (!this.streamEnded) {
-        throw new Error("Stream ended before done event");
-      }
-
       if (!botMsg.text.trim()) {
         throw new Error("Empty stream response");
       }
@@ -333,11 +329,10 @@ export class FooterComponent implements OnInit, OnDestroy {
         botMsg.createdAt = Date.now();
       }
 
-      botMsg.text = botMsg.text?.trim()
-        ? botMsg.text + "\n\nConnection interrupted before the response completed. Please try again."
-        : "I’m having trouble connecting right now. Please try again in a moment.";
-
-      botMsg.html = this.toSafeHtml(botMsg.text);
+      if (!botMsg.text?.trim()) {
+        botMsg.text = "I’m having trouble connecting right now. Please try again in a moment.";
+        botMsg.html = this.toSafeHtml(botMsg.text);
+      }
       this.rebuildTimeline();
       this.scheduleRender();
       this.scheduleScroll(true);
@@ -419,12 +414,22 @@ export class FooterComponent implements OnInit, OnDestroy {
       }
 
       if (row.answer?.trim()) {
+        let sources: any[] = [];
+        if (Array.isArray((row as any).sources)) {
+          sources = (row as any).sources;
+        } else if (typeof (row as any).metadata === "string") {
+          try {
+            const meta = JSON.parse((row as any).metadata);
+            if (Array.isArray(meta?.sources)) sources = meta.sources;
+          } catch {}
+        }
         mapped.push({
           id: `history-a-${row.id}`,
           sender: "bot",
           text: row.answer,
           html: this.toSafeHtml(row.answer),
           createdAt,
+          sources: sources.length > 0 ? sources : undefined,
         });
       }
     }
@@ -554,6 +559,13 @@ export class FooterComponent implements OnInit, OnDestroy {
 
     if (finalRemainder) {
       this.processSSEBlock(finalRemainder, botMsg);
+    }
+
+    if (botMsg.text.trim()) {
+      this.streamEnded = true;
+      this.rebuildTimeline();
+      this.scheduleRender();
+      return;
     }
 
     if (!this.streamEnded && !this.destroyed) {
