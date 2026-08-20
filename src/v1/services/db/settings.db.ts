@@ -58,18 +58,19 @@ export class SettingsDbService {
   }
 
   async saveSettings(db: D1Database, settings: Partial<SystemSettings>): Promise<SystemSettings> {
-    const company = String(settings.company_name || DEFAULT_SETTINGS.company_name).trim();
-    const assistant = String(settings.assistant_name || DEFAULT_SETTINGS.assistant_name).trim();
-    const domain = String(settings.domain_hint || DEFAULT_SETTINGS.domain_hint).trim();
-    const tone = String(settings.brand_tone || DEFAULT_SETTINGS.brand_tone).trim();
-    const lang = String(settings.primary_language || DEFAULT_SETTINGS.primary_language).trim();
-    const schedule = String(settings.fallback_schedule || DEFAULT_SETTINGS.fallback_schedule).trim();
-    const adminEnabled = settings.dataset_admin_enabled !== undefined ? Number(settings.dataset_admin_enabled) : (DEFAULT_SETTINGS.dataset_admin_enabled ?? 1);
-    const adminWeight = settings.dataset_admin_weight !== undefined ? Number(settings.dataset_admin_weight) : (DEFAULT_SETTINGS.dataset_admin_weight ?? 1.25);
-    const pdfEnabled = settings.dataset_pdf_enabled !== undefined ? Number(settings.dataset_pdf_enabled) : (DEFAULT_SETTINGS.dataset_pdf_enabled ?? 1);
-    const pdfWeight = settings.dataset_pdf_weight !== undefined ? Number(settings.dataset_pdf_weight) : (DEFAULT_SETTINGS.dataset_pdf_weight ?? 1.10);
-    const webEnabled = settings.dataset_web_enabled !== undefined ? Number(settings.dataset_web_enabled) : (DEFAULT_SETTINGS.dataset_web_enabled ?? 1);
-    const webWeight = settings.dataset_web_weight !== undefined ? Number(settings.dataset_web_weight) : (DEFAULT_SETTINGS.dataset_web_weight ?? 1.00);
+    const current = await this.getSettings(db);
+    const company = String(settings.company_name !== undefined ? settings.company_name : current.company_name).trim();
+    const assistant = String(settings.assistant_name !== undefined ? settings.assistant_name : current.assistant_name).trim();
+    const domain = String(settings.domain_hint !== undefined ? settings.domain_hint : current.domain_hint).trim();
+    const tone = String(settings.brand_tone !== undefined ? settings.brand_tone : current.brand_tone).trim();
+    const lang = String(settings.primary_language !== undefined ? settings.primary_language : current.primary_language).trim();
+    const schedule = String(settings.fallback_schedule !== undefined ? settings.fallback_schedule : current.fallback_schedule).trim();
+    const adminEnabled = settings.dataset_admin_enabled !== undefined ? Number(settings.dataset_admin_enabled) : (current.dataset_admin_enabled ?? 1);
+    const adminWeight = settings.dataset_admin_weight !== undefined ? Number(settings.dataset_admin_weight) : (current.dataset_admin_weight ?? 1.25);
+    const pdfEnabled = settings.dataset_pdf_enabled !== undefined ? Number(settings.dataset_pdf_enabled) : (current.dataset_pdf_enabled ?? 1);
+    const pdfWeight = settings.dataset_pdf_weight !== undefined ? Number(settings.dataset_pdf_weight) : (current.dataset_pdf_weight ?? 1.10);
+    const webEnabled = settings.dataset_web_enabled !== undefined ? Number(settings.dataset_web_enabled) : (current.dataset_web_enabled ?? 1);
+    const webWeight = settings.dataset_web_weight !== undefined ? Number(settings.dataset_web_weight) : (current.dataset_web_weight ?? 1.00);
 
     await db
       .prepare(
