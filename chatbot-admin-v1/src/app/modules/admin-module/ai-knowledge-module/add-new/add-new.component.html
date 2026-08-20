@@ -160,7 +160,7 @@
                         <label for="file" class="button upload-btn">
                           <span class="upload-icon"><i class="ri-upload-cloud-2-line"></i></span>
                           <span class="choose-file">Choose File</span>
-                          <input hidden type="file" id="file" accept=".txt,.pdf,.docx,.pptx,.xlsx,.csv,.png,.jpg,.jpeg" (change)="onFile($event)" required />
+                          <input hidden type="file" id="file" accept=".txt,.pdf,.docx,.pptx,.xlsx,.csv,.json,.md,.xml,.yaml,.yml,.png,.jpg,.jpeg" (change)="onFile($event)" required />
                         </label>
                       </div>
                       <div *ngIf="uploadForm.submitted && !filePreview" class="invalid-feedback d-block mt-2">File is required.</div>
