@@ -214,7 +214,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectorRef } from "@angular/core";
 import { Router } from "@angular/router";
 import { MatDialog } from "@angular/material/dialog";
-import { Subject } from "rxjs";
+import { Subject, firstValueFrom } from "rxjs";
 import { takeUntil } from "rxjs/operators";
 import Swal from "sweetalert2";
 import { nanoid } from "nanoid";
@@ -963,24 +963,12 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
 
     const dataset = this.activeIngestTab === "pdf" ? "pdf" : "admin";
 
-    const payload = {
-      fileName: this.fileName || `manual-${new Date().toISOString()}.txt`,
-      version: this.model.version || `v${Date.now()}`,
-      fileId: this.fileId,
-      uploadId: this.uploadId,
-      dataset,
-      chunkMethod: this.model.strategy || "adaptive",
-      engineMode: this.model.engineMode || "offline",
-      embeddingModel: "text-embedding-3-small",
-      rawText,
-      chunks: this.chunkData.map((c: any, idx: number) => ({
-        index: typeof c.index === "number" ? c.index : idx,
-        content: c.content,
-        section: c.section,
-        tags: Array.isArray(c.tags) ? c.tags : [],
-        topic: c.topic || "general",
-      })),
-    };
+    const totalChunks = this.chunkData.length;
+    const batchSize = 60;
+    const batches: any[][] = [];
+    for (let i = 0; i < totalChunks; i += batchSize) {
+      batches.push(this.chunkData.slice(i, i + batchSize));
+    }
 
     const dialogRef = this.dialog.open(UploadProgressComponent, {
       disableClose: true,
@@ -989,33 +977,58 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       data: { fileName: this.fileName, uploadId: this.uploadId },
     });
 
-    this.aiService.finalizeReviewedChunks(payload).subscribe({
-      next: (res: any) => {
+    const saveBatch = async (batchIdx: number): Promise<void> => {
+      if (batchIdx >= batches.length) {
         if (dialogRef) dialogRef.close();
-        if (res?.ok) {
-          Swal.fire("Saved", "Reviewed chunks stored successfully.", "success");
-          this.resetForm();
+        Swal.fire("Saved", `All ${totalChunks} chunks stored and indexed successfully.`, "success");
+        this.resetForm();
+        return;
+      }
+
+      const currentBatch = batches[batchIdx];
+      const batchPayload = {
+        fileName: this.fileName || `manual-${new Date().toISOString()}.txt`,
+        version: this.model.version || `v${Date.now()}`,
+        fileId: this.fileId,
+        uploadId: this.uploadId,
+        dataset,
+        chunkMethod: this.model.strategy || "adaptive",
+        engineMode: this.model.engineMode || "offline",
+        embeddingModel: "text-embedding-3-small",
+        rawText: batchIdx === 0 ? rawText : "",
+        chunks: currentBatch.map((c: any, idx: number) => ({
+          index: typeof c.index === "number" ? c.index : batchIdx * batchSize + idx,
+          content: c.content,
+          section: c.section,
+          tags: Array.isArray(c.tags) ? c.tags : [],
+          topic: c.topic || "general",
+        })),
+      };
+
+      try {
+        const res: any = await firstValueFrom(this.aiService.finalizeReviewedChunks(batchPayload));
+        if (res?.ok || res?.results) {
+          await saveBatch(batchIdx + 1);
         } else {
-          Swal.fire("Error", res?.message || "Failed to save chunks.", "error");
+          throw new Error(res?.message || `Failed to save batch ${batchIdx + 1}`);
         }
-      },
-      error: (err: any) => {
+      } catch (err: any) {
         if (dialogRef) dialogRef.close();
-        let errorMsg = err?.error?.message || err?.error?.error;
+        let errorMsg = err?.error?.message || err?.error?.error || err?.message;
         if (!errorMsg) {
           if (err?.status === 413) {
             errorMsg = "Payload too large for upload (>10MB).";
           } else if (err?.status === 504 || err?.status === 524) {
             errorMsg = "Storage timeout. Please retry.";
-          } else if (typeof err?.error === "string" && err.error.length < 200) {
-            errorMsg = err.error;
           } else {
             errorMsg = err?.statusText || "Failed to save chunks.";
           }
         }
         Swal.fire("Error", errorMsg, "error");
-      },
-    });
+      }
+    };
+
+    saveBatch(0);
   }
 
   onBack() {
