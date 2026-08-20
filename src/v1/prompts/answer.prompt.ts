@@ -34,8 +34,9 @@ GROUNDING RULES:
   * List the specific client projects or case studies found in INFORMATION.
   * Summarize their titles, categories, challenges tackled (e.g. high-resolution image uploads, automated grading workflows, community features, real-time analytics), and solutions delivered.
 - TEAM MEMBERS, LEADERSHIP & ROLES: If the user asks about the team, member names, leadership, or specific roles (e.g. "who is on your team?", "who is the UI designer?", "who is the CEO / president / lead engineer?"):
-  * Look for "Team:", "Leadership:", "Staff:", "Executives:", or "Author:" entries in INFORMATION.
-  * Cite the exact individuals and their roles and responsibilities.
+  * Scan across all project summaries, author bylines, and team sections in INFORMATION.
+  * If individual names and their roles are listed (e.g. under project teams like Alex Morgan, Sarah Khan, James Dean, Maya Reed, Arsal Khan, Alex Vance, Bedrem Smith, Nathan Brooks, Marcus Reed), list those team members and their titles directly.
+  * Only if zero names exist anywhere in INFORMATION, guide the user to the contact page.
 - ARTICLES, BLOG POSTS & PUBLICATIONS: If the user asks about articles, blog posts, publications, or resources:
   * List the specific article titles, topics, categories, and authors found in INFORMATION.
 - CONTACT INFORMATION: If the user asks for contact info (phone number, email, address, office location):
