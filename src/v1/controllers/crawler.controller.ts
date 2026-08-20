@@ -283,8 +283,8 @@ export const CrawlerController = {
 
       const body = await c.req.json().catch(() => ({}));
       const rawUrl = String(body.url || "").trim();
-      const maxDepth = Number(body.maxDepth ?? 1);
-      const maxPages = Number(body.maxPages ?? 40);
+      const maxDepth = Number(body.maxDepth ?? 2);
+      const maxPages = Math.min(Math.max(Number(body.maxPages ?? 200), 1), 200);
 
       if (!rawUrl) {
         return c.json({ ok: false, message: "URL is required" }, 400);

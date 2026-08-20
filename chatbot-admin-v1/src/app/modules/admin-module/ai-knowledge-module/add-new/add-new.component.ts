@@ -236,9 +236,9 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
   crawlUrl = "";
   crawlSchedule = "manual";
 
-  // Recursive crawler state
+  // Recursive crawler state (auto discovers up to 200 pages max)
   crawlMaxDepth = 2;
-  crawlMaxPages = 50;
+  crawlMaxPages = 200;
   discoveredPages: Array<{ url: string; title: string; depth: number; selected: boolean }> = [];
   showPageSelector = false;
   isDiscovering = false;

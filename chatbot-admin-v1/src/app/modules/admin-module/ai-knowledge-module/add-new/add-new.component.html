@@ -219,7 +219,7 @@
 
               <!-- URL Input & Discovery Controls -->
               <div class="row">
-                <div class="col-md-5">
+                <div class="col-md-6">
                   <div class="form-group mb-3">
                     <label for="crawlUrl" class="font-weight-bold" style="font-size: 14px; color: #1e293b;">Root Website URL</label>
                     <div class="input-group">
@@ -230,23 +230,13 @@
                     </div>
                   </div>
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-3">
                   <div class="form-group mb-3">
                     <label class="font-weight-bold" style="font-size: 14px; color: #1e293b;">Max Depth</label>
                     <select class="form-control" [(ngModel)]="crawlMaxDepth" [disabled]="isDiscovering || isCrawlingSelected" style="font-size: 14px;">
                       <option [ngValue]="1">1 Level</option>
                       <option [ngValue]="2">2 Levels</option>
                       <option [ngValue]="3">3 Levels</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="col-md-2">
-                  <div class="form-group mb-3">
-                    <label class="font-weight-bold" style="font-size: 14px; color: #1e293b;">Max Pages</label>
-                    <select class="form-control" [(ngModel)]="crawlMaxPages" [disabled]="isDiscovering || isCrawlingSelected" style="font-size: 14px;">
-                      <option [ngValue]="20">20 pages</option>
-                      <option [ngValue]="50">50 pages</option>
-                      <option [ngValue]="100">100 pages</option>
                     </select>
                   </div>
                 </div>

@@ -425,7 +425,7 @@ export async function discoverLinks(
   env: Env["Bindings"],
   rootUrl: string,
   maxDepth: number = 2,
-  maxPages: number = 50
+  maxPages: number = 200
 ): Promise<DiscoveredPage[]> {
   try {
     const rootUrlObj = new URL(rootUrl);
@@ -480,7 +480,7 @@ export async function discoverLinks(
 
     // 4. If maxDepth >= 2 and results are under maxPages, crawl Depth 2 from the top Depth 1 pages
     if (maxDepth >= 2 && resultsMap.size < maxPages && depth1Results.length > 0) {
-      const crawlSubset = depth1Results.slice(0, 6); // Take first 6 sub-pages
+      const crawlSubset = depth1Results.slice(0, 30); // Inspect top Depth 1 pages for Depth 2 links
       const depth2Candidates: string[] = [];
 
       for (const d1Page of crawlSubset) {
