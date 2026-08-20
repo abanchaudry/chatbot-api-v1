@@ -62,33 +62,36 @@ chatbot-api-v1 (branch: version-2)
   - Administrators can enable/disable any knowledge base live from the Admin Panel or customize weighted Reciprocal Rank Fusion (RRF) priority multipliers.
   - Inactive datasets are automatically excluded from Vectorize, SQLite FTS5 lexical, and metadata queries.
 
-### 🌐 2. Recursive Multi-Depth Web Crawler Engine
-- **Recursive BFS Multi-Page Discovery**: Discovers all sub-links across domain variations (e.g. `www.` vs non-`www.`) up to customizable depth levels.
+### 🌐 2. Autonomous 200-Page Web Crawler Engine
+- **Autonomous Multi-Depth Discovery**: Discovers all sub-links across domain variations (e.g. `www.` vs non-`www.`) up to **200 pages max** without requiring manual limit selection.
 - **Automated XML Sitemap Ingestion**: Automatically detects `/sitemap.xml`, `/sitemap_index.xml`, and `/wp-sitemap.xml` for site-wide page discovery.
 - **Headless Chrome & Anti-Bot Bypass**: Uses `@cloudflare/puppeteer` (`env.MY_BROWSER`) with automated Jina Reader Proxy fallback for blocked domains.
 - **Auto-Sync Schedule Selector**: Supports `Manual Only`, `Daily Every 24h`, `Weekly Every 7 Days`, and `Monthly Every 30 Days`.
 
-### 🛡️ 3. Resilient Multi-Signal Evidence Gate & Cache Partitioning
-- **Multi-Signal Grounding Evaluation**: Evaluates substantive text length ($\ge 40$ chars), semantic reranker coverage ($\ge 40\%$), exact entity/phrase matches, and vector score thresholds ($\ge 40$) to prevent false negative fallbacks on conversational queries.
-- **Signature-Aware Cache Partitioning**: Every cache key is bound to the active dataset signature (e.g. `qcache:a1_p1_w1:<hash>`), ensuring $0\text{ms}$ instantaneous cache invalidation when any dataset toggle or weight is modified.
-- **Automatic Deep KV Cache Purging**: System settings modifications, file deletions, and chunk updates automatically trigger deep key purges across Cloudflare KV.
-
-### 🎯 4. Strict LLM Citation Filtering & Source Badging
-- **Answer-Driven Filtering**: `formatRetrievedSources(pieces, answerText)` token-matches candidate chunks against the **actual generated LLM answer**, filtering out unreferenced documents.
-- **Visual Source Badges**:
-  - **`📄 Admin Doc`**: Purple badge with document icon for executive policy uploads.
-  - **`📚 PDF Reference`**: Indigo badge with book icon for technical hardware datasheets.
-  - **`🌐 Web Crawled`**: Blue badge with globe icon linking to live web sources.
-
-### ✏️ 5. Linked 3-Tier Multi-Tier Knowledge Chunk Editor
-- **3-Tier Hierarchy**:
+### 📑 3. Multimodal 300–600 DPI Vision OCR & 200-Page Ingestion Pipeline
+- **Configurable DPI Scale (300 to 600 DPI)**: Dynamically control rendering resolution for dense engineering blueprints, tables, and fine-print PDFs.
+- **200-Page Ingestion Engine**: Adaptive image chunk batching and token budgeting to rasterize and verbatim-transcribe documents up to 200 pages without context truncations.
+- **3 Hierarchical Chunking Tiers**:
   - 📄 **Large Tier (~3000 tokens)**: High-level overview & structural context.
   - 📝 **Medium Tier (~1200 tokens)**: Section policies & standard context.
   - 🔍 **Small Tier (~300 tokens)**: Granular rules, fee tables, and definitions.
+
+### 🛡️ 4. Resilient Multi-Signal Evidence Gate & Cache Partitioning
+- **Multi-Signal Grounding Evaluation**: Evaluates substantive text length ($\ge 40$ chars), semantic reranker coverage ($\ge 40\%$), exact entity/phrase matches, and vector score thresholds ($\ge 40$) to prevent false negative fallbacks.
+- **Signature-Aware Cache Partitioning**: Every cache key is bound to the active dataset signature (e.g. `qcache:a1_p1_w1:<hash>`), ensuring $0\text{ms}$ instantaneous cache invalidation when any dataset toggle or weight is modified.
+- **Deep KV Cache Purging**: System settings modifications, file deletions, and chunk updates automatically trigger deep key purges across Cloudflare KV.
+
+### 🎯 5. Interactive In-App Citation Routing, Auto-Pagination & Golden Glow Pulse
+- **In-App Citation Navigation**: Clicking any citation chip in the Admin Chat widget navigates directly to the **AI Knowledge** page, automatically flips to the correct pagination page, and scrolls the cited file into view.
+- **Golden Glow Pulse Animation**: The cited document row is highlighted with a 4.5s golden glow pulse (`@keyframes highlightRowPulse`).
+- **Web Link Direct Access**: Includes an inline `🔗` external link for direct browser visits to original web sources.
+- **Refusal Citation Suppression**: Citations are cleanly suppressed on out-of-scope guardrail refusals.
+
+### ✏️ 6. Linked 3-Tier Multi-Tier Knowledge Chunk Editor
 - **In-Place Tabbed Modal**: Editing any chunk opens a 960px tabbed editor showing linked parent/child chunks for that section.
 - **Bulk D1 & Vectorize Re-Indexing**: Updating chunk text or tags automatically re-embeds vectors in Cloudflare Vectorize and updates D1 SQLite in a single transaction.
 
-### 📊 6. Developer Trace Inspector & Observability
+### 📊 7. Developer Trace Inspector & Observability
 - Access real-time execution logs for any user message at `/dashboard/threads/detail-page/:id`.
 - Inspect step timings (`history_load`, `preflight`, `embed_speculative`, `rag_query`), planner intent parsing, RRF fusion scores, and raw JSON traces.
 

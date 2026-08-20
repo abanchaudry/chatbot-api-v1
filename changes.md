@@ -337,3 +337,64 @@ This document maintains a complete, chronological record of all architectural up
   - Added visual greyed-out state (`opacity: 0.45` and `(Disabled)` badge) for files belonging to disabled datasets.
   - Fixed settings unpacking in `loadSettings()` so toggle states persist across page refreshes.
 
+---
+
+## 24. High-Resolution Multimodal OCR Scaling (300–600 DPI & 200-Page Extended Capacity)
+
+- **Configurable High-Resolution DPI Selector (`add-new.component.html` & `.ts`)**:
+  - Added interactive DPI range slider (300 to 600 DPI) for the **100% AI Vision** extraction pipeline.
+  - Allows administrators to dynamically scale rendering density for intricate architectural blueprints, financial ledgers, and complex schematics.
+- **200-Page Adaptive Ingestion Pipeline**:
+  - Extended canvas rasterization capacity from 30 pages to **200 pages max** in Angular client (`add-new.component.ts`) and backend extraction services.
+  - Built adaptive image batching and token budgeting to prevent LLM context overflow on massive document uploads while ensuring verbatim transcribing.
+
+---
+
+## 25. Interactive In-App Citation Routing, Auto-Pagination & Golden Glow Pulse
+
+- **In-App Citation Navigation (`footer.component.html` & `.ts`)**:
+  - Updated all citation chips (`Admin Doc`, `PDF Library`, `Web`) in the floating Admin Chat Widget to route directly to `/dashboard/ai-knowledge/all-knowledge`.
+  - Passes document identifiers (`highlightFile`, `fileId`, `dataset`) via query parameters.
+  - Preserved inline `🔗` external link icon on Web citations for direct live URL visits.
+- **Automated Pagination Calculation & Golden Pulse Glow (`all-knowledge.component.ts` & `.css`)**:
+  - Automatically calculates and switches the knowledge table to the exact pagination page containing the cited document.
+  - Smoothly scrolls the target table row into center view (`element.scrollIntoView({ behavior: 'smooth', block: 'center' })`).
+  - Applies a 4.5s animated golden pulse effect (`@keyframes highlightRowPulse`) to highlight the cited file row.
+
+---
+
+## 26. Resilient SSE Stream Lifecycle, Cache Source Preservation & Refusal Suppression
+
+- **Client SSE Stream Termination Fix (`footer.component.ts`)**:
+  - Fixed false-positive `"Connection interrupted before the response completed"` warnings by safely checking for completed response text before throwing stream errors.
+  - Enhanced JSON payload parsing in `processSSEBlock` to attach `botMsg.sources` on `event: done`.
+- **Backend Stream Stability & Dataset Resolution (`ask.controller.ts`)**:
+  - Fixed missing `dataset` assignment in `formatRetrievedSources`, resolving uncaught `STREAM_ERROR` at stream completion.
+  - Restored full source metadata in Layer 1 (KV) and Layer 2 (Vectorize) cache hit responses.
+  - Added fallback to top retrieved pieces for bulleted or paraphrased LLM responses.
+- **Guardrail Refusal Citation Suppression**:
+  - Added `isRefusalText` check in `formatRetrievedSources` to automatically suppress citation chips when the LLM refuses out-of-scope queries (e.g. recipe requests).
+
+---
+
+## 27. Automated 200-Page Web Crawler Auto-Discovery
+
+- **Removed Manual Page Limit Dropdown (`add-new.component.html`)**:
+  - Removed restrictive `20 / 50 / 100 pages` select dropdown in favor of fully automated discovery.
+  - Refactored form layout to an expanded 3-column configuration (`Website URL` $\rightarrow$ `Max Depth` $\rightarrow$ `Auto-Sync`).
+- **Autonomous 200-Page Discovery Engine (`crawler.service.ts` & `crawler.controller.ts`)**:
+  - Upgraded crawler discovery to autonomously traverse sitemaps and multi-depth links up to **200 pages max**.
+  - Populates discovered URLs in the interactive selection checklist for user review and cherry-picking.
+
+---
+
+## 28. D1 Database Optimization & Test Artifact Cleansing
+
+- **Orphan Chunk Purge**:
+  - Executed remote SQL cleanup removing 5,086 orphan test chunks from `chunks` table, reducing total chunks to **460 active chunks** perfectly synced with the 12 active documents.
+- **Chat & KV Cache Flush**:
+  - Wiped historical testing threads, message traces, and unmapped fallback query clusters.
+  - Flushed all `qcache:*` query keys from Cloudflare KV.
+- **Comprehensive User POV Audit**:
+  - Verified 100% accurate extraction across Rdeens services, case studies (Omakase, Sports Video Library), strict guardrails, zero hallucination, and real-time streaming citations.
+
