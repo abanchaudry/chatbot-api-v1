@@ -81,7 +81,15 @@ function formatRetrievedSources(
     lowerAnswer.includes("no information available") ||
     lowerAnswer.includes("cannot find specific details");
 
-  if (isFallbackText) return [];
+  const isRefusalText =
+    lowerAnswer.includes("i'm here to assist you with inquiries related to") ||
+    lowerAnswer.includes("i am here to assist you with inquiries related to") ||
+    lowerAnswer.includes("i can only assist") ||
+    lowerAnswer.includes("i can only help") ||
+    lowerAnswer.includes("can only assist with") ||
+    lowerAnswer.includes("can only help with");
+
+  if (isFallbackText || isRefusalText) return [];
   if (!Array.isArray(pieces) || !pieces.length) return [];
 
   // RULE 2: Only show sources/documents that the LLM actually used/cited to construct the answer
