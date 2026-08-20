@@ -57,13 +57,11 @@ function buildDoc(c: Chunk): Document {
     metadata: {
       chunk_id: c.id,
       topic: c.topic || "general",
-      text: c.content,
       section: c.section || "",
       section_number: c.sectionNumber ?? "",
       first_sentence,
       dataset,
       tags: c.tags || [],
-      ...(c.metadata || {}),
     },
   });
 }
@@ -97,20 +95,12 @@ export const vectorService = {
       return;
     }
 
-
     const batchSize = Math.max(
       1,
       Math.min(opts?.batchSize ?? DEFAULT_UPSERT_BATCH_SIZE, MAX_UPSERT_BATCH_SIZE)
     );
 
-    const embeddings = new OpenAIEmbeddings({
-      apiKey,
-      model: opts?.embeddingModel,
-    });
-
-    const vectorStore = await CloudflareVectorizeStore.fromExistingIndex(embeddings, {
-      index: vectorIndex,
-    });
+    let vectorStore: any = null;
 
     for (let i = 0; i < chunks.length; i += batchSize) {
       const batch = chunks.slice(i, i + batchSize);
@@ -139,11 +129,19 @@ export const vectorService = {
               }));
               await (vectorIndex as any).upsert(vectorizeRecords);
             } else {
-              await (vectorStore as any).addVectors(vectors, docs, { ids });
+              if (!vectorStore) {
+                const embeddings = new OpenAIEmbeddings({ apiKey, model: opts?.embeddingModel });
+                vectorStore = await CloudflareVectorizeStore.fromExistingIndex(embeddings, { index: vectorIndex });
+              }
+              await vectorStore.addVectors(vectors, docs, { ids });
             }
           } else {
-            if (typeof (vectorStore as any).addDocuments === "function") {
-              await (vectorStore as any).addDocuments(docs, { ids });
+            if (!vectorStore) {
+              const embeddings = new OpenAIEmbeddings({ apiKey, model: opts?.embeddingModel });
+              vectorStore = await CloudflareVectorizeStore.fromExistingIndex(embeddings, { index: vectorIndex });
+            }
+            if (typeof vectorStore.addDocuments === "function") {
+              await vectorStore.addDocuments(docs, { ids });
             } else {
               await vectorStore.addDocuments(docs);
             }
