@@ -37,9 +37,14 @@ const STOP_WORDS = new Set([
   "assistant",
   "can",
   "do",
+  "done",
   "for",
   "get",
   "give",
+  "guys",
+  "have",
+  "ahve",
+  "has",
   "help",
   "how",
   "hows",
@@ -49,11 +54,14 @@ const STOP_WORDS = new Set([
   "is",
   "me",
   "of",
+  "our",
   "please",
   "show",
   "tell",
   "the",
   "to",
+  "ur",
+  "us",
   "what",
   "whats",
   "what's",
@@ -63,8 +71,10 @@ const STOP_WORDS = new Set([
   "who",
   "whos",
   "who's",
+  "whose",
   "with",
   "you",
+  "your",
 ]);
 
 function normalize(text: string): string {
@@ -99,7 +109,7 @@ function extractLatestUserTurn(historyPreview: string): string {
 function extractQuestionFocus(question: string): string[] {
   const text = normalize(question);
   const patterns = [
-    /^(?:who is|who s|whos|tell me about|about)\s+(.+)$/,
+    /^(?:who is|who s|whos|whose|tell me about|about)\s+(.+)$/,
     /^(?:what is|what s|whats|show me|tell me|give me|share|find|need|looking for)\s+(?:the\s+)?(.+)$/,
     /^(?:how do i|how can i)\s+(.+)$/,
   ];
@@ -132,16 +142,16 @@ function extractEntities(question: string, exactPhrases: string[], intent: Query
   if (intent === "person") {
     for (const phrase of exactPhrases) {
       const cleaned = normalize(phrase)
-        .replace(/\b(?:the|a|an)\b/g, " ")
+        .replace(/\b(?:the|a|an|your|ur|our)\b/g, " ")
         .replace(/\s+/g, " ")
         .trim();
       if (cleaned) entities.add(cleaned);
     }
 
     const directMatch =
-      text.match(/^(?:who is|who s|whos|tell me about|about)\s+(.+)$/)?.[1] || "";
+      text.match(/^(?:who is|who s|whos|whose|tell me about|about)\s+(.+)$/)?.[1] || "";
     const cleaned = normalize(directMatch)
-      .replace(/\b(?:the|a|an)\b/g, " ")
+      .replace(/\b(?:the|a|an|your|ur|our)\b/g, " ")
       .replace(/\s+/g, " ")
       .trim();
     if (cleaned) entities.add(cleaned);
@@ -165,19 +175,19 @@ function detectIntent(question: string, sectionRef: string | null, usesHistory: 
 
   if (usesHistory) return "follow_up";
   if (sectionRef) return "section";
-  if (/\bwho is\b|\bwho s\b|\bwhos\b|\bleadership\b|\bpresident\b|\bvice president\b/.test(text)) {
+  if (/\bwho is\b|\bwho s\b|\bwhos\b|\bwhose\b|\bleadership\b|\bpresident\b|\bteam\b|\bmembers\b|\bdesigner\b|\bengineer\b|\bdeveloper\b|\bmanager\b|\bstrategist\b|\barchitect\b|\blead\b|\bauthor\b/.test(text)) {
     return "person";
   }
-  if (/\bpolicy\b|\bprivacy\b|\brefund\b|\bcancellation\b|\bstatement\b/.test(text)) {
+  if (/\bpolicy\b|\bprivacy\b|\brefund\b|\bcancellation\b|\bstatement\b|\bterms\b/.test(text)) {
     return "policy";
   }
-  if (/\baddress\b|\bphone\b|\bemail\b|\boffice\b|\bcontact\b|\bmailing\b/.test(text)) {
+  if (/\baddress\b|\bphone\b|\bemail\b|\boffice\b|\bcontact\b|\bmailing\b|\blocation\b/.test(text)) {
     return "contact";
   }
   if (/\bfaq\b|\bfrequently asked\b|\bwhere can i\b|\bcan i\b/.test(text)) {
     return "faq";
   }
-  if (/\bhow\b|\bsteps\b|\bprocess\b|\brequest\b|\bobtain\b|\baccess\b|\bget\b/.test(text)) {
+  if (/\bhow\b|\bsteps\b|\bprocess\b|\brequest\b|\bobtain\b|\baccess\b|\bget\b|\bproject\b|\bprojects\b|\bportfolio\b|\bcase stud\b|\bwork\b|\bclient\b|\btools\b|\btechnology\b|\btechnologies\b|\bservices\b/.test(text)) {
     return "process";
   }
 

@@ -30,7 +30,7 @@ export function decideLocalEvidence(args: {
   const keywordHybridHits = pieces.slice(0, 5).reduce((count, piece) => {
     const haystack = `${piece.title || ""} ${piece.section || ""} ${String(piece.text || "").slice(0, 500)}`.toLowerCase();
     const hits = args.plan.keywords.filter((keyword) => haystack.includes(keyword)).length;
-    return count + (hits >= 2 ? 1 : 0);
+    return count + (hits >= 1 ? 1 : 0);
   }, 0);
   const hybridHits = pieces.filter((piece) => {
     const origins = piece?.meta?.__origins;
@@ -43,7 +43,7 @@ export function decideLocalEvidence(args: {
   
   const hasExactGrounding = exactEntityMatch || exactPhraseMatch || exactSectionMatch;
   const hasCoverageGrounding = typeof rerankCoverage === "number" && rerankCoverage >= 40;
-  const hasTopicGrounding = keywordHybridHits >= 1 && (hybridHits >= 1 || topScore >= 40);
+  const hasTopicGrounding = keywordHybridHits >= 1 || hybridHits >= 1 || topScore >= 40;
   const isBroadQuery =
     args.plan.intent === "ambiguous" ||
     args.plan.searchMode === "support_broad";
@@ -61,7 +61,9 @@ export function decideLocalEvidence(args: {
   const broadQueryGrounded =
     hasExactGrounding ||
     hasCoverageGrounding ||
-    hasTopicGrounding;
+    hasTopicGrounding ||
+    args.rerankKept >= 1 ||
+    topScore >= 35;
 
   const sufficient =
     pieces.length > 0 &&
