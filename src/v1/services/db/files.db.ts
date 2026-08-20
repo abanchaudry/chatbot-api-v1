@@ -321,15 +321,15 @@ export const fileDb = {
     const origin = args.source || "admin";
     const dataset = args.dataset || (origin === "admin" ? "admin" : "web");
 
-    const statements: any[] = [];
-    for (const ch of args.chunks) {
-      const chunk_id = await makeStableChunkId(args.fileId, ch.index, ch.section);
-      const firstSentence = (ch.content.split(/[.!?]/)[0] || "").slice(0, 200);
-      const sectionNumber = extractSection(ch.section || "") || extractSection(ch.content || "");
-      const content_hash = await sha256Hex(ch.content);
+    const statements = await Promise.all(
+      args.chunks.map(async (ch) => {
+        const contentStr = String(ch?.content || "");
+        const chunk_id = await makeStableChunkId(args.fileId, ch.index, ch.section);
+        const firstSentence = String(contentStr.split(/[.!?]/)[0] || "").slice(0, 200);
+        const sectionNumber = extractSection(ch?.section || "") || extractSection(contentStr) || "";
+        const content_hash = await sha256Hex(contentStr);
 
-      statements.push(
-        db.prepare(
+        return db.prepare(
           `INSERT OR IGNORE INTO chunks (
              chunk_id, file_id, dataset, source, content, version, created_at,
              tags, topic, first_sentence, section, chunk_index,
@@ -357,9 +357,9 @@ export const fileDb = {
           args.chunkMethod,
           ch.tier || "standard",
           ch.parentId || null
-        )
-      );
-    }
+        );
+      })
+    );
 
     // Execute in fast D1 statement batches of 50
     for (let i = 0; i < statements.length; i += 50) {

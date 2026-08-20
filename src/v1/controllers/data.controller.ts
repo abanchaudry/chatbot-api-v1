@@ -735,20 +735,22 @@ export const DataController = {
       const targetVectorIndex = (getVectorIndexForDataset(c.env, dataset) || c.env.VECTORIZE) as any;
       const allVectorRecords = await Promise.all(
         normalized.map(async (ch, idx) => {
-          const firstSentence = String(ch.content.split(/[.!?]/)[0] || "").slice(0, 200);
-          const sectionNumber = extractSectionNumber(ch.section || "") || "";
+          const contentStr = String(ch?.content || "");
+          const firstSentence = String(contentStr.split(/[.!?]/)[0] || "").slice(0, 200);
+          const sectionNumber = extractSectionNumber(ch?.section || "") || "";
           const chunkId = await fileDb.makeStableChunkId(fileId, ch.index, ch.section);
           return {
             id: chunkId,
+            content: contentStr,
             values: vectors[idx] || [],
             metadata: {
               chunk_id: String(chunkId),
-              topic: String(ch.topic || "general"),
+              topic: String(ch?.topic || "general"),
               dataset: String(dataset),
-              section: String(ch.section || ""),
+              section: String(ch?.section || ""),
               section_number: String(sectionNumber),
               first_sentence: String(firstSentence),
-              tags: Array.isArray(ch.tags) ? ch.tags.map(String) : [],
+              tags: Array.isArray(ch?.tags) ? ch.tags.map(String) : [],
             },
           };
         })
@@ -758,7 +760,12 @@ export const DataController = {
         const batch = allVectorRecords.slice(i, i + 100);
         if (targetVectorIndex && typeof targetVectorIndex.upsert === "function") {
           try {
-            await targetVectorIndex.upsert(batch);
+            const cleanVectorizeBatch = batch.map((b) => ({
+              id: b.id,
+              values: b.values,
+              metadata: b.metadata,
+            }));
+            await targetVectorIndex.upsert(cleanVectorizeBatch);
           } catch (upsertErr: any) {
             console.warn(`[Vectorize.upsert] Direct batch failed (${upsertErr.message}), falling back to vectorService:`, upsertErr);
             await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });

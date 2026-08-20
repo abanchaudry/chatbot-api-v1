@@ -47,21 +47,22 @@ export function getVectorIndexForDataset(env: any, dataset?: string): VectorizeI
 }
 
 function buildDoc(c: Chunk): Document {
+  const contentStr = String(c?.content || (c as any)?.pageContent || (c as any)?.text || "");
   const first_sentence =
-    c.firstSentence || (c.content.split(/[.!?]/)[0] || "").slice(0, 200);
+    c?.firstSentence || (contentStr.split(/[.!?]/)[0] || "").slice(0, 200);
 
-  const dataset = c.metadata?.dataset || "admin";
+  const dataset = (c?.metadata as any)?.dataset || (c as any)?.dataset || "admin";
 
   return new Document({
-    pageContent: c.content,
+    pageContent: contentStr,
     metadata: {
-      chunk_id: c.id,
-      topic: c.topic || "general",
-      section: c.section || "",
-      section_number: c.sectionNumber ?? "",
+      chunk_id: c?.id || "",
+      topic: c?.topic || "general",
+      section: c?.section || "",
+      section_number: c?.sectionNumber ?? "",
       first_sentence,
       dataset,
-      tags: c.tags || [],
+      tags: Array.isArray(c?.tags) ? c.tags : [],
     },
   });
 }
