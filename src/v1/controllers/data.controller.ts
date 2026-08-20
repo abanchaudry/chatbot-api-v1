@@ -100,14 +100,11 @@ async function embedChunksInBatches(
   embeddingModel: string,
   uploadId?: string
 ): Promise<number[][]> {
-  const vectors: number[][] = [];
-
-  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    // Truncate text to max 24,000 chars (~6,000 tokens) to ensure it stays well within OpenAI's 8,192 token limit
-    const batchTexts = chunks.slice(i, i + BATCH_SIZE).map((x) => String(x.content || "").slice(0, 24000));
-    const out = await EmbeddingService.generate(batchTexts, key, uploadId, embeddingModel);
-    vectors.push(...out);
-  }
+  const allTexts = chunks.map((x) => String(x.content || "").slice(0, 24000));
+  const vectors = await EmbeddingService.generate(allTexts, key, uploadId, {
+    model: embeddingModel,
+    batchSize: 200,
+  });
 
   if (vectors.length !== chunks.length) {
     throw new Error(`Embedding count mismatch: ${vectors.length} for ${chunks.length}`);
@@ -734,42 +731,46 @@ export const DataController = {
         source: "admin",
       });
 
-      // Save to Vectorize (route to dataset index)
+      // Save to Vectorize (route to dataset index in direct high-speed batches of 100)
       const targetVectorIndex = (getVectorIndexForDataset(c.env, dataset) || c.env.VECTORIZE) as any;
-      for (let offset = 0; offset < normalized.length; offset += BATCH_SIZE) {
-        const batch = await buildVectorizeBatch({
-          fileId,
-          fileName,
-          version,
-          embeddingModel,
-          chunkMethod,
-          chunks: normalized,
-          vectors,
-          offset,
-          size: BATCH_SIZE,
-          dataset,
-        });
+      const allVectorRecords = await Promise.all(
+        normalized.map(async (ch, idx) => {
+          const firstSentence = String(ch.content.split(/[.!?]/)[0] || "").slice(0, 200);
+          const sectionNumber = extractSectionNumber(ch.section || "") || "";
+          const chunkId = await fileDb.makeStableChunkId(fileId, ch.index, ch.section);
+          return {
+            id: chunkId,
+            values: vectors[idx] || [],
+            metadata: {
+              chunk_id: String(chunkId),
+              topic: String(ch.topic || "general"),
+              dataset: String(dataset),
+              section: String(ch.section || ""),
+              section_number: String(sectionNumber),
+              first_sentence: String(firstSentence),
+              tags: Array.isArray(ch.tags) ? ch.tags.map(String) : [],
+            },
+          };
+        })
+      );
 
-        let attempt = 0;
-        for (;;) {
+      for (let i = 0; i < allVectorRecords.length; i += 100) {
+        const batch = allVectorRecords.slice(i, i + 100);
+        if (targetVectorIndex && typeof targetVectorIndex.upsert === "function") {
           try {
-            await vectorService.storeChunks(batch, key, targetVectorIndex, { embeddingModel });
-            break;
-          } catch (err: any) {
-            attempt++;
-            await ingestDb.log(c.env.DB, jobId, fileId, "WARN", `Vectorize retry ${attempt}: ${err.message}`);
-            if (attempt >= 3) throw err;
-            await new Promise((r) =>
-              setTimeout(r, 500 * Math.pow(2, attempt) + Math.floor(Math.random() * 200))
-            );
+            await targetVectorIndex.upsert(batch);
+          } catch (upsertErr: any) {
+            console.warn(`[Vectorize.upsert] Direct batch failed (${upsertErr.message}), falling back to vectorService:`, upsertErr);
+            await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
           }
+        } else if (targetVectorIndex) {
+          await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
         }
+      }
 
-        if (uploadId) {
-          const done = Math.min(offset + BATCH_SIZE, normalized.length);
-          await pt.step(uploadId, `Vector upload ${done}/${normalized.length}`);
-          await pt.update(uploadId);
-        }
+      if (uploadId) {
+        await pt.step(uploadId, `Vector upload completed: ${normalized.length}/${normalized.length}`);
+        await pt.update(uploadId);
       }
 
       await fileDb.updateFile(c.env.DB, fileId, { file_status: "completed" });

@@ -52,27 +52,13 @@ export class ChunkEnricher {
    * Enrich multiple chunks, considering context and relationships
    */
   static enrichChunks(chunks: Chunk[], context?: string): EnrichedChunk[] {
-    const enriched = chunks.map((ch, idx) => {
+    return chunks.map((ch, idx) => {
       const prevContext = idx > 0 ? chunks[idx - 1].content : undefined;
       const nextContext = idx < chunks.length - 1 ? chunks[idx + 1].content : undefined;
       const allContext = [prevContext, context, nextContext].filter(Boolean).join(" ");
 
       return this.enrichChunk(ch, allContext);
     });
-
-    // Cross-reference related chunks
-    for (let i = 0; i < enriched.length; i++) {
-      const similarIndices = this.findSimilarChunks(enriched[i].content, enriched);
-      if (similarIndices.length > 0) {
-        // Add cross-reference info (optional metadata)
-        enriched[i].tags = [
-          ...enriched[i].tags,
-          ...similarIndices.map((idx) => `see-chunk-${idx}`).slice(0, 2),
-        ].slice(0, 8);
-      }
-    }
-
-    return enriched;
   }
 
   /**

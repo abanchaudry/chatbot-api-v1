@@ -52,55 +52,54 @@ export const EmbeddingService = {
     }
 
     const clean = sanitizeTexts(texts);
-    const out: number[][] = [];
     const batchSize = Math.max(1, Math.min(opts.batchSize || 100, 200));
-
+    const batches: string[][] = [];
     for (let i = 0; i < clean.length; i += batchSize) {
-      const batch = clean.slice(i, i + batchSize);
-
-      let attempt = 0;
-      // retry loop per batch
-      for (;;) {
-        try {
-          attempt++;
-          const res = await fetch("https://api.openai.com/v1/embeddings", {
-            method: "POST",
-            headers: {
-              "Authorization": `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: opts.model,
-              input: batch,
-            }),
-          });
-
-          if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const errMsg = (errData as any)?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-            throw new Error(errMsg);
-          }
-
-          const data: any = await res.json();
-          const batchVectors = (data.data || []).sort((a: any, b: any) => a.index - b.index).map((d: any) => d.embedding);
-          out.push(...batchVectors);
-          break;
-        } catch (err: any) {
-          const msg = err?.message || String(err);
-          if (attempt >= opts.maxRetries) {
-            console.error(
-              `embeddings.batch failed i=${i} size=${batch.length} attempts=${attempt} error=${msg}`
-            );
-            throw err;
-          }
-          const wait = backoff(attempt);
-          console.warn(
-            `embeddings.retry i=${i} size=${batch.length} attempt=${attempt} waitMs=${wait} error=${msg}`
-          );
-          await sleep(wait);
-        }
-      }
+      batches.push(clean.slice(i, i + batchSize));
     }
+
+    const batchResults = await Promise.all(
+      batches.map(async (batch, bIdx) => {
+        let attempt = 0;
+        for (;;) {
+          try {
+            attempt++;
+            const res = await fetch("https://api.openai.com/v1/embeddings", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: opts.model,
+                input: batch,
+              }),
+            });
+
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              const errMsg = (errData as any)?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+              throw new Error(errMsg);
+            }
+
+            const data: any = await res.json();
+            return (data.data || []).sort((a: any, b: any) => a.index - b.index).map((d: any) => d.embedding);
+          } catch (err: any) {
+            const msg = err?.message || String(err);
+            if (attempt >= opts.maxRetries) {
+              console.error(
+                `embeddings.batch failed bIdx=${bIdx} size=${batch.length} attempts=${attempt} error=${msg}`
+              );
+              throw err;
+            }
+            const wait = backoff(attempt);
+            await sleep(wait);
+          }
+        }
+      })
+    );
+
+    const out = batchResults.flat();
 
     // Sanity check: preserve 1:1 alignment
     if (out.length !== texts.length) {
