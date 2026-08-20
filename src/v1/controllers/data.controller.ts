@@ -103,7 +103,7 @@ async function embedChunksInBatches(
   const allTexts = chunks.map((c) => c.content);
   return await EmbeddingService.generate(allTexts, key, uploadId, {
     model: embeddingModel,
-    batchSize: 20,
+    batchSize: 100,
   });
 }
 
