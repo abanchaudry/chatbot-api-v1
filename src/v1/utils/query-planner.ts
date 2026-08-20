@@ -93,7 +93,9 @@ function extractQuotedPhrases(question: string): string[] {
 
 function extractSectionRef(question: string): string | null {
   const text = normalize(question);
-  const refMatch = text.match(/\b(?:section|article|step|part|nrs|nac|clause|item|faq)\s+[a-z0-9.]+\b/);
+  const refMatch =
+    text.match(/\b(?:nrs|nac)\s+\d+(?:\.\d+)+\b/) ||
+    text.match(/\b(?:section|article|step|part|clause|item|faq)\s+\d+[a-z0-9.-]*\b/);
   if (refMatch) return refMatch[0];
 
   return null;

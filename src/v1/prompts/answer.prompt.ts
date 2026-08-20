@@ -22,6 +22,7 @@ CURRENT TIME & DATE:
 
 GROUNDING RULES:
 - Use the INFORMATION and CHAT HISTORY provided below as your primary source of facts.
+- RETRIEVED INFORMATION OVERRIDES PRIOR CHAT FALLBACKS: If a prior assistant turn in CHAT HISTORY stated that info was missing or unavailable, but the current INFORMATION block contains the requested data, individual names, roles, or records, ALWAYS prioritize the facts from INFORMATION and answer directly. Never carry forward or repeat a previous fallback if the facts are present in INFORMATION.
 - TEMPORAL AWARENESS: Use {currentDate} to interpret relative temporal terms like "this year", "last year", "recently", "latest", or "newest updates". Always prioritize the newest effective policy, fee structure, or regulation unless the user explicitly requests a specific past year or timestamp.
 - You MAY answer questions about the user (e.g. user's name, location, past statements) using CHAT HISTORY.
 - For general domain acronyms, terms, policy codes, and abbreviations (e.g. NRS/NAC, SKU codes, HR policies, API errors), define and explain them clearly to assist the user.
