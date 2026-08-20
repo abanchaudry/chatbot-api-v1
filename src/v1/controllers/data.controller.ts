@@ -203,20 +203,24 @@ export const DataController = {
           continue;
         }
 
-        const rawText = await file.text();
         const fileName = file.name;
         const version = `v${Date.now()}`;
+        const isTextFile = /\.(txt|csv|md|json|log|sql|xml|yaml|yml)$/i.test(fileName);
+        let rawText = "";
 
-        if (rawText.length < 50) {
-          const error = "File too short to process";
-          if (uploadId) await pt.fail(uploadId, error);
-          results.push({ file: fileName, error });
-          continue;
+        if (isTextFile) {
+          rawText = await file.text();
+          if (rawText.length < 50) {
+            const error = "File too short to process";
+            if (uploadId) await pt.fail(uploadId, error);
+            results.push({ file: fileName, error });
+            continue;
+          }
         }
 
         let chunks: any[] = [];
         let extractedFullMarkdown = "";
-        const isScalableRag = ["offline", "hybrid", "ai-full", "ai", "adaptive"].includes(engineMode) || strategy === "adaptive" || strategy === "ai";
+        const isScalableRag = ["offline", "hybrid", "ai-full", "ai", "adaptive"].includes(engineMode) || strategy === "adaptive" || strategy === "ai" || !isTextFile;
 
         if (isScalableRag) {
           // Route through Scalable RAG microservice for multi-format extraction + 3-tier chunking
@@ -227,8 +231,6 @@ export const DataController = {
 
             // Determine chunking strategy: map fervent-curie strategies to scalable-rag strategies
             const scalableStrategy = (strategy === "ai" || strategy === "agentic") ? "ai" : "adaptive";
-
-            const isTextFile = /\.(txt|csv|md|json|log|sql|xml|yaml|yml)$/i.test(fileName);
             const effectiveEngineMode = isTextFile ? "offline" : (engineMode as any);
 
             if (uploadId) {
@@ -255,15 +257,18 @@ export const DataController = {
             // Convert 3-tier chunks to fervent-curie preview format with tags
             chunks = ScalableRagClient.toFerventCurieChunks(scalableResult);
 
-
             if (uploadId) {
               await pt.step(uploadId, `Extracted ${scalableResult.counts.total} chunks (${scalableResult.classification.category})`);
             }
           } catch (err: any) {
             console.warn("[DataController] Scalable RAG bridge warning, using resilient fallback:", err?.message);
             try {
-              const result = await new ChunkingServiceV2(key, { cacheKV: c.env.CACHE }).process(rawText, fileName, version, true, uploadId);
-              chunks = result.chunks;
+              if (rawText && rawText.length >= 50) {
+                const result = await new ChunkingServiceV2(key, { cacheKV: c.env.CACHE }).process(rawText, fileName, version, true, uploadId);
+                chunks = result.chunks;
+              } else {
+                throw err;
+              }
             } catch (fallbackErr: any) {
               const errorMsg = err.message || fallbackErr.message || "Failed to process document";
               if (uploadId) await pt.fail(uploadId, errorMsg);
@@ -272,8 +277,10 @@ export const DataController = {
             }
           }
         } else if (strategy === "general") {
+          rawText = rawText || (await file.text());
           chunks = await new LangChainChunkingService().generateChunksOnly(rawText, fileName, uploadId);
         } else {
+          rawText = rawText || (await file.text());
           const result = await new ChunkingServiceV2(key, { cacheKV: c.env.CACHE }).process(rawText, fileName, version, true, uploadId);
           chunks = result.chunks;
         }

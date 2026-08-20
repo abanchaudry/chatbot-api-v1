@@ -761,9 +761,9 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       const safeDpi = Math.max(300, Math.min(Number(requestedDpi) || 300, 600));
       // Scale multiplier: 300 DPI = 2.0x, 400 DPI = 2.67x, 500 DPI = 3.33x, 600 DPI = 4.0x
       const renderScale = safeDpi / 150;
-      const maxPages = Math.min(pdf.numPages, 15);
+      const maxPages = Math.min(pdf.numPages, 10);
       let totalEstimatedBytes = 0;
-      const MAX_TOTAL_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB safety budget for Cloudflare 10MB limit
+      const MAX_TOTAL_IMAGE_BYTES = 3.5 * 1024 * 1024; // 3.5MB safety budget for Cloudflare HTTP payload limits
 
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
@@ -775,12 +775,12 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
 
         if (context) {
           await page.render({ canvasContext: context, viewport }).promise;
-          const quality = safeDpi >= 500 ? 0.65 : 0.60;
+          const quality = safeDpi >= 500 ? 0.60 : 0.50;
           const dataUrl = canvas.toDataURL("image/jpeg", quality);
           totalEstimatedBytes += dataUrl.length;
 
           if (totalEstimatedBytes > MAX_TOTAL_IMAGE_BYTES) {
-            console.warn(`[renderPdfPagesToImages] Reached 5MB payload cap at page ${i}. Stopping further rasterization.`);
+            console.warn(`[renderPdfPagesToImages] Reached 3.5MB payload cap at page ${i}. Stopping further rasterization.`);
             break;
           }
 
@@ -818,7 +818,7 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       this.fileToUpload.name.toLowerCase().endsWith(".pdf") &&
       (this.model.engineMode === "ai-full" || this.model.engineMode === "hybrid")
     ) {
-      this.updateProcessingStep(1, `Pre-rendering ${chosenDpi} DPI Canvas Pages`, `Rendering PDF pages into ${chosenDpi} DPI high-resolution visual streams...`, 20);
+      this.updateProcessingStep(1, `Pre-rendering ${chosenDpi} DPI Canvas Pages`, `Rendering PDF pages into ${chosenDpi} DPI visual streams...`, 20);
       const pageImages = await this.renderPdfPagesToImages(this.fileToUpload, chosenDpi);
       if (pageImages.length > 0) {
         formData.append("pageImages", JSON.stringify(pageImages));
@@ -873,6 +873,8 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
               errorMsg = "File or pre-rendered page payload is too large (>10MB). Please select 'Free Edge (Fast)' or reduce page count.";
             } else if (err?.status === 504 || err?.status === 524) {
               errorMsg = "Extraction timed out. For large PDFs, please use 'Free Edge' or 'Adaptive' chunking.";
+            } else if (err?.status === 0) {
+              errorMsg = "Network connection interrupted. Please try again or use Free Edge mode.";
             } else if (typeof err?.error === "string" && err.error.length < 200) {
               errorMsg = err.error;
             } else {
