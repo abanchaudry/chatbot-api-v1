@@ -303,6 +303,7 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
     fileId: "",
     strategy: "adaptive",
     engineMode: "offline",
+    ocrDpi: 300,
     version: "",
   };
 
@@ -735,10 +736,10 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Client-Side HTML5 Canvas 300 DPI PDF Page Rasterizer (Option 3 / ai-full)
-   * Pre-renders PDF pages at 2.0x scale (300 DPI) into base64 PNG data URLs
+   * Client-Side HTML5 Canvas PDF Page Rasterizer (Configurable 300 - 600 DPI)
+   * Pre-renders PDF pages at dynamic resolution into base64 JPEG visual streams
    */
-  async renderPdfPagesToImages(file: File): Promise<Array<{ pageNum: number; dataUrl: string }>> {
+  async renderPdfPagesToImages(file: File, requestedDpi: number = 300): Promise<Array<{ pageNum: number; dataUrl: string }>> {
     try {
       if (!(window as any).pdfjsLib) {
         await new Promise<void>((resolve, reject) => {
@@ -757,13 +758,16 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pageImages: Array<{ pageNum: number; dataUrl: string }> = [];
 
+      const safeDpi = Math.max(300, Math.min(Number(requestedDpi) || 300, 600));
+      // Scale multiplier: 300 DPI = 2.0x, 400 DPI = 2.67x, 500 DPI = 3.33x, 600 DPI = 4.0x
+      const renderScale = safeDpi / 150;
       const maxPages = Math.min(pdf.numPages, 15);
       let totalEstimatedBytes = 0;
-      const MAX_TOTAL_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB safety budget for Cloudflare 10MB limit
+      const MAX_TOTAL_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB safety budget for Cloudflare 10MB limit
 
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 1.0 });
+        const viewport = page.getViewport({ scale: renderScale });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d");
         canvas.height = viewport.height;
@@ -771,11 +775,12 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
 
         if (context) {
           await page.render({ canvasContext: context, viewport }).promise;
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.55);
+          const quality = safeDpi >= 500 ? 0.65 : 0.60;
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
           totalEstimatedBytes += dataUrl.length;
 
           if (totalEstimatedBytes > MAX_TOTAL_IMAGE_BYTES) {
-            console.warn(`[renderPdfPagesToImages] Reached 4MB payload cap at page ${i}. Stopping further rasterization.`);
+            console.warn(`[renderPdfPagesToImages] Reached 5MB payload cap at page ${i}. Stopping further rasterization.`);
             break;
           }
 
@@ -787,7 +792,7 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       }
       return pageImages;
     } catch (err) {
-      console.warn("Client 300 DPI PDF rendering note:", err);
+      console.warn("Client PDF rasterization note:", err);
       return [];
     }
   }
@@ -800,10 +805,12 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
     this.inProcess = true;
     this.resetProcessingSteps();
 
+    const chosenDpi = Number(this.model.ocrDpi) || 300;
     const formData = new FormData();
     formData.append("files", this.fileToUpload);
     formData.append("strategy", this.model.strategy || "adaptive");
     formData.append("engineMode", this.model.engineMode || "offline");
+    formData.append("ocrDpi", String(chosenDpi));
     formData.append("uploadId", this.uploadId);
 
     // Pre-render page images for PDF files in AI Vision modes
@@ -811,8 +818,8 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       this.fileToUpload.name.toLowerCase().endsWith(".pdf") &&
       (this.model.engineMode === "ai-full" || this.model.engineMode === "hybrid")
     ) {
-      this.updateProcessingStep(1, "Pre-rendering 300 DPI Canvas Pages", "Rendering PDF pages into high-resolution visual streams...", 20);
-      const pageImages = await this.renderPdfPagesToImages(this.fileToUpload);
+      this.updateProcessingStep(1, `Pre-rendering ${chosenDpi} DPI Canvas Pages`, `Rendering PDF pages into ${chosenDpi} DPI high-resolution visual streams...`, 20);
+      const pageImages = await this.renderPdfPagesToImages(this.fileToUpload, chosenDpi);
       if (pageImages.length > 0) {
         formData.append("pageImages", JSON.stringify(pageImages));
       }

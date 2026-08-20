@@ -126,18 +126,29 @@
               </div>
 
               <div class="row">
-                <div class="col-md-6">
+                <div [ngClass]="(model.engineMode === 'ai-full' || model.engineMode === 'hybrid') ? 'col-md-4' : 'col-md-6'">
                   <div class="form-group">
                     <label for="engineMode">Extraction Pipeline</label>
                     <select id="engineMode" name="engineMode" class="form-control" [(ngModel)]="model.engineMode" required #engineMode="ngModel" [ngClass]="{'is-invalid': uploadForm.submitted && !engineMode.valid}">
                       <option value="offline">Free Edge (Fast, $0 cost)</option>
                       <option value="hybrid">Hybrid AI (Text + Vision)</option>
-                      <option value="ai-full">100% AI Vision (300 DPI OCR)</option>
+                      <option value="ai-full">100% Full AI Vision OCR</option>
                     </select>
                     <div *ngIf="uploadForm.submitted && !engineMode.valid" class="invalid-feedback">Extraction pipeline is required.</div>
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4" *ngIf="model.engineMode === 'ai-full' || model.engineMode === 'hybrid'">
+                  <div class="form-group">
+                    <label for="ocrDpi">AI OCR Resolution (DPI)</label>
+                    <select id="ocrDpi" name="ocrDpi" class="form-control" [(ngModel)]="model.ocrDpi">
+                      <option [value]="300">300 DPI — Standard Crisp (Recommended)</option>
+                      <option [value]="400">400 DPI — High Definition</option>
+                      <option [value]="500">500 DPI — Ultra High Definition</option>
+                      <option [value]="600">600 DPI — Maximum Fidelity (Dense Schematics)</option>
+                    </select>
+                  </div>
+                </div>
+                <div [ngClass]="(model.engineMode === 'ai-full' || model.engineMode === 'hybrid') ? 'col-md-4' : 'col-md-6'">
                   <div class="form-group">
                     <label for="chunksType" class="d-flex justify-content-between align-items-center">
                       Chunks Type
