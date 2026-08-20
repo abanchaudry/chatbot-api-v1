@@ -52,20 +52,38 @@ export const EmbeddingService = {
     }
 
     const clean = sanitizeTexts(texts);
-    const embedder = new OpenAIEmbeddings({ apiKey, model: opts.model });
     const out: number[][] = [];
+    const batchSize = Math.max(1, Math.min(opts.batchSize || 100, 200));
 
-    for (let i = 0; i < clean.length; i += opts.batchSize) {
-      const batch = clean.slice(i, i + opts.batchSize);
+    for (let i = 0; i < clean.length; i += batchSize) {
+      const batch = clean.slice(i, i + batchSize);
 
       let attempt = 0;
       // retry loop per batch
       for (;;) {
         try {
           attempt++;
-          // LangChain’s embedDocuments preserves order
-          const vectors = await embedder.embedDocuments(batch);
-          out.push(...vectors);
+          const res = await fetch("https://api.openai.com/v1/embeddings", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: opts.model,
+              input: batch,
+            }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg = (errData as any)?.error?.message || `HTTP ${res.status} ${res.statusText}`;
+            throw new Error(errMsg);
+          }
+
+          const data: any = await res.json();
+          const batchVectors = (data.data || []).sort((a: any, b: any) => a.index - b.index).map((d: any) => d.embedding);
+          out.push(...batchVectors);
           break;
         } catch (err: any) {
           const msg = err?.message || String(err);

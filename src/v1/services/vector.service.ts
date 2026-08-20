@@ -131,7 +131,16 @@ export const vectorService = {
                 `vectorService.storeChunks: length mismatch (vectors=${vectors.length}, docs=${docs.length}, ids=${ids.length})`
               );
             }
-            await (vectorStore as any).addVectors(vectors, docs, { ids });
+            if (typeof (vectorIndex as any).upsert === "function") {
+              const vectorizeRecords = batch.map((b, idx) => ({
+                id: ids[idx],
+                values: b.values!,
+                metadata: docs[idx].metadata,
+              }));
+              await (vectorIndex as any).upsert(vectorizeRecords);
+            } else {
+              await (vectorStore as any).addVectors(vectors, docs, { ids });
+            }
           } else {
             if (typeof (vectorStore as any).addDocuments === "function") {
               await (vectorStore as any).addDocuments(docs, { ids });
