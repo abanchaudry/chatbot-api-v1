@@ -33,7 +33,6 @@ const STOP_WORDS = new Set([
   "and",
   "are",
   "about",
-  "apogee",
   "assistant",
   "can",
   "do",
@@ -94,11 +93,10 @@ function extractQuotedPhrases(question: string): string[] {
 
 function extractSectionRef(question: string): string | null {
   const text = normalize(question);
-  const lawRef = text.match(/\b(?:nrs|nac)\s+\d+(?:\.\d+)+\b/);
-  if (lawRef) return lawRef[0];
+  const refMatch = text.match(/\b(?:section|article|step|part|nrs|nac|clause|item|faq)\s+[a-z0-9.]+\b/);
+  if (refMatch) return refMatch[0];
 
-  const sectionRef = text.match(/\bsection\s+\d+(?:\.\d+)*\b/);
-  return sectionRef ? sectionRef[0] : null;
+  return null;
 }
 
 function extractLatestUserTurn(historyPreview: string): string {
@@ -121,7 +119,7 @@ function extractQuestionFocus(question: string): string[] {
     if (!match) continue;
 
     const cleaned = match
-      .replace(/\b(?:at apogee|of apogee|for apogee)\b/g, " ")
+      .replace(/\b(?:at|of|for)\s+(?:the\s+)?(?:company|agency|firm|team|business|organization)\b/g, " ")
       .replace(/\b(?:please|thanks|thank you)\b/g, " ")
       .replace(/\s+/g, " ")
       .trim();

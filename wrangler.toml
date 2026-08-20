@@ -69,10 +69,12 @@ database_id = "34b4f608-2250-4840-b166-fe9e8e476ee2"
 [[kv_namespaces]]
 binding = "CONFIG"
 id = "f192ebb3713b426c8e6885f04779299a"
+preview_id = "f192ebb3713b426c8e6885f04779299a"
 
 [[kv_namespaces]]
 binding = "CACHE"
 id = "14f7a24502994f1aaca780f1a7a2347e"
+preview_id = "14f7a24502994f1aaca780f1a7a2347e"
 
 # To enable R2 bucket storage when activated on your Cloudflare account, uncomment:
 # [[r2_buckets]]
