@@ -79,14 +79,16 @@ export const EmbeddingService = {
             if (!res.ok) {
               const errData = await res.json().catch(() => ({}));
               const errMsg = (errData as any)?.error?.message || `HTTP ${res.status} ${res.statusText}`;
-              throw new Error(errMsg);
+              const fatalErr = new Error(`OpenAI Embedding API Error (${res.status}): ${errMsg}`);
+              (fatalErr as any).isFatal = res.status === 400 || res.status === 401 || res.status === 403;
+              throw fatalErr;
             }
 
             const data: any = await res.json();
             return (data.data || []).sort((a: any, b: any) => a.index - b.index).map((d: any) => d.embedding);
           } catch (err: any) {
             const msg = err?.message || String(err);
-            if (attempt >= opts.maxRetries) {
+            if (err?.isFatal || attempt >= opts.maxRetries) {
               console.error(
                 `embeddings.batch failed bIdx=${bIdx} size=${batch.length} attempts=${attempt} error=${msg}`
               );

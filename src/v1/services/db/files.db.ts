@@ -361,9 +361,9 @@ export const fileDb = {
       })
     );
 
-    // Execute in fast D1 statement batches of 50
-    for (let i = 0; i < statements.length; i += 50) {
-      const batch = statements.slice(i, i + 50);
+    // Execute in fast sequential D1 statement batches of 100
+    for (let i = 0; i < statements.length; i += 100) {
+      const batch = statements.slice(i, i + 100);
       await db.batch(batch);
     }
   },

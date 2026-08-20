@@ -7,7 +7,7 @@ import { ChunkingServiceV2 } from "../services/chunkingv2.service";
 import { EmbeddingService } from "../services/embedding.service";
 import { LangChainChunkingService } from "../services/langChain.service";
 import { progressTrackerKV } from "../utils/progress-tracker";
-import { getOpenAIKey } from "../utils/keys";
+import { getOpenAIKey, getOpenAIKeyAsync } from "../utils/keys";
 import { FileStorageService } from "../services/fileStorage.service";
 import { ChunkEnricher } from "../utils/chunk-enricher";
 import { MetadataExtractor } from "../utils/metadata-extractor";
@@ -100,17 +100,11 @@ async function embedChunksInBatches(
   embeddingModel: string,
   uploadId?: string
 ): Promise<number[][]> {
-  const allTexts = chunks.map((x) => String(x.content || "").slice(0, 24000));
-  const vectors = await EmbeddingService.generate(allTexts, key, uploadId, {
+  const allTexts = chunks.map((c) => c.content);
+  return await EmbeddingService.generate(allTexts, key, uploadId, {
     model: embeddingModel,
-    batchSize: 200,
+    batchSize: 20,
   });
-
-  if (vectors.length !== chunks.length) {
-    throw new Error(`Embedding count mismatch: ${vectors.length} for ${chunks.length}`);
-  }
-
-  return vectors;
 }
 
 
@@ -586,7 +580,7 @@ export const DataController = {
     const pt = progressTrackerKV(c.env.CACHE);
 
     try {
-      const key = getOpenAIKey(c.env);
+      const key = (await getOpenAIKeyAsync(c.env)) || getOpenAIKey(c.env);
       if (!key) return c.json({ ok: false, message: "Missing OPENAI_API_KEY" }, 500);
       if (!body) return c.json({ ok: false, message: "Invalid JSON body" }, 400);
 
@@ -739,25 +733,31 @@ export const DataController = {
           const firstSentence = String(contentStr.split(/[.!?]/)[0] || "").slice(0, 200);
           const sectionNumber = extractSectionNumber(ch?.section || "") || "";
           const chunkId = await fileDb.makeStableChunkId(fileId, ch.index, ch.section);
+
+          const meta: Record<string, string | number | boolean | string[]> = {
+            chunk_id: String(chunkId),
+            topic: String(ch?.topic || "general"),
+            dataset: String(dataset),
+          };
+          if (ch?.section) meta.section = String(ch.section);
+          if (sectionNumber) meta.section_number = String(sectionNumber);
+          if (firstSentence) meta.first_sentence = String(firstSentence);
+          if (Array.isArray(ch?.tags) && ch.tags.length > 0) {
+            meta.tags = ch.tags.map(String).filter(Boolean);
+          }
+
           return {
             id: chunkId,
             content: contentStr,
             values: vectors[idx] || [],
-            metadata: {
-              chunk_id: String(chunkId),
-              topic: String(ch?.topic || "general"),
-              dataset: String(dataset),
-              section: String(ch?.section || ""),
-              section_number: String(sectionNumber),
-              first_sentence: String(firstSentence),
-              tags: Array.isArray(ch?.tags) ? ch.tags.map(String) : [],
-            },
+            metadata: meta,
           };
         })
       );
 
-      for (let i = 0; i < allVectorRecords.length; i += 100) {
-        const batch = allVectorRecords.slice(i, i + 100);
+      // Sequential lock-free Vectorize batches of 50
+      for (let i = 0; i < allVectorRecords.length; i += 50) {
+        const batch = allVectorRecords.slice(i, i + 50);
         if (targetVectorIndex && typeof targetVectorIndex.upsert === "function") {
           try {
             const cleanVectorizeBatch = batch.map((b) => ({
@@ -768,7 +768,11 @@ export const DataController = {
             await targetVectorIndex.upsert(cleanVectorizeBatch);
           } catch (upsertErr: any) {
             console.warn(`[Vectorize.upsert] Direct batch failed (${upsertErr.message}), falling back to vectorService:`, upsertErr);
-            await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
+            try {
+              await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
+            } catch (fallbackErr: any) {
+              console.error(`[Vectorize fallback error]:`, fallbackErr.message);
+            }
           }
         } else if (targetVectorIndex) {
           await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });

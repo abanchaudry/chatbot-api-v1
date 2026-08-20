@@ -75,53 +75,97 @@ export const progressTracker = {
   },
 };
 
+const memProgress = new Map<string, UploadProgress>();
+
 export const progressTrackerKV = (kv: KVNamespace) => ({
   async init(uploadId: string, fileName: string, totalBatches: number) {
     const data = initialProgress(fileName, totalBatches);
-    await kv.put(`progress:${uploadId}`, JSON.stringify(data), { expirationTtl: 86400 });
+    memProgress.set(uploadId, data);
+    if (kv && typeof kv.put === "function") {
+      kv.put(`progress:${uploadId}`, JSON.stringify(data), { expirationTtl: 86400 }).catch(() => {});
+    }
   },
   async setTotalBatches(uploadId: string, totalBatches: number) {
-    const curRaw = await kv.get(`progress:${uploadId}`);
-    if (!curRaw) return;
-    const cur = JSON.parse(curRaw) as UploadProgress;
+    let cur = memProgress.get(uploadId);
+    if (!cur && kv && typeof kv.get === "function") {
+      const curRaw = await kv.get(`progress:${uploadId}`);
+      if (curRaw) cur = JSON.parse(curRaw);
+    }
+    if (!cur) return;
     const next = addLine({ ...cur, totalBatches }, `totalBatches set to ${totalBatches}`);
-    await kv.put(`progress:${uploadId}`, JSON.stringify(next), { expirationTtl: 86400 });
+    memProgress.set(uploadId, next);
+    if (kv && typeof kv.put === "function") {
+      kv.put(`progress:${uploadId}`, JSON.stringify(next), { expirationTtl: 86400 }).catch(() => {});
+    }
   },
   async update(uploadId: string) {
-    const curRaw = await kv.get(`progress:${uploadId}`);
-    if (!curRaw) return;
-    const cur = JSON.parse(curRaw) as UploadProgress;
+    let cur = memProgress.get(uploadId);
+    if (!cur && kv && typeof kv.get === "function") {
+      const curRaw = await kv.get(`progress:${uploadId}`);
+      if (curRaw) cur = JSON.parse(curRaw);
+    }
+    if (!cur) return;
     const newCount = Math.min(cur.completedBatches + 1, cur.totalBatches);
     const next = addLine(cur, `Batch ${newCount}/${cur.totalBatches} completed`);
     const fin = { ...next, completedBatches: newCount };
-    await kv.put(`progress:${uploadId}`, JSON.stringify(fin), { expirationTtl: 86400 });
+    memProgress.set(uploadId, fin);
+    if (kv && typeof kv.put === "function") {
+      kv.put(`progress:${uploadId}`, JSON.stringify(fin), { expirationTtl: 86400 }).catch(() => {});
+    }
   },
   async step(uploadId: string, message: string) {
-    const curRaw = await kv.get(`progress:${uploadId}`);
-    if (!curRaw) return;
-    const cur = JSON.parse(curRaw) as UploadProgress;
+    let cur = memProgress.get(uploadId);
+    if (!cur && kv && typeof kv.get === "function") {
+      const curRaw = await kv.get(`progress:${uploadId}`);
+      if (curRaw) cur = JSON.parse(curRaw);
+    }
+    if (!cur) return;
     const next = addLine(cur, message);
-    await kv.put(`progress:${uploadId}`, JSON.stringify(next), { expirationTtl: 86400 });
+    memProgress.set(uploadId, next);
+    if (kv && typeof kv.put === "function") {
+      kv.put(`progress:${uploadId}`, JSON.stringify(next), { expirationTtl: 86400 }).catch(() => {});
+    }
   },
   async complete(uploadId: string, message = "Upload completed successfully") {
-    const curRaw = await kv.get(`progress:${uploadId}`);
-    if (!curRaw) return;
-    const cur = JSON.parse(curRaw) as UploadProgress;
+    let cur = memProgress.get(uploadId);
+    if (!cur && kv && typeof kv.get === "function") {
+      const curRaw = await kv.get(`progress:${uploadId}`);
+      if (curRaw) cur = JSON.parse(curRaw);
+    }
+    if (!cur) cur = initialProgress(uploadId, 1);
     const next = addLine(cur, message);
-    await kv.put(`progress:${uploadId}`, JSON.stringify({ ...next, status: "completed" }), { expirationTtl: 86400 });
+    const fin = { ...next, status: "completed" as const };
+    memProgress.set(uploadId, fin);
+    if (kv && typeof kv.put === "function") {
+      await kv.put(`progress:${uploadId}`, JSON.stringify(fin), { expirationTtl: 86400 }).catch(() => {});
+    }
   },
   async fail(uploadId: string, error = "An unexpected error occurred") {
-    const curRaw = await kv.get(`progress:${uploadId}`);
-    if (!curRaw) return;
-    const cur = JSON.parse(curRaw) as UploadProgress;
+    let cur = memProgress.get(uploadId);
+    if (!cur && kv && typeof kv.get === "function") {
+      const curRaw = await kv.get(`progress:${uploadId}`);
+      if (curRaw) cur = JSON.parse(curRaw);
+    }
+    if (!cur) cur = initialProgress(uploadId, 1);
     const next = addLine(cur, `Failed: ${error}`);
-    await kv.put(`progress:${uploadId}`, JSON.stringify({ ...next, status: "failed", error }), { expirationTtl: 86400 });
+    const fin = { ...next, status: "failed" as const, error };
+    memProgress.set(uploadId, fin);
+    if (kv && typeof kv.put === "function") {
+      await kv.put(`progress:${uploadId}`, JSON.stringify(fin), { expirationTtl: 86400 }).catch(() => {});
+    }
   },
   async get(uploadId: string): Promise<UploadProgress | null> {
-    const raw = await kv.get(`progress:${uploadId}`);
-    return raw ? (JSON.parse(raw) as UploadProgress) : null;
+    if (memProgress.has(uploadId)) return memProgress.get(uploadId)!;
+    if (kv && typeof kv.get === "function") {
+      const raw = await kv.get(`progress:${uploadId}`);
+      return raw ? (JSON.parse(raw) as UploadProgress) : null;
+    }
+    return null;
   },
   async reset(uploadId: string) {
-    await kv.delete(`progress:${uploadId}`);
+    memProgress.delete(uploadId);
+    if (kv && typeof kv.delete === "function") {
+      await kv.delete(`progress:${uploadId}`).catch(() => {});
+    }
   },
 });
