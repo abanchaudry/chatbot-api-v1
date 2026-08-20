@@ -477,3 +477,35 @@ input:checked + .slider-custom:before {
   border-color: #3167f3;
   outline: none;
 }
+
+/* Document Citation Highlight & Glow */
+.row-highlighted {
+  background-color: #fef9c3 !important;
+  animation: highlightRowPulse 4.5s ease-in-out forwards;
+  box-shadow: inset 0 0 0 2px #eab308, 0 0 16px rgba(234, 179, 8, 0.35);
+  position: relative;
+  z-index: 5;
+}
+
+@keyframes highlightRowPulse {
+  0% {
+    background-color: #fef08a;
+    box-shadow: inset 0 0 0 2px #ca8a04, 0 0 20px rgba(202, 138, 4, 0.55);
+  }
+  20% {
+    background-color: #fef9c3;
+    box-shadow: inset 0 0 0 2px #eab308, 0 0 14px rgba(234, 179, 8, 0.4);
+  }
+  50% {
+    background-color: #fefce8;
+    box-shadow: inset 0 0 0 1.5px #fde047, 0 0 8px rgba(253, 224, 71, 0.3);
+  }
+  80% {
+    background-color: #fffef5;
+    box-shadow: inset 0 0 0 1px rgba(253, 224, 71, 0.5);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}

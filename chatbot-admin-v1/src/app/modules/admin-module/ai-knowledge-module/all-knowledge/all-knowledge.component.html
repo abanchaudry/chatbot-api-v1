@@ -249,6 +249,8 @@
                         let i = index;
                         trackBy: trackByFileId
                       "
+                      [id]="'file-row-' + item.file_id"
+                      [class.row-highlighted]="isItemHighlighted(item)"
                       [class.row-disabled]="!isDatasetEnabled(getDatasetType(item))"
                     >
                       <td>

@@ -150,6 +150,20 @@ export class FooterComponent implements OnInit, OnDestroy {
     this.router.navigate(["/dashboard/ai-knowledge/all-ai-knowledge"]);
   }
 
+  navigateToSource(src: any): void {
+    const queryParams: any = {};
+    if (src?.fileName) {
+      queryParams.highlightFile = src.fileName;
+    }
+    if (src?.fileId) {
+      queryParams.fileId = src.fileId;
+    }
+    if (src?.dataset) {
+      queryParams.dataset = src.dataset;
+    }
+    this.router.navigate(["/dashboard/ai-knowledge/all-ai-knowledge"], { queryParams });
+  }
+
   ngOnInit(): void {
     this.userId = this.getSessionId();
     this.threadId = this.getStoredThreadId();

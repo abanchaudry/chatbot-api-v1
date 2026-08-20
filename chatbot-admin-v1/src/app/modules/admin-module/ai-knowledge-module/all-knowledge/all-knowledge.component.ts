@@ -1,4 +1,5 @@
-import { Component, OnInit } from "@angular/core";
+import { Component, OnInit, ChangeDetectorRef } from "@angular/core";
+import { ActivatedRoute } from "@angular/router";
 import { finalize } from "rxjs";
 import { AiKnowledgeService } from "src/app/modules/shared/services/ai-knowledge.service";
 import { AssistantService } from "src/app/modules/shared/services/assistant.service";
@@ -26,6 +27,10 @@ export class AllAIKnowledgeComponent implements OnInit {
   searchText: string = "";
   selectedDatasetFilter: string = "all";
 
+  // Citation direct highlight & scroll
+  highlightedFileId: string | null = null;
+  highlightedFileName: string | null = null;
+
   datasetSettings = {
     dataset_admin_enabled: true,
     dataset_admin_weight: 1.25,
@@ -47,10 +52,23 @@ export class AllAIKnowledgeComponent implements OnInit {
 
   constructor(
     private aiKnowledgeService: AiKnowledgeService,
-    private assistantService: AssistantService
+    private assistantService: AssistantService,
+    private route: ActivatedRoute,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit(): void {
+    this.route.queryParams.subscribe((params) => {
+      if (params["highlightFile"] || params["fileId"]) {
+        this.highlightedFileName = params["highlightFile"] || null;
+        this.highlightedFileId = params["fileId"] || null;
+        if (params["dataset"]) {
+          this.selectedDatasetFilter = params["dataset"];
+        }
+        this.applyHighlightAndScroll();
+      }
+    });
+
     this.getAiKnowledgeData();
     this.loadSettings();
   }
@@ -163,11 +181,65 @@ export class AllAIKnowledgeComponent implements OnInit {
             (total, item) => total + (Number(item.chunk_count) || 0),
             0
           );
+          this.applyHighlightAndScroll();
         },
         error: (err) => {
           console.error("Fetch AI knowledge list failed:", err);
         },
       });
+  }
+
+  isItemHighlighted(item: any): boolean {
+    if (!item) return false;
+    if (this.highlightedFileId && item.file_id === this.highlightedFileId) return true;
+    if (this.highlightedFileName) {
+      const tName = this.highlightedFileName.toLowerCase().trim();
+      const iName = String(item.file_name || "").toLowerCase().trim();
+      return iName === tName || iName.includes(tName) || tName.includes(iName);
+    }
+    return false;
+  }
+
+  applyHighlightAndScroll(): void {
+    if (!this.highlightedFileName && !this.highlightedFileId) return;
+    if (!this.aiKnowledgeData || this.aiKnowledgeData.length === 0) return;
+
+    const targetName = (this.highlightedFileName || "").toLowerCase().trim();
+    const targetId = (this.highlightedFileId || "").toLowerCase().trim();
+
+    const targetIndex = this.filteredKnowledgeData.findIndex((item) => {
+      const iId = String(item.file_id || "").toLowerCase().trim();
+      const iName = String(item.file_name || "").toLowerCase().trim();
+      return (
+        (targetId && iId === targetId) ||
+        (targetName && iName === targetName) ||
+        (targetName && (iName.includes(targetName) || targetName.includes(iName)))
+      );
+    });
+
+    if (targetIndex !== -1) {
+      const targetItem = this.filteredKnowledgeData[targetIndex];
+      this.highlightedFileId = targetItem.file_id;
+      this.highlightedFileName = targetItem.file_name;
+
+      // Navigate table pagination directly to the page containing this file
+      this.page = Math.floor(targetIndex / this.entries) + 1;
+      this.cdr.detectChanges();
+
+      setTimeout(() => {
+        const rowElem = document.getElementById("file-row-" + targetItem.file_id);
+        if (rowElem) {
+          rowElem.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 300);
+
+      // Auto-fade pulse highlight after 4.5 seconds
+      setTimeout(() => {
+        this.highlightedFileId = null;
+        this.highlightedFileName = null;
+        this.cdr.detectChanges();
+      }, 4500);
+    }
   }
 
   trackByFileId(index: number, item: any): string {

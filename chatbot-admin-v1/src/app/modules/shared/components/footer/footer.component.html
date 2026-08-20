@@ -143,20 +143,31 @@
                   </div>
                   <div class="cited-sources-chips">
                     <ng-container *ngFor="let src of item.message.sources">
-                      <!-- Web Crawled Source: Click opens original URL in new tab -->
-                      <a
-                        *ngIf="src.dataset === 'web' || src.isWeb || (src.url && src.url.startsWith('http')); else nonWebChip"
-                        [href]="src.url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="cited-chip-btn text-decoration-none mr-1 mb-1"
+                      <!-- Web Crawled Source -->
+                      <button
+                        *ngIf="src.dataset === 'web' || src.isWeb; else nonWebChip"
+                        type="button"
+                        class="cited-chip-btn mr-1 mb-1"
                         style="border-color: #bae6fd; background-color: #f0f9ff;"
-                        [title]="'Click to open website: ' + (src.url || src.fileName)"
+                        (click)="navigateToSource(src)"
+                        [title]="'Click to locate web page in AI Knowledge: ' + (src.fileName || src.url)"
                       >
                         <i class="ri-global-line text-info mr-1" style="font-size: 14px;"></i>
                         <span class="cited-chip-text" style="color: #0369a1; font-weight: 500;">🌐 {{ src.fileName || 'Web Source' }}</span>
                         <span *ngIf="src.score" class="cited-score-pill" style="background-color: #e0f2fe; color: #0284c7;">{{ src.score }}% match</span>
-                      </a>
+                        <a
+                          *ngIf="src.url && src.url.startsWith('http')"
+                          [href]="src.url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          (click)="$event.stopPropagation()"
+                          class="ml-1 text-info"
+                          title="Open original website link in new tab"
+                          style="font-size: 13px; display: inline-flex; align-items: center;"
+                        >
+                          <i class="ri-external-link-line"></i>
+                        </a>
+                      </button>
 
                       <!-- Non-Web Sources: PDF Reference Library or Admin Doc -->
                       <ng-template #nonWebChip>
@@ -166,8 +177,8 @@
                           type="button"
                           class="cited-chip-btn mr-1 mb-1"
                           style="border-color: #c7d2fe; background-color: #f5f7ff;"
-                          (click)="navigateToAiKnowledge()"
-                          title="Click to view PDF Reference Library in AI Knowledge"
+                          (click)="navigateToSource(src)"
+                          [title]="'Click to locate PDF in AI Knowledge: ' + (src.fileName || 'PDF Reference')"
                         >
                           <i class="ri-book-open-line mr-1" style="color: #4f46e5;"></i>
                           <span class="cited-chip-text" style="color: #3730a3; font-weight: 500;">📚 {{ src.fileName || 'PDF Reference' }}</span>
@@ -180,8 +191,8 @@
                             type="button"
                             class="cited-chip-btn mr-1 mb-1"
                             style="border-color: #e9d5ff; background-color: #faf5ff;"
-                            (click)="navigateToAiKnowledge()"
-                            title="Click to view all documents in AI Knowledge"
+                            (click)="navigateToSource(src)"
+                            [title]="'Click to locate document in AI Knowledge: ' + (src.fileName || 'Admin Doc')"
                           >
                             <i class="ri-file-text-line mr-1" style="color: #9333ea;"></i>
                             <span class="cited-chip-text" style="color: #6b21a8; font-weight: 500;">📄 {{ src.fileName || 'Admin Doc' }}</span>
