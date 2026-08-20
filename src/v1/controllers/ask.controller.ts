@@ -102,7 +102,10 @@ function formatRetrievedSources(
   });
 
   // Strict match threshold: chunk must share at least 2 distinct key content words with the answer
-  const matched = scoredPieces.filter((sp) => sp.matchCount >= 2).map((sp) => sp.piece);
+  let matched = scoredPieces.filter((sp) => sp.matchCount >= 2).map((sp) => sp.piece);
+  if (!matched.length && pieces.length > 0) {
+    matched = pieces.slice(0, 3);
+  }
   if (!matched.length) return [];
 
   const docMap = new Map<string, any>();
@@ -307,6 +310,7 @@ async function runSharedAskLogic(
           tokensUsed: 0,
           source: "cache_L1_exact",
           startedAt,
+          sources: formatRetrievedSources(cached.sources, cached.answer, "completed"),
           meta: { cacheHit: true, cacheLayer: "L1_KV_EXACT", cacheLatencyMs: cached.latencyMs },
         };
       }
@@ -391,6 +395,7 @@ async function runSharedAskLogic(
           tokensUsed: 0,
           source: "cache_L2_semantic",
           startedAt: prep.startedAt,
+          sources: formatRetrievedSources(semHit.sources, semHit.answer, "completed"),
           meta: { cacheHit: true, cacheLayer: "L2_SEMANTIC", cacheScore: semHit.score, cacheLatencyMs: semHit.latencyMs },
         };
       }
@@ -475,7 +480,7 @@ async function runSharedAskLogic(
           const cachePayload = {
             answer: executed.answer,
             context: retrieve.context || "",
-            sources: retrieve.pieces?.map((p: any) => ({ section: p.section, score: p.score })) || [],
+            sources: retrieve.pieces || [],
             tokensUsed: executed.tokensUsed,
           };
 
@@ -553,7 +558,7 @@ async function runStreamingPreparation(
       const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature);
       if (cached) {
         console.log(JSON.stringify({ level: "INFO", label: "stream_fast_cache_hit_L1", latencyMs: cached.latencyMs }));
-        return { ok: true, prep, cachedAnswer: cached.answer, cacheLayer: "L1_KV_EXACT" };
+        return { ok: true, prep, cachedAnswer: cached.answer, cachedSources: cached.sources, cacheLayer: "L1_KV_EXACT" };
       }
     } catch (e: any) {
       logError("stream_fast_cache_L1_failed", e);
@@ -580,7 +585,7 @@ async function runStreamingPreparation(
       const semHit = await getSemanticCacheHit(c.env.VECTORIZE_CACHE, prep.embedding, c.env.CACHE, cacheQuery);
       if (semHit.hit && semHit.answer) {
         console.log(JSON.stringify({ level: "INFO", label: "stream_cache_hit_L2", score: semHit.score }));
-        return { ok: true, prep, cachedAnswer: semHit.answer, cacheLayer: "L2_SEMANTIC" };
+        return { ok: true, prep, cachedAnswer: semHit.answer, cachedSources: semHit.sources, cacheLayer: "L2_SEMANTIC" };
       }
     } catch (e: any) {
       logError("stream_cache_L2_failed", e);
@@ -765,6 +770,7 @@ export const askController = {
               ok: true,
               tokensUsed: 0,
               timing: { ms: now() - prep.startedAt },
+              sources: formatRetrievedSources(result.cachedSources, result.cachedAnswer, "completed"),
             });
             return;
           }

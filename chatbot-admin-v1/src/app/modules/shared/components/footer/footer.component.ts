@@ -635,6 +635,12 @@ export class FooterComponent implements OnInit, OnDestroy {
       }
 
       case "done":
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch {}
+        }
+
         if (data?.threadId) {
           this.threadId = data.threadId;
           localStorage.setItem(this.THREAD_KEY, this.threadId);

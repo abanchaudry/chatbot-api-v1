@@ -105,7 +105,7 @@ export async function getSemanticCacheHit(
   kvCache: KVNamespace,
   incomingQuestion?: string,
   datasetSignature?: string
-): Promise<{ hit: boolean; answer?: string; score?: number; latencyMs?: number }> {
+): Promise<{ hit: boolean; answer?: string; sources?: any[]; score?: number; latencyMs?: number }> {
   const start = performance.now();
 
   if (!vectorizeCache || !embedding) {
@@ -137,6 +137,7 @@ export async function getSemanticCacheHit(
           return {
             hit: true,
             answer: data.answer,
+            sources: data.sources || [],
             score: match.score,
             latencyMs: performance.now() - start,
           };
