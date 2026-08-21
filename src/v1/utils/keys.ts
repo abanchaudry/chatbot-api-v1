@@ -31,3 +31,11 @@ export async function getAdminApiKey(
   if (getFromKV) return (await getFromKV("ADMIN_API_KEY")) || "";
   return "";
 }
+
+export function getJwtSecret(env: Record<string, any>): string {
+  if (env?.JWT_SECRET && typeof env.JWT_SECRET === "string" && env.JWT_SECRET.trim()) {
+    return env.JWT_SECRET.trim();
+  }
+  return "fervent-curie-jwt-enterprise-auth-key-2026-production";
+}
+

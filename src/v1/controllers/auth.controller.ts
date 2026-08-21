@@ -2,6 +2,7 @@ import { Context } from "hono";
 import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
 import { authdb } from "../services/db/auth.db";
+import { getJwtSecret } from "../utils/keys";
 
 export const authController = {
   login: async (c: Context) => {
@@ -18,16 +19,12 @@ export const authController = {
 
       await authdb.updateLastLogin(c.env.DB, username);
 
-      if (!c.env.JWT_SECRET) {
-        console.error("JWT_SECRET is not configured");
-        return c.json({ message: "Authentication is not configured." }, 500);
-      }
-
-      const jwtSecret = new TextEncoder().encode(c.env.JWT_SECRET);
+      const jwtSecretStr = getJwtSecret(c.env);
+      const jwtSecret = new TextEncoder().encode(jwtSecretStr);
       const token = await new SignJWT({ id: user.id, username: user.username })
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
-        .setExpirationTime("24h")
+        .setExpirationTime("30d")
         .sign(jwtSecret);
 
       return c.json({ token });

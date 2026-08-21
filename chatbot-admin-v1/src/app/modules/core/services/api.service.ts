@@ -38,9 +38,13 @@ export class ApiService {
     return new HttpHeaders(headers);
   }
 
-  private formatErrors(error: any) {
+  private formatErrors = (error: any) => {
+    if (error?.status === 401) {
+      localStorage.removeItem(environment.token_label);
+      this.route.navigate(['/login']);
+    }
     return throwError(() => error);
-  }
+  };
 
   get(path: string, httpParams: HttpParams = new HttpParams()): Observable<any> {
     return this.http

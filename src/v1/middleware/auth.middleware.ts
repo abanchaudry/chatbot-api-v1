@@ -1,5 +1,6 @@
 import { MiddlewareHandler } from "hono";
 import { jwtVerify } from "jose";
+import { getJwtSecret } from "../utils/keys";
 
 export const auth: MiddlewareHandler = async (c, next) => {
   const authHeader = c.req.header("Authorization");
@@ -10,12 +11,8 @@ export const auth: MiddlewareHandler = async (c, next) => {
 
   const token = authHeader.split(" ")[1];
   try {
-    if (!c.env.JWT_SECRET) {
-      console.error("JWT_SECRET is not configured");
-      return c.json({ message: "Authentication is not configured" }, 500);
-    }
-
-    const jwtSecret = new TextEncoder().encode(c.env.JWT_SECRET);
+    const jwtSecretStr = getJwtSecret(c.env);
+    const jwtSecret = new TextEncoder().encode(jwtSecretStr);
     const { payload } = await jwtVerify(token, jwtSecret);
     c.set("user", payload);
     await next();
