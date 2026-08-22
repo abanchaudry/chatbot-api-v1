@@ -758,46 +758,31 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const pageImages: Array<{ pageNum: number; dataUrl: string }> = [];
 
-      const safeDpi = Math.max(300, Math.min(Number(requestedDpi) || 300, 600));
-      // Adaptive scaling: dynamically scale resolution so long documents (up to 200 pages) process smoothly
       const totalPages = pdf.numPages;
       const maxPages = Math.min(totalPages, 200);
-      let renderScale = safeDpi / 150;
-      let quality = 0.55;
-
-      if (totalPages > 50) {
-        renderScale = 0.85;
-        quality = 0.35;
-      } else if (totalPages > 20) {
-        renderScale = 1.15;
-        quality = 0.40;
-      } else if (totalPages > 10) {
-        renderScale = 1.35;
-        quality = 0.45;
-      } else if (safeDpi >= 500) {
-        quality = 0.60;
-      }
-
-      let totalEstimatedBytes = 0;
-      const MAX_TOTAL_IMAGE_BYTES = 7.5 * 1024 * 1024; // 7.5MB safety budget for Cloudflare HTTP payload limits
+      const quality = 0.92;
 
       for (let i = 1; i <= maxPages; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: renderScale });
+        const baseViewport = page.getViewport({ scale: 1.0 });
+
+        // Calculate 300 DPI scale (300 / 72 = 4.166), capped at OpenAI Vision's 2048px maximum hardware detail ceiling
+        const maxPageDim = Math.max(baseViewport.width, baseViewport.height);
+        const dpiScale = 300 / 72;
+        const targetScale = (maxPageDim * dpiScale > 2048) ? (2048 / maxPageDim) : dpiScale;
+
+        const viewport = page.getViewport({ scale: targetScale });
         const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
+        const context = canvas.getContext("2d", { alpha: false });
         canvas.height = viewport.height;
         canvas.width = viewport.width;
 
         if (context) {
+          // Fill crisp white background behind canvas before rendering
+          context.fillStyle = "#FFFFFF";
+          context.fillRect(0, 0, canvas.width, canvas.height);
           await page.render({ canvasContext: context, viewport }).promise;
-          const dataUrl = canvas.toDataURL("image/jpeg", quality);
-          totalEstimatedBytes += dataUrl.length;
-
-          if (totalEstimatedBytes > MAX_TOTAL_IMAGE_BYTES) {
-            console.warn(`[renderPdfPagesToImages] Reached 7.5MB payload cap at page ${i}. Stopping further rasterization.`);
-            break;
-          }
+          const dataUrl = canvas.toDataURL("image/png");
 
           pageImages.push({
             pageNum: i,
@@ -820,12 +805,12 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
     this.inProcess = true;
     this.resetProcessingSteps();
 
-    const chosenDpi = Number(this.model.ocrDpi) || 300;
+    const chosenDpi = 300;
     const formData = new FormData();
     formData.append("files", this.fileToUpload);
     formData.append("strategy", this.model.strategy || "adaptive");
     formData.append("engineMode", this.model.engineMode || "offline");
-    formData.append("ocrDpi", String(chosenDpi));
+    formData.append("ocrDpi", "300");
     formData.append("uploadId", this.uploadId);
 
     // Pre-render page images for PDF files in AI Vision modes
@@ -833,8 +818,8 @@ export class AddNewKnowledgeComponent implements OnInit, OnDestroy {
       this.fileToUpload.name.toLowerCase().endsWith(".pdf") &&
       (this.model.engineMode === "ai-full" || this.model.engineMode === "hybrid")
     ) {
-      this.updateProcessingStep(1, `Pre-rendering ${chosenDpi} DPI Canvas Pages`, `Rendering PDF pages into ${chosenDpi} DPI visual streams...`, 20);
-      const pageImages = await this.renderPdfPagesToImages(this.fileToUpload, chosenDpi);
+      this.updateProcessingStep(1, `Pre-rendering 300 DPI Canvas Pages`, `Rendering PDF pages into 300 DPI visual streams...`, 20);
+      const pageImages = await this.renderPdfPagesToImages(this.fileToUpload, 300);
       if (pageImages.length > 0) {
         formData.append("pageImages", JSON.stringify(pageImages));
       }

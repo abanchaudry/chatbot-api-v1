@@ -564,31 +564,22 @@ app.post("/process-sync", async (c) => {
     let markdown = "";
     const warnings: string[] = [];
 
-    const apiKey = c.env.OPENAI_API_KEY || (typeof process !== "undefined" ? process.env.OPENAI_API_KEY : "");
-    const openai = new OpenAI({ apiKey });
+    let pageImages: Array<{ pageNum: number; dataUrl: string }> = [];
+    if (pageImagesStr) {
+      try {
+        pageImages = JSON.parse(pageImagesStr);
+      } catch {
+        pageImages = [];
+      }
+    }
 
     if (engineMode === "offline") {
       const res = await extractOffline(c.env, data, file.name, detection.type, documentId);
       markdown = res.markdown;
     } else if (engineMode === "hybrid") {
-      markdown = await extractDocumentHybrid(c.env, openai, data, file.name, detection.type, warnings);
+      markdown = await extractDocumentHybrid(c.env, openai, data, file.name, detection.type, warnings, pageImages);
     } else if (engineMode === "ai-full") {
-      const envProxy = new Proxy(c.env, {
-        get(target, prop) {
-          if (prop === "DOCUMENTS") {
-            return {
-              get: async (key: string) => {
-                if (key === `uploads/${documentId}/page_images.json` && pageImagesStr) {
-                  return { json: async () => JSON.parse(pageImagesStr) };
-                }
-                return null;
-              }
-            };
-          }
-          return target[prop as keyof typeof target];
-        }
-      });
-      markdown = await extractDocumentFullVision(envProxy, openai, data, file.name, detection.type, documentId, warnings);
+      markdown = await extractDocumentFullVision(c.env, openai, data, file.name, detection.type, documentId, warnings, pageImages);
     }
 
     const cleanedMarkdown = cleanMarkdownContent(markdown);
