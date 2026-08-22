@@ -573,6 +573,9 @@ app.post("/process-sync", async (c) => {
       }
     }
 
+    const apiKey = c.env.OPENAI_API_KEY || (typeof process !== "undefined" ? process.env.OPENAI_API_KEY : "");
+    const openai = new OpenAI({ apiKey });
+
     if (engineMode === "offline") {
       const res = await extractOffline(c.env, data, file.name, detection.type, documentId);
       markdown = res.markdown;
