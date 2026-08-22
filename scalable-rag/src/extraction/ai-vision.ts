@@ -589,9 +589,6 @@ function rawToFastPng(width: number, height: number, rawData: Uint8Array, channe
   return png;
 }
 
-  return png;
-}
-
 // ─── Multimodal Image Extractor ─────────────────────────────────────
 
 interface ExtractedImage {
@@ -608,7 +605,7 @@ async function extractEmbeddedImagesAsync(data: ArrayBuffer, fileType: DocumentT
         const pageImgs = await extractImages(pdf, i);
         for (const img of pageImgs) {
           if (img.width > 100 && img.height > 100) {
-            const pngBytes = rawToPng(img.width, img.height, img.data, img.channels);
+            const pngBytes = rawToFastPng(img.width, img.height, img.data, img.channels);
             out.push({ mime: "image/png", data: pngBytes });
           }
         }
