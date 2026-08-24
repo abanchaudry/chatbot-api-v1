@@ -310,62 +310,125 @@ function extractInternalLinks(htmlOrMarkdown: string, currentUrl: string, rootUr
 }
 
 /**
+ * Fetches the raw text of an XML sitemap.
+ */
+async function fetchSingleSitemapXml(url: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        Accept: "application/xml,text/xml,text/html,*/*",
+      },
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      return await res.text();
+    }
+  } catch {
+    // Ignore fetch errors
+  }
+  return null;
+}
+
+/**
  * Attempts to fetch XML sitemaps to quickly discover all indexed URLs.
+ * Supports direct sitemap URLs, sitemap index hierarchies, and auto-discovery.
  */
 async function tryFetchSitemaps(origin: string, rootUrl: string, maxPages: number): Promise<DiscoveredPage[]> {
-  const sitemapCandidates = [
-    `${origin}/sitemap.xml`,
-    `${origin}/sitemap_index.xml`,
-    `${origin}/wp-sitemap.xml`,
-  ];
+  const isDirectSitemap = rootUrl.toLowerCase().endsWith(".xml") || rootUrl.toLowerCase().includes("sitemap");
+
+  const sitemapCandidates: string[] = isDirectSitemap
+    ? [rootUrl]
+    : [
+        `${origin}/sitemap.xml`,
+        `${origin}/sitemap_index.xml`,
+        `${origin}/wp-sitemap.xml`,
+        `${origin}/sitemap1.xml`,
+      ];
+
+  const seenSitemaps = new Set<string>();
+  const pageMap = new Map<string, DiscoveredPage>();
 
   for (const sitemapUrl of sitemapCandidates) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+    if (pageMap.size >= maxPages) break;
+    if (seenSitemaps.has(sitemapUrl)) continue;
+    seenSitemaps.add(sitemapUrl);
 
-      const res = await fetch(sitemapUrl, {
-        signal: controller.signal,
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-          Accept: "application/xml,text/xml,*/*",
-        },
-      });
-      clearTimeout(timeoutId);
+    const xmlText = await fetchSingleSitemapXml(sitemapUrl);
+    if (!xmlText) continue;
 
-      if (res.ok) {
-        const text = await res.text();
-        const locMatches = text.match(/<loc>(https?:\/\/[^<]+)<\/loc>/gi);
-        if (locMatches && locMatches.length > 1) {
-          const results: DiscoveredPage[] = [];
-          for (const locTag of locMatches) {
-            const locUrl = locTag.replace(/<\/?loc>/gi, "").trim();
-            if (isSameDomain(locUrl, rootUrl)) {
-              let clean = locUrl.split("#")[0].split("?")[0];
-              if (clean.endsWith("/")) clean = clean.slice(0, -1);
-              if (!clean.endsWith(".xml")) {
-                results.push({
-                  url: clean,
-                  title: titleFromUrl(clean),
-                  depth: clean === rootUrl ? 0 : 1,
-                });
-              }
-            }
-            if (results.length >= maxPages) break;
-          }
+    const locMatches = xmlText.match(/<loc>(https?:\/\/[^<]+)<\/loc>/gi);
+    if (!locMatches || locMatches.length === 0) continue;
 
-          if (results.length >= 2) {
-            console.log(`[Crawler] Discovered ${results.length} URLs via sitemap: ${sitemapUrl}`);
-            return results;
-          }
+    const nestedSitemaps: string[] = [];
+
+    for (const locTag of locMatches) {
+      const locUrl = locTag.replace(/<\/?loc>/gi, "").trim();
+      if (!isSameDomain(locUrl, rootUrl)) continue;
+
+      let clean = locUrl.split("#")[0].split("?")[0];
+      if (clean.endsWith("/")) clean = clean.slice(0, -1);
+
+      if (clean.toLowerCase().endsWith(".xml") || clean.toLowerCase().includes("sitemap")) {
+        if (!seenSitemaps.has(clean) && nestedSitemaps.length < 20) {
+          nestedSitemaps.push(clean);
+        }
+      } else {
+        if (!pageMap.has(clean)) {
+          pageMap.set(clean, {
+            url: clean,
+            title: titleFromUrl(clean),
+            depth: 1,
+          });
         }
       }
-    } catch {
-      // Continue to next sitemap candidate
+
+      if (pageMap.size >= maxPages) break;
+    }
+
+    // Process nested sitemaps if any found (sitemap index format)
+    for (const nestedUrl of nestedSitemaps) {
+      if (pageMap.size >= maxPages) break;
+      if (seenSitemaps.has(nestedUrl)) continue;
+      seenSitemaps.add(nestedUrl);
+
+      const nestedXml = await fetchSingleSitemapXml(nestedUrl);
+      if (!nestedXml) continue;
+
+      const nestedLocs = nestedXml.match(/<loc>(https?:\/\/[^<]+)<\/loc>/gi);
+      if (!nestedLocs) continue;
+
+      for (const locTag of nestedLocs) {
+        const locUrl = locTag.replace(/<\/?loc>/gi, "").trim();
+        if (!isSameDomain(locUrl, rootUrl)) continue;
+
+        let clean = locUrl.split("#")[0].split("?")[0];
+        if (clean.endsWith("/")) clean = clean.slice(0, -1);
+
+        if (!clean.toLowerCase().endsWith(".xml") && !pageMap.has(clean)) {
+          pageMap.set(clean, {
+            url: clean,
+            title: titleFromUrl(clean),
+            depth: 1,
+          });
+        }
+        if (pageMap.size >= maxPages) break;
+      }
+    }
+
+    if (pageMap.size > 0) {
+      console.log(`[Crawler] Discovered ${pageMap.size} URLs via sitemap(s) starting from ${sitemapUrl}`);
+      break;
     }
   }
 
-  return [];
+  return Array.from(pageMap.values());
 }
 
 /**
@@ -443,11 +506,16 @@ export async function discoverLinks(
 
     // 1. Try Sitemap Discovery First (fastest & most comprehensive)
     const sitemapPages = await tryFetchSitemaps(origin, cleanRootUrl, maxPages);
-    if (sitemapPages.length >= 3) {
+    if (sitemapPages.length > 0) {
       sitemapPages.forEach((p) => resultsMap.set(p.url, p));
       const sitemapResults = Array.from(resultsMap.values()).slice(0, maxPages);
       sitemapResults.sort((a, b) => (a.depth !== b.depth ? a.depth - b.depth : a.url.localeCompare(b.url)));
       return sitemapResults;
+    }
+
+    // If the user explicitly provided an XML / sitemap link and nothing was discovered, return empty
+    if (cleanRootUrl.toLowerCase().endsWith(".xml") || cleanRootUrl.toLowerCase().includes("sitemap")) {
+      return [];
     }
 
     // 2. Fetch Root Page (Depth 0)

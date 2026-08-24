@@ -600,34 +600,157 @@ color: #fff;
   padding: 12px 16px;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
+}
+
+.sync-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2540;
+  margin: 0;
+}
+
+.sync-subtitle {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.step-timeline {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.step-item {
+  border-radius: 8px;
+  transition: all 0.25s ease;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+}
+
+.step-item.step-active {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.08);
+}
+
+.step-item.step-completed {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.step-item.step-pending {
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  opacity: 0.7;
+}
+
+
+/* ── Custom Modal Backdrop & Dialog ──────────────────────────────── */
+.custom-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+.custom-modal-dialog {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  width: 90%;
+  max-width: 650px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlide 0.25s ease-out;
+}
+
+.custom-modal-lg {
+  max-width: 900px;
+}
+
+@keyframes modalSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.custom-modal-header {
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.page-selector-list::-webkit-scrollbar {
-  width: 6px;
+.custom-modal-header h5 {
+  color: #1e293b;
+  font-size: 1.1rem;
 }
 
-.page-selector-list::-webkit-scrollbar-track {
-  background: #f1f5f9;
+.custom-modal-header .close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #64748b;
+  cursor: pointer;
+  line-height: 1;
 }
 
-.page-selector-list::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+.custom-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
 }
 
-.page-selector-list::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+.custom-modal-footer {
+  padding: 16px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.spin-icon {
-  display: inline-block;
-  animation: spin 1s linear infinite;
+.crawler-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.crawler-input-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: #3167f3;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.crawler-input-field {
+  padding-left: 40px !important;
+  height: 45px !important;
+  font-size: 14px !important;
+  border: 1px solid #edf2f9;
+  border-radius: 0.4rem;
+  width: 100%;
 }

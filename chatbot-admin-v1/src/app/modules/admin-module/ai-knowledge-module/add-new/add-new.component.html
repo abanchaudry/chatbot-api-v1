@@ -203,19 +203,17 @@
             <div *ngIf="activeIngestTab === 'web'" class="web-crawler-container p-2">
               <div class="alert alert-info border d-flex align-items-center mb-4" style="background: #eff6ff; color: #1e40af; border-color: #bfdbfe !important;">
                 <mat-icon class="mr-2">public</mat-icon>
-                <span><strong>Recursive Web Crawler:</strong> Enter a website URL to discover all sub-pages. Select which pages to crawl, and each will be indexed as a <strong>separate knowledge source</strong> with its own chunks and vectors.</span>
+                <span><strong>Web Crawler & Sitemap:</strong> Enter a website root URL or a sitemap URL (.xml) to discover pages. Select which pages to crawl, and each will be indexed as a <strong>separate knowledge source</strong> with its own chunks and vectors.</span>
               </div>
 
               <!-- URL Input & Discovery Controls -->
               <div class="row">
                 <div class="col-md-6">
                   <div class="form-group mb-3">
-                    <label for="crawlUrl" class="font-weight-bold" style="font-size: 14px; color: #1e293b;">Root Website URL</label>
-                    <div class="input-group">
-                      <div class="input-group-prepend">
-                        <span class="input-group-text bg-white border-right-0"><i class="ri-global-line text-primary" style="font-size: 18px;"></i></span>
-                      </div>
-                      <input type="url" id="crawlUrl" name="crawlUrl" class="form-control border-left-0" [(ngModel)]="crawlUrl" placeholder="e.g. https://www.solarenergy.org/" style="font-size: 14px;" [disabled]="isDiscovering || isCrawlingSelected" />
+                    <label for="crawlUrl" class="font-weight-bold" style="font-size: 14px; color: #1e293b;">Root URL or Sitemap</label>
+                    <div class="crawler-input-wrapper">
+                      <i class="ri-global-line crawler-input-icon"></i>
+                      <input type="url" id="crawlUrl" name="crawlUrl" class="form-control crawler-input-field" [(ngModel)]="crawlUrl" placeholder="e.g. https://example.com or https://example.com/sitemap.xml" [disabled]="isDiscovering || isCrawlingSelected" />
                     </div>
                   </div>
                 </div>

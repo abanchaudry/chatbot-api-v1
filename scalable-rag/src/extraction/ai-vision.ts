@@ -73,6 +73,24 @@ export async function extractWithAI(
 
 // ─── Multimodal Document Extraction ─────────────────────────────────
 
+export const UNIVERSAL_OCR_PROMPT = [
+  "You are an ultra-high precision document OCR and verbatim transcription engine.",
+  "CRITICAL MANDATE: Perform 100% EXHAUSTIVE VERBATIM CHARACTER-BY-CHARACTER TRANSCRIBING & OCR.",
+  "Transcribe EVERY visible word, letter, digit, symbol, navigation item, button label, dropdown arrow (˅), badge, quote, code snippet, and address EXACTLY as visually written in the image/document into clean GFM Markdown.",
+  "",
+  "UNIVERSAL OCR & TRANSCRIPTION RULES (APPLIES TO ALL DOCUMENTS):",
+  "1. ABSOLUTE VERBATIM INTEGRITY: Never hallucinate, guess, infer, truncate, or substitute ANY word, name, address, street number, phone number, email, URL, code, or identifier. If text is visible, transcribe the exact characters. Never replace unfamiliar or foreign words with training data.",
+  "2. PROPER NOUNS & TESTIMONIALS: Transcribe all person names, usernames, designations, company names, review quotes, star ratings (★), and testimonial cards with 100% exact spelling and casing.",
+  "3. ALPHANUMERIC IDENTIFIERS & ADDRESSES: Transcribe all street addresses, building numbers, suite/unit numbers, postal/ZIP codes, country labels, emails, phone numbers, and geospatial plus-codes (e.g. format `XXXX+XXX`) with 100% digit-for-digit precision. Treat alphanumeric strings as literal characters — never concatenate adjacent words or merge letters with numbers.",
+  "4. HIGH-CONTRAST & STYLIZED TYPOGRAPHY DISAMBIGUATION: When reading text on dark/colored backgrounds or thin geometric fonts, carefully distinguish easily confused glyph pairs: 'S' vs '5', 'O' vs '0', 'I' vs 'l' vs '1', 'B' vs '8', 'D' vs 'R', 'n' vs 'ri'/'lr', 'H' vs 'M', '4' vs 'A'/'J'.",
+  "5. UI ELEMENTS, NAVIGATION & CARDS (NO INVENTED LINKS): Transcribe all navigation headers, dropdown menus, button labels, category tags/chips, publication logos, case study card titles, and footer links verbatim as plain text. DO NOT create Markdown links [text](url) unless an exact, full URL is explicitly visible/printed in the document. DO NOT fabricate URLs, links, or anchor tags (e.g., #contact, https://...).",
+  "6. STRICTLY NO IMAGES OR BASE64 DATA: NEVER output markdown image syntax (such as ![...]), data URIs, or base64 strings under any circumstances. Ignore decorative icons, logos, graphic shapes, and illustrations, or represent them solely as text/unicode emojis if relevant (e.g. ⭐, ⚠️, ✉). NEVER output raw base64 data.",
+  "7. TABLES & CODE BLOCKS: Render all tabular data as clean, aligned GFM Markdown tables (| Col 1 | Col 2 |). Format all code snippets into clean fenced code blocks (```language).",
+  "8. ANTI-SUMMARIZATION: Do NOT summarize, explain, paraphrase, or omit any content (e.g. NEVER write 'This slide covers...'). Extract the raw text and content directly.",
+  "9. DOCUMENT IMAGES & AVATARS: If an image contains visual avatar pictures or graphic icons alongside text cards, focus exclusively on transcribing the printed text, quotes, and content verbatim without describing human faces or emitting image tags/placeholders.",
+  "10. OUTPUT FORMAT: Output ONLY clean GFM Markdown without any conversational preamble or meta-commentary.",
+].join("\n");
+
 export async function extractDocumentHybrid(
   env: Env,
   openai: OpenAI,
@@ -97,22 +115,7 @@ export async function extractDocumentHybrid(
   let pageImages = directPageImages || [];
   const embeddedImages = pageImages.length === 0 ? await extractEmbeddedImagesAsync(imageBuffer, fileType) : [];
 
-  const systemPrompt = [
-    `You are an ultra-high precision document OCR and verbatim transcription engine.`,
-    `CRITICAL MANDATE: Perform 100% EXHAUSTIVE VERBATIM CHARACTER-BY-CHARACTER TRANSCRIBING & OCR.`,
-    `Transcribe EVERY visible word, letter, digit, symbol, navigation item, button label, dropdown arrow (˅), badge, quote, code snippet, and address EXACTLY as visually written in the image/document into clean GFM Markdown.`,
-    "",
-    "UNIVERSAL OCR & TRANSCRIPTION RULES (APPLIES TO ALL DOCUMENTS):",
-    "1. ABSOLUTE VERBATIM INTEGRITY: Never hallucinate, guess, infer, truncate, or substitute ANY word, name, address, street number, phone number, email, URL, code, or identifier. If text is visible, transcribe the exact characters. Never replace unfamiliar or foreign words with training data.",
-    "2. PROPER NOUNS & TESTIMONIALS: Transcribe all person names, usernames, designations, company names, review quotes, star ratings (★), and testimonial cards with 100% exact spelling and casing.",
-    "3. ALPHANUMERIC IDENTIFIERS & ADDRESSES: Transcribe all street addresses, building numbers, suite/unit numbers, postal/ZIP codes, country labels, emails, phone numbers, and geospatial plus-codes (e.g. format `XXXX+XXX`) with 100% digit-for-digit precision. Treat alphanumeric strings as literal characters — never concatenate adjacent words or merge letters with numbers.",
-    "4. HIGH-CONTRAST & STYLIZED TYPOGRAPHY DISAMBIGUATION: When reading text on dark/colored backgrounds or thin geometric fonts, carefully distinguish easily confused glyph pairs: 'S' vs '5', 'O' vs '0', 'I' vs 'l' vs '1', 'B' vs '8', 'D' vs 'R', 'n' vs 'ri'/'lr', 'H' vs 'M', '4' vs 'A'/'J'.",
-    "5. UI ELEMENTS, NAVIGATION & CARDS: Transcribe all navigation headers, dropdown menus, button labels, category tags/chips, publication logos, case study card titles, and footer links verbatim.",
-    "6. TABLES & CODE BLOCKS: Render all tabular data as clean, aligned GFM Markdown tables (| Col 1 | Col 2 |). Format all code snippets into clean fenced code blocks (```language).",
-    "7. ANTI-SUMMARIZATION: Do NOT summarize, explain, paraphrase, or omit any content (e.g. NEVER write 'This slide covers...'). Extract the raw text and content directly.",
-    "8. DOCUMENT IMAGES & AVATARS: If an image contains visual avatar pictures or graphic icons alongside text cards, focus exclusively on transcribing the printed text, quotes, and content verbatim without describing human faces.",
-    "9. OUTPUT FORMAT: Output ONLY clean GFM Markdown without any conversational preamble or meta-commentary.",
-  ].join("\n");
+  const systemPrompt = UNIVERSAL_OCR_PROMPT;
 
   // Case A: High-Resolution Visual Pages from Client Canvas
   if (pageImages.length > 0) {
@@ -289,23 +292,7 @@ export async function extractDocumentFullVision(
   }
 
   const embeddedImages = pageImages.length === 0 ? await extractEmbeddedImagesAsync(imageBuffer, fileType) : [];
-
-  const systemPrompt = [
-    `You are an ultra-high precision document OCR and verbatim transcription engine.`,
-    `CRITICAL MANDATE: Perform 100% EXHAUSTIVE VERBATIM CHARACTER-BY-CHARACTER TRANSCRIBING & OCR.`,
-    `Transcribe EVERY visible word, letter, digit, symbol, navigation item, button label, dropdown arrow (˅), badge, quote, code snippet, and address EXACTLY as visually written in the image/document into clean GFM Markdown.`,
-    "",
-    "UNIVERSAL OCR & TRANSCRIPTION RULES (APPLIES TO ALL DOCUMENTS):",
-    "1. ABSOLUTE VERBATIM INTEGRITY: Never hallucinate, guess, infer, truncate, or substitute ANY word, name, address, street number, phone number, email, URL, code, or identifier. If text is visible, transcribe the exact characters. Never replace unfamiliar or foreign words with training data.",
-    "2. PROPER NOUNS & TESTIMONIALS: Transcribe all person names, usernames, designations, company names, review quotes, star ratings (★), and testimonial cards with 100% exact spelling and casing.",
-    "3. ALPHANUMERIC IDENTIFIERS & ADDRESSES: Transcribe all street addresses, building numbers, suite/unit numbers, postal/ZIP codes, country labels, emails, phone numbers, and geospatial plus-codes (e.g. format `XXXX+XXX`) with 100% digit-for-digit precision. Treat alphanumeric strings as literal characters — never concatenate adjacent words or merge letters with numbers.",
-    "4. HIGH-CONTRAST & STYLIZED TYPOGRAPHY DISAMBIGUATION: When reading text on dark/colored backgrounds or thin geometric fonts, carefully distinguish easily confused glyph pairs: 'S' vs '5', 'O' vs '0', 'I' vs 'l' vs '1', 'B' vs '8', 'D' vs 'R', 'n' vs 'ri'/'lr', 'H' vs 'M', '4' vs 'A'/'J'.",
-    "5. UI ELEMENTS, NAVIGATION & CARDS: Transcribe all navigation headers, dropdown menus, button labels, category tags/chips, publication logos, case study card titles, and footer links verbatim.",
-    "6. TABLES & CODE BLOCKS: Render all tabular data as clean, aligned GFM Markdown tables (| Col 1 | Col 2 |). Format all code snippets into clean fenced code blocks (```language).",
-    "7. ANTI-SUMMARIZATION: Do NOT summarize, explain, paraphrase, or omit any content (e.g. NEVER write 'This slide covers...'). Extract the raw text and content directly.",
-    "8. DOCUMENT IMAGES & AVATARS: If an image contains visual avatar pictures or graphic icons alongside text cards, focus exclusively on transcribing the printed text, quotes, and content verbatim without describing human faces.",
-    "9. OUTPUT FORMAT: Output ONLY clean GFM Markdown without any conversational preamble or meta-commentary.",
-  ].join("\n");
+  const systemPrompt = UNIVERSAL_OCR_PROMPT;
 
   if (baseText.trim().length > 200 && pageImages.length === 0 && embeddedImages.length === 0) {
     const response = await openai.chat.completions.create({
@@ -406,6 +393,8 @@ export async function extractDocumentFullVision(
     max_tokens: 16384,
   });
 
+  const result = response.choices[0]?.message?.content ?? "";
+
   if (
     !result ||
     result.includes("unable to") ||
@@ -438,22 +427,7 @@ async function extractImageVision(
     messages: [
       {
         role: "system",
-        content: [
-          "You are an ultra-high precision document OCR and verbatim transcription engine.",
-          "CRITICAL MANDATE: Perform 100% EXHAUSTIVE VERBATIM CHARACTER-BY-CHARACTER TRANSCRIBING & OCR.",
-          "Transcribe EVERY visible word, letter, digit, symbol, navigation item, button label, dropdown arrow (˅), badge, quote, code snippet, and address EXACTLY as visually written into clean GFM Markdown.",
-          "",
-          "UNIVERSAL OCR & TRANSCRIPTION RULES (APPLIES TO ALL DOCUMENTS):",
-          "1. ABSOLUTE VERBATIM INTEGRITY: Never hallucinate, guess, infer, truncate, or substitute ANY word, name, address, street number, phone number, email, URL, code, or identifier. If text is visible, transcribe the exact characters. Never replace unfamiliar or foreign words with training data.",
-          "2. PROPER NOUNS & TESTIMONIALS: Transcribe all person names, usernames, designations, company names, review quotes, star ratings (★), and testimonial cards with 100% exact spelling and casing.",
-          "3. ALPHANUMERIC IDENTIFIERS & ADDRESSES: Transcribe all street addresses, building numbers, suite/unit numbers, postal/ZIP codes, country labels, emails, phone numbers, and geospatial plus-codes (e.g. format `XXXX+XXX`) with 100% digit-for-digit precision. Treat alphanumeric strings as literal characters — never concatenate adjacent words or merge letters with numbers.",
-          "4. HIGH-CONTRAST & STYLIZED TYPOGRAPHY DISAMBIGUATION: When reading text on dark/colored backgrounds or thin geometric fonts, carefully distinguish easily confused glyph pairs: 'S' vs '5', 'O' vs '0', 'I' vs 'l' vs '1', 'B' vs '8', 'D' vs 'R', 'n' vs 'ri'/'lr', 'H' vs 'M', '4' vs 'A'/'J'.",
-          "5. UI ELEMENTS, NAVIGATION & CARDS: Transcribe all navigation headers, dropdown menus, button labels, category tags/chips, publication logos, case study card titles, and footer links verbatim.",
-          "6. TABLES & CODE BLOCKS: Render all tabular data as clean, aligned GFM Markdown tables (| Col 1 | Col 2 |). Format all code snippets into clean fenced code blocks (```language).",
-          "7. ANTI-SUMMARIZATION: Do NOT summarize, explain, paraphrase, or omit any content (e.g. NEVER write 'This slide covers...'). Extract the raw text and content directly.",
-          "8. DOCUMENT IMAGES & AVATARS: If an image contains visual avatar pictures or graphic icons alongside text cards, focus exclusively on transcribing the printed text, quotes, and content verbatim without describing human faces.",
-          "9. OUTPUT FORMAT: Output ONLY clean GFM Markdown without any conversational preamble or meta-commentary.",
-        ].join("\n"),
+        content: UNIVERSAL_OCR_PROMPT,
       },
       {
         role: "user",
