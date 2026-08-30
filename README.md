@@ -1,37 +1,40 @@
-# 🤖 Chatbot API — Enterprise RAG Platform, Web Crawler & Edge AI (v1)
+# 🤖 Chatbot API — Enterprise Multi-Tenant SaaS, BYOK Engine & Edge AI (v2)
 
-A production-grade, multi-tenant **Retrieval-Augmented Generation (RAG)** platform, web crawler engine, and administration portal built on **Cloudflare Workers**, **SQLite FTS5 (Cloudflare D1)**, **Cloudflare Vectorize**, **Cloudflare Browser Run (Puppeteer)**, **Cloudflare KV Cache**, and **Angular 16+**.
+A production-grade, edge-native **Multi-Tenant SaaS Platform**, **Bring Your Own Key (BYOK) Vector Engine**, web crawler, and administration portal built on **Cloudflare Workers**, **SQLite FTS5 (Cloudflare D1)**, **Cloudflare Vectorize**, **Cloudflare Browser Run (Puppeteer)**, **Cloudflare KV Cache**, and **Angular 16+**.
 
-The entire codebase is structured as a **unified monorepo** under branch `version-2`, combining the **Backend Worker API**, **Scalable RAG Extraction Microservice**, and **Angular Admin Portal**.
+The codebase is structured as a **unified monorepo** on branch [`multitenant-version`](https://github.com/abanchaudry/chatbot-api-v1/tree/multitenant-version). For an in-depth technical deep dive and production deployment instructions, see [**`MULTI_TENANT_ARCHITECTURE.md`**](./MULTI_TENANT_ARCHITECTURE.md).
 
 ---
 
 ## 🏗️ Monorepo Architecture & Folder Structure
 
 ```text
-chatbot-api-v1 (branch: version-2)
+chatbot-api-v1 (branch: multitenant-version)
 ├── src/                                  # ⚡ 1. Backend Worker API (Cloudflare Worker + Hono)
 │   ├── index.ts                          # Main entry point & Hono routing
 │   └── v1/
-│       ├── controllers/                  # HTTP controllers (ask, crawler, data, auth, logs, settings, traces)
+│       ├── controllers/                  # HTTP controllers (super-admin, ask, crawler, data, auth, settings)
 │       ├── pipeline/                     # 3-Stage RAG Pipeline (prepare → retrieve → execute)
-│       ├── services/                     # 3-Layer Cache, Crawler Engine, D1 DB services, Vectorize
+│       ├── services/                     # Multi-Tenant Tenant Resolver, Cloudflare Vectorize REST Client, DB services
+│       │   ├── tenant.service.ts         # Resolves tenant config, decrypts BYOK secrets & routes LLM
+│       │   ├── cloudflare-vectorize-rest.service.ts # Dynamic Vectorize v2 REST Client for BYOK clients
 │       │   ├── crawler.service.ts        # Cloudflare Browser Run Puppeteer + Jina Anti-Bot Fallback
 │       │   ├── fallback-clustering.service.ts # Aggregative TF-IDF + Cosine Fallback Intelligence
-│       │   └── db/                       # D1 SQLite Database Access Objects (files, chunks, traces, settings)
+│       │   └── db/                       # D1 SQLite Access Objects (clients, secrets, auth, files, chunks)
 │       ├── prompts/                      # System prompts (router, answer generation, reranker, persona)
-│       ├── routes/                       # API route definitions (/ask, /crawler, /data, /message-traces, /settings)
-│       └── utils/                        # Developer Trace Logger, Token Ledgers, KaTeX math helpers
+│       ├── routes/                       # API routes (/super-admin, /ask, /crawler, /data, /settings)
+│       └── utils/                        # Crypto AES-GCM 256-bit helpers, Token Ledgers, Trace Loggers
 │
 ├── chatbot-admin-v1/                     # 🅰️ 2. Angular Admin Portal (Angular 16+)
 │   ├── src/app/modules/
 │   │   ├── admin-module/
+│   │   │   ├── super-admin/              # Super Admin Business Manager, BYOK Secrets, & Global Stats
 │   │   │   ├── ai-knowledge-module/      # Multi-format upload, Web Crawling & Auto-Sync Schedule manager
 │   │   │   ├── chuncks/                  # 3-Tier Chunks Editor, Tag Manager & Vector Re-indexer
 │   │   │   ├── chat-analytics/           # Analytics KPIs, Word Cloud & Fallback Intelligence clustering
 │   │   │   ├── threads-module/           # User Conversations & Developer Trace Inspector
 │   │   │   └── business-persona/         # Live Company Identity & AI Brand Tone Management
-│   │   └── shared/                       # Floating Admin Chatbot Widget with Web Citations & Redirection
+│   │   └── shared/                       # Sidebar Workspace Switcher & Chatbot Widget
 │   ├── package.json
 │   └── angular.json
 │
@@ -41,12 +44,13 @@ chatbot-api-v1 (branch: version-2)
 │   │   └── chunking/                     # 3-Tier Hierarchical Chunker (Large, Medium, Small)
 │   └── wrangler.jsonc
 │
-├── migrations/                           # 🗄️ Cloudflare D1 Database Migrations
-│   ├── 0012_fts5_schema.sql              # FTS5 Virtual Tables & Automated SQL Triggers
-│   └── 0013_system_settings.sql          # Business Persona system settings schema
+├── migrations/                           # 🗄️ Cloudflare D1 Database Migrations (17 Migrations)
+│   ├── 0016_multi_tenant_schema.sql      # Multi-tenant tables, client secrets, & foreign keys
+│   └── 0017_fallback_multi_tenant.sql    # Scoped fallback intelligence & clustering
 │
 ├── wrangler.jsonc                         # ⚙️ Cloudflare Worker Bindings & Environment Variables
-└── README.md                             # 📖 Developer Documentation
+├── MULTI_TENANT_ARCHITECTURE.md          # 📖 Developer Multi-Tenant & Deployment Guide
+└── README.md                             # 📖 General Documentation
 ```
 
 ---
@@ -238,18 +242,18 @@ npx wrangler d1 execute DB --remote --file=./migrations/0013_system_settings.sql
 
 ## 🌿 Git Branching & Contribution Workflow
 
-- **Primary Working Branch**: `version-2`
+- **Primary Multi-Tenant Branch**: `multitenant-version`
 - **Main Monorepo Repository**: [`abanchaudry/chatbot-api-v1`](https://github.com/abanchaudry/chatbot-api-v1)
 
 ```bash
-# Pull latest changes from version-2
-git checkout version-2
-git pull origin version-2
+# Pull latest changes from multitenant-version
+git checkout multitenant-version
+git pull origin multitenant-version
 
 # Commit & push updates
 git add .
 git commit -m "Your descriptive commit message"
-git push origin version-2
+git push origin multitenant-version
 ```
 
 ---
