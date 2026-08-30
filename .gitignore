@@ -1,7 +1,13 @@
 # Dependencies
 node_modules/
 chatbot-admin-v1/node_modules/
+chatbot-developer-admin/node_modules/
 scalable-rag/node_modules/
+
+# Angular Cache & Builds
+.angular/
+chatbot-admin-v1/.angular/
+chatbot-developer-admin/.angular/
 
 # Environment and Secrets (CRITICAL: Do NOT commit)
 .dev.vars
@@ -17,6 +23,7 @@ scalable-rag/.wrangler/
 # Build Outputs
 dist/
 chatbot-admin-v1/dist/
+chatbot-developer-admin/dist/
 
 # Scratch & Logs
 scratch/

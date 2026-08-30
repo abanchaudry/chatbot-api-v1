@@ -1,0 +1,199 @@
+.form-control {
+  border-radius: 6px;
+  height: 42px;
+  border: 1px solid #d2d2d2;
+  padding-left: 20px;
+  background: none;
+  width: 280px;
+  max-width: 280px;
+  display: block;
+}
+
+.form-control:focus {
+  border-color: #3369f3;
+  background-color: #ffffff;
+  color: #25282d;
+}
+
+.search-wrapper {
+  position: relative;
+}
+
+.search-wrapper .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.search-wrapper input {
+  padding-left: 36px !important;
+}
+
+.ai-knowledge-box {
+  background: linear-gradient(to right, #3167f3, #2a58cf);
+  border-radius: 6px;
+  padding: 30px 20px;
+  margin-bottom: 2rem;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-title {
+  font-size: 1.875rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.ai-subtitle {
+  color: #fff;
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+.ai-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.ai-stat-item {
+  background-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  border-radius: 0.4rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.button-primary {
+  background-color: #3167f3;
+  border: 1px solid #3167f3;
+  color: #ffffff !important;
+  box-shadow: 0 1px 2px #3167f359;
+  border-radius: 0.4rem;
+  font-size: 14px;
+  padding: 8px 16px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.button-primary:hover {
+  background-color: #254fd0;
+  border-color: #254fd0;
+}
+
+.view-btn {
+  box-shadow: none !important;
+  background-color: #3167f3;
+  color: #ffffff !important;
+  font-size: 13px;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  border: none;
+  transition: background 0.3s ease;
+  cursor: pointer;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.view-btn:hover {
+  background-color: #254fd0;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 800px;
+  border-collapse: collapse;
+}
+
+.index-cell {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.bg-corner-img {
+  background-image: url("https://mannatthemes.com/approx/default/assets/images/extra/corner.png");
+  background-position: right;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.card-h {
+  font-size: 14px;
+  font-weight: 600;
+  color: #96a0cd;
+}
+
+.price {
+  font-weight: 700 !important;
+  font-size: 22px;
+  color: #25282d;
+}
+
+.thumb-md {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 36px;
+  width: 36px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 0.3s ease;
+}
+
+.border-dashed {
+  border: 1px dashed;
+}
+
+.rounded {
+  border-radius: 0.4rem !important;
+}
+
+.dashboard-card {
+  transition: all 0.3s ease-in-out;
+  cursor: pointer;
+}
+
+.dashboard-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card:hover .thumb-md i {
+  transform: scale(1.2) rotate(5deg);
+}
+
+.table th {
+  font-weight: 600;
+  border-top: none;
+  font-size: 13px;
+  color: #475569;
+  padding: 12px 14px;
+}
+
+.table td {
+  vertical-align: middle;
+  padding: 14px 14px;
+  font-size: 13.5px;
+}

@@ -36,10 +36,11 @@ const parseRange = (c: Context) => {
 export const ChatAnalyticsController = {
   stats: async (c: Context) => {
     try {
+      const clientId = (c as any).get("clientId") || "default";
       const { from, to } = parseRange(c);
       const granularity = clampGranularity(c.req.query("granularity"));
 
-      const totals = await chatAnalyticsDb.getTotals(c.env.DB, from, to);
+      const totals = await chatAnalyticsDb.getTotals(c.env.DB, from, to, clientId);
 
       return c.json({
         ok: true,
@@ -54,10 +55,11 @@ export const ChatAnalyticsController = {
 
   dailyBreakdown: async (c: Context) => {
     try {
+      const clientId = (c as any).get("clientId") || "default";
       const { from, to } = parseRange(c);
       const q = (c.req.query("q") || "").trim().toLowerCase();
 
-      let rows = await chatAnalyticsDb.getDailyBreakdown(c.env.DB, from, to);
+      let rows = await chatAnalyticsDb.getDailyBreakdown(c.env.DB, from, to, clientId);
 
       if (q) {
         rows = rows.filter((r) => r.date.includes(q));
@@ -75,6 +77,7 @@ export const ChatAnalyticsController = {
 
   threadsByDate: async (c: Context) => {
     try {
+      const clientId = (c as any).get("clientId") || "default";
       const dateStr = c.req.query("date");
       if (!dateStr) return c.json({ ok: false, message: "date is required (YYYY-MM-DD)" }, 400);
 
@@ -82,7 +85,7 @@ export const ChatAnalyticsController = {
       if (!date) return c.json({ ok: false, message: "Invalid date" }, 400);
 
       const dateISO = toDateOnlyISO(date);
-      const threads = await chatAnalyticsDb.getThreadsByDate(c.env.DB, dateISO);
+      const threads = await chatAnalyticsDb.getThreadsByDate(c.env.DB, dateISO, clientId);
 
       return c.json({ ok: true, date: dateISO, threads });
     } catch (err: any) {

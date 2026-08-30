@@ -1,0 +1,217 @@
+<div class="main-content">
+  <div class="container-fluid">
+
+    <!-- Hero Banner Box -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">{{ client?.name || 'Business Details' }}</h1>
+            <p class="ai-subtitle">ID: <code>{{ clientId }}</code> | Slug: <code>{{ client?.slug }}</code></p>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <button (click)="managePlayground()" type="button" class="button-primary" style="background: #ffffff; color: #3167f3 !important; font-weight: 600;">
+              <i class="ri-login-box-line"></i> Open Workspace
+            </button>
+            <a routerLink="/dashboard/super-admin/dashboard" class="button-primary" style="background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3);">
+              <i class="ri-arrow-left-line"></i> Back
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="isLoading" class="text-center p-5">
+      <div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+      </div>
+    </div>
+
+    <div *ngIf="!isLoading && client" class="row">
+      <!-- Left Column: Business Profile & Settings -->
+      <div class="col-md-7 mb-4">
+        <!-- Edit Profile Card -->
+        <div class="card mb-4">
+          <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+            <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
+              <i class="ri-settings-3-line text-primary me-2"></i> Business Settings & Infrastructure
+            </h4>
+            <span *ngIf="client.status === 'active'" class="badge" style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #bbf7d0;">Active</span>
+            <span *ngIf="client.status === 'suspended'" class="badge" style="background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fecaca;">Suspended</span>
+          </div>
+          <div class="card-body p-4">
+            <form (ngSubmit)="onSaveProfile()">
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Business Name</label>
+                  <input type="text" class="form-control custom-input w-100" name="name" [(ngModel)]="editForm.name" required />
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Website Domain</label>
+                  <input type="text" class="form-control custom-input w-100" name="domain" [(ngModel)]="editForm.domain" />
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Billing Mode</label>
+                  <select class="form-select custom-input w-100" name="billing_mode" [(ngModel)]="editForm.billing_mode">
+                    <option value="platform">Platform Billed (Managed)</option>
+                    <option value="byok">Bring Your Own Key (BYOK)</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Account Status</label>
+                  <select class="form-select custom-input w-100" name="status" [(ngModel)]="editForm.status">
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- BYOK Secret Management -->
+              <div *ngIf="editForm.billing_mode === 'byok'" class="p-3 rounded border mb-3" style="background: #f8fafc; border-color: #e2e8f0 !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <h6 class="fw-bold m-0" style="font-size: 13.5px; color: #1e293b;">
+                    <i class="ri-lock-2-line text-primary me-1"></i> Tenant BYOK Credentials
+                  </h6>
+                  <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 10.5px;">AES-GCM 256-bit</span>
+                </div>
+
+                <div class="form-group mb-3">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label mb-0" style="font-size: 12.5px; font-weight: 600; color: #475569;">OpenAI API Key</label>
+                    <span *ngIf="secrets.has_openai_key" class="text-success" style="font-size: 11.5px;"><i class="ri-check-line"></i> Key Configured</span>
+                  </div>
+                  <div class="input-group">
+                    <input [type]="showOpenAIKey ? 'text' : 'password'" class="form-control custom-input bg-white" [placeholder]="secrets.has_openai_key ? 'Enter new key to replace current key' : 'sk-proj-...'" name="openai_api_key" [(ngModel)]="editForm.openai_api_key" />
+                    <button type="button" class="btn btn-outline-secondary input-addon-btn" (click)="showOpenAIKey = !showOpenAIKey" title="Toggle key visibility">
+                      <i [class]="showOpenAIKey ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="row">
+                  <div class="col-md-6 mb-2 mb-md-0">
+                    <label class="form-label" style="font-size: 12.5px; font-weight: 600; color: #475569;">Cloudflare Account ID</label>
+                    <input type="text" class="form-control custom-input bg-white w-100" placeholder="e.g. 4121119f..." name="cf_account_id" [(ngModel)]="editForm.cf_account_id" />
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label class="form-label mb-0" style="font-size: 12.5px; font-weight: 600; color: #475569;">Cloudflare API Token</label>
+                      <span *ngIf="secrets.has_cf_token" class="text-success" style="font-size: 11.5px;"><i class="ri-check-line"></i> Token Configured</span>
+                    </div>
+                    <div class="input-group">
+                      <input [type]="showCfToken ? 'text' : 'password'" class="form-control custom-input bg-white" [placeholder]="secrets.has_cf_token ? 'Enter new token to replace' : 'Token'" name="cf_api_token" [(ngModel)]="editForm.cf_api_token" />
+                      <button type="button" class="btn btn-outline-secondary input-addon-btn" (click)="showCfToken = !showCfToken" title="Toggle token visibility">
+                        <i [class]="showCfToken ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
+                <button type="button" (click)="onDeleteClient()" class="btn btn-outline-danger btn-sm" style="border-radius: 6px; font-size: 13px;">
+                  <i class="ri-delete-bin-line me-1"></i> Delete Business
+                </button>
+                <button type="submit" class="button-primary" [disabled]="isSaving">
+                  <i class="ri-save-line me-1"></i> Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Widget Integration & Login Credentials -->
+      <div class="col-md-5 mb-4">
+        <!-- Card 1: Chat Widget Embed Token -->
+        <div class="card mb-4">
+          <div class="card-header card-header-icon m-0" style="padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+            <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
+              <i class="ri-code-s-slash-line text-primary me-2"></i> Public Chat Widget Integration
+            </h4>
+          </div>
+          <div class="card-body p-4">
+            <p class="text-muted mb-3" style="font-size: 12.5px;">
+              Provide this public token to the client to embed their dedicated chatbot on external sites.
+            </p>
+
+            <div class="form-group mb-3">
+              <label class="form-label" style="font-size: 12px; font-weight: 600; color: #475569;">Public Widget Token</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="text" class="form-control custom-input bg-light" [value]="client.public_token" readonly />
+                <button class="view-btn" type="button" (click)="copyToClipboard(client.public_token)" style="white-space: nowrap;">
+                  <i [class]="copiedToken ? 'ri-check-line me-1' : 'ri-file-copy-line me-1'"></i>
+                  {{ copiedToken ? 'Copied' : 'Copy' }}
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-0">
+              <label class="form-label" style="font-size: 12px; font-weight: 600; color: #475569;">API Request Header</label>
+              <pre class="bg-dark text-light p-3 rounded" style="font-size: 11.5px; overflow-x: auto; margin-bottom: 0;"><code>x-client-token: {{ client.public_token }}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Client Login Accounts -->
+        <div class="card">
+          <div class="card-header card-header-icon m-0" style="padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+            <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
+              <i class="ri-user-shared-line text-primary me-2"></i> Business Admin Accounts
+            </h4>
+          </div>
+          <div class="card-body p-4">
+            <div *ngIf="users.length === 0" class="text-muted mb-3" style="font-size: 12.5px;">
+              No admin logins configured yet.
+            </div>
+
+            <div *ngIf="users.length > 0" class="mb-3">
+              <div class="table-container">
+                <table class="table table-light mb-0">
+                  <tbody>
+                    <tr *ngFor="let u of users">
+                      <td style="padding: 10px 8px;">
+                        <strong style="color: #1e293b; font-size: 13px;">{{ u.username }}</strong>
+                        <span class="badge ms-1" style="background-color: #f1f5f9; color: #475569; font-size: 10px; border: 1px solid #e2e8f0;">{{ u.role }}</span>
+                      </td>
+                      <td class="text-end td-actions" style="padding: 10px 8px;">
+                        <button type="button" class="view-btn py-1 px-2" style="background: #64748b; font-size: 11px;" (click)="onResetUserPassword(u)" title="Reset Password">
+                          <i class="ri-key-line"></i> Reset
+                        </button>
+                        <button type="button" class="view-btn ml-1 py-1 px-2" style="background: #ef4444; font-size: 11px;" (click)="onDeleteUser(u)" title="Delete User">
+                          <i class="ri-delete-bin-line"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Create New User Form -->
+            <div class="p-3 bg-light rounded border">
+              <h6 class="fw-bold mb-2" style="font-size: 12.5px; color: #1e293b;">Add New Admin Login</h6>
+              <div class="mb-2">
+                <input type="text" class="form-control custom-input bg-white w-100 mb-2" placeholder="Username" [(ngModel)]="newUserForm.username" />
+                <div class="input-group">
+                  <input [type]="showNewUserPwd ? 'text' : 'password'" class="form-control custom-input bg-white" placeholder="Password" [(ngModel)]="newUserForm.password" />
+                  <button type="button" class="btn btn-outline-secondary" (click)="showNewUserPwd = !showNewUserPwd" style="border-color: #d2d2d2;">
+                    <i [class]="showNewUserPwd ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
+                  </button>
+                </div>
+              </div>
+              <button (click)="onCreateUser()" class="button-primary w-100 justify-content-center mt-2" style="font-size: 13px; padding: 7px 14px;">
+                <i class="ri-user-add-line me-1"></i> Add Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

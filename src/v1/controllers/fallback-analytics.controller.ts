@@ -7,14 +7,15 @@ import { SettingsDbService } from "../services/db/settings.db";
 
 export async function getFallbackClustersHandler(c: Context<Env>) {
   try {
+    const clientId = (c as any).get("clientId") || "default";
     const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
     const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") || "6", 10)), 100);
 
     const [clusters, totalClusters, unclusteredCount, settings] = await Promise.all([
-      fallbackDb.getLatestClusters(c.env.DB, limit, page),
-      fallbackDb.getActiveClustersCount(c.env.DB),
-      fallbackDb.getUnclusteredCount(c.env.DB),
-      new SettingsDbService().getSettings(c.env.DB),
+      fallbackDb.getLatestClusters(c.env.DB, limit, page, clientId),
+      fallbackDb.getActiveClustersCount(c.env.DB, clientId),
+      fallbackDb.getUnclusteredCount(c.env.DB, clientId),
+      new SettingsDbService().getSettings(c.env.DB, clientId),
     ]);
 
     const totalPages = Math.ceil(totalClusters / limit) || 1;
@@ -39,14 +40,17 @@ export async function getFallbackClustersHandler(c: Context<Env>) {
 
 export async function triggerFallbackClusteringHandler(c: Context<Env>) {
   try {
+    const clientId = (c as any).get("clientId") || "default";
     const body = (await c.req.json().catch(() => ({}))) as {
       period?: "daily" | "weekly" | "monthly" | "manual";
       startDate?: string;
       endDate?: string;
       recluster?: boolean;
       unclusteredOnly?: boolean;
+      clientId?: string;
     };
 
+    body.clientId = clientId;
     const result = await runFallbackClustering(c.env, body);
 
     return c.json({
@@ -61,12 +65,15 @@ export async function triggerFallbackClusteringHandler(c: Context<Env>) {
 
 export async function getFallbackQueryCountHandler(c: Context<Env>) {
   try {
+    const clientId = (c as any).get("clientId") || "default";
     const body = (await c.req.json().catch(() => ({}))) as {
       startDate?: string;
       endDate?: string;
       unclusteredOnly?: boolean;
+      clientId?: string;
     };
 
+    body.clientId = clientId;
     const count = await fallbackDb.getFallbackQueryCount(c.env.DB, body);
 
     return c.json({
@@ -81,11 +88,12 @@ export async function getFallbackQueryCountHandler(c: Context<Env>) {
 
 export async function getClusterQueriesHandler(c: Context<Env>) {
   try {
+    const clientId = (c as any).get("clientId") || "default";
     const clusterId = c.req.param("clusterId");
     if (!clusterId) {
       return c.json({ ok: false, error: "clusterId parameter is required" }, 400);
     }
-    const queries = await fallbackDb.getQueriesForCluster(c.env.DB, clusterId);
+    const queries = await fallbackDb.getQueriesForCluster(c.env.DB, clusterId, clientId);
     return c.json({
       ok: true,
       clusterId,

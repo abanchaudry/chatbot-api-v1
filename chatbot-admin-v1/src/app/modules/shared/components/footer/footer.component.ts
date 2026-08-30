@@ -10,12 +10,12 @@ import {
 import { animate, style, transition, trigger } from "@angular/animations";
 import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
 import { environment } from "src/environments/environment";
+import { jwtDecode } from "jwt-decode";
+import { Router } from "@angular/router";
 
 type ChatLang = "english" | "spanish";
 type StreamPhase = "idle" | "connecting" | "streaming";
 type StreamEventName = "meta" | "token" | "done" | "error" | "message";
-
-import { Router } from "@angular/router";
 
 export type CitedSource = {
   section: string;
@@ -105,10 +105,46 @@ export class FooterComponent implements OnInit, OnDestroy {
     { label: "Office Address", text: "What is the office address?" },
   ];
 
-  private readonly TENANT = environment.tenant || "default";
-  private readonly THREAD_KEY = `${this.TENANT}_threadid`;
-  private readonly USER_KEY = `${this.TENANT}_userthId`;
-  private readonly LANG_KEY = `${this.TENANT}_chat_lang`;
+  private getActiveClientId(): string {
+    const savedClientId = localStorage.getItem("__active_client_id");
+    if (savedClientId) return savedClientId;
+
+    const token = localStorage.getItem(environment.token_label);
+    if (token) {
+      try {
+        const payload: any = jwtDecode(token);
+        if (payload?.clientId) return payload.clientId;
+        if (payload?.client_id) return payload.client_id;
+      } catch {}
+    }
+
+    return "default";
+  }
+
+  private get THREAD_KEY(): string {
+    return `${this.getActiveClientId()}_threadid`;
+  }
+
+  private get USER_KEY(): string {
+    return `${this.getActiveClientId()}_userthId`;
+  }
+
+  private get LANG_KEY(): string {
+    return `${this.getActiveClientId()}_chat_lang`;
+  }
+
+  private getAuthHeaders(additionalHeaders: Record<string, string> = {}): Record<string, string> {
+    const headers: Record<string, string> = { ...additionalHeaders };
+    const token = localStorage.getItem(environment.token_label);
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    const activeClientId = this.getActiveClientId();
+    if (activeClientId && activeClientId !== "default") {
+      headers["x-client-id"] = activeClientId;
+    }
+    return headers;
+  }
 
   messages: ChatMsg[] = [];
   chatTimeline: ChatTimelineItem[] = [];
@@ -210,6 +246,16 @@ export class FooterComponent implements OnInit, OnDestroy {
     this.scheduleRender();
 
     if (this.isChatOpen) {
+      const currentStoredThread = this.getStoredThreadId();
+      if (currentStoredThread !== this.threadId) {
+        this.threadId = currentStoredThread;
+        this.hasLoadedHistory = false;
+        if (!this.threadId) {
+          this.resetMessages(false);
+          this.rebuildTimeline();
+        }
+      }
+      this.userId = this.getSessionId();
       await this.loadThreadHistoryIfNeeded();
       this.scheduleScroll(true);
       this.focusInputSoon();
@@ -360,9 +406,9 @@ export class FooterComponent implements OnInit, OnDestroy {
 
       const response = await fetch(url, {
         method: "GET",
-        headers: {
+        headers: this.getAuthHeaders({
           Accept: "application/json",
-        },
+        }),
         cache: "no-store",
       });
 
@@ -515,10 +561,10 @@ export class FooterComponent implements OnInit, OnDestroy {
 
     const response = await fetch(streamUrl, {
       method: "POST",
-      headers: {
+      headers: this.getAuthHeaders({
         "Content-Type": "application/json",
         Accept: "text/event-stream",
-      },
+      }),
       body: JSON.stringify(payload),
       signal: this.activeAbortController.signal,
       cache: "no-store",

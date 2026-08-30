@@ -287,6 +287,11 @@ async function executeSingleRetrievalPass(args: {
   }, { level: "info", vis: "dev" });
 
   const db = c.env.DB as unknown as D1Database;
+  const clientId = (c as any).get("clientId") || "default";
+  const cfAccountId = (c as any).get("cfAccountId") || "";
+  const cfApiToken = (c as any).get("cfApiToken") || "";
+  const byokConfig = cfAccountId && cfApiToken ? { cfAccountId, cfApiToken } : undefined;
+
   const localResults = await traceSpan(
     trace,
     `${passLabel}_retrieve_local`,
@@ -302,6 +307,8 @@ async function executeSingleRetrievalPass(args: {
         lexicalTopK: Math.min(Math.max(topK, 18), 24),
         metadataTopK: 12,
         activeDatasets,
+        clientId,
+        byokConfig,
       });
     },
     {

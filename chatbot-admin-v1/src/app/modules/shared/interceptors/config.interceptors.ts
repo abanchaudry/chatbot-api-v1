@@ -29,6 +29,11 @@ export class HttpConfigInterceptor implements HttpInterceptor {
       headers['x-api-key'] = environment.admin_api_key;
     }
 
+    const activeClientId = localStorage.getItem('__active_client_id');
+    if (activeClientId) {
+      headers['x-client-id'] = activeClientId;
+    }
+
     if (Object.keys(headers).length > 0) {
       request = request.clone({
         setHeaders: headers

@@ -138,6 +138,8 @@ export async function retrieveLocalCandidates(args: {
   lexicalTopK: number;
   metadataTopK: number;
   activeDatasets?: Array<"admin" | "pdf" | "web">;
+  clientId?: string;
+  byokConfig?: { cfAccountId: string; cfApiToken: string; indexName?: string };
 }): Promise<LocalRetrievalResult> {
   const {
     db,
@@ -150,16 +152,19 @@ export async function retrieveLocalCandidates(args: {
     lexicalTopK,
     metadataTopK,
     activeDatasets = ["admin", "pdf", "web"],
+    clientId = "default",
+    byokConfig,
   } = args;
 
   const [vectorPieces, lexicalRows, metadataRows] = await Promise.all([
-    embedding?.length ? retrieveVector(env, apiKey, embedding, vectorTopK, activeDatasets).catch((e) => { console.warn("vectorSearch error:", e.message); return []; }) : Promise.resolve([] as Piece[]),
+    embedding?.length ? retrieveVector(env, apiKey, embedding, vectorTopK, activeDatasets, clientId, byokConfig).catch((e) => { console.warn("vectorSearch error:", e.message); return []; }) : Promise.resolve([] as Piece[]),
     chunkDb.lexicalSearch(db, {
       query: plan.searchQuery || question,
       terms: plan.keywords,
       exactPhrases: plan.exactPhrases,
       maxResults: lexicalTopK,
       datasets: activeDatasets,
+      clientId,
     }).catch((e) => { console.warn("lexicalSearch error:", e.message); return []; }),
     chunkDb.metadataSearch(db, {
       entities: plan.entities,
@@ -167,6 +172,7 @@ export async function retrieveLocalCandidates(args: {
       sectionRef: plan.sectionRef,
       maxResults: metadataTopK,
       datasets: activeDatasets,
+      clientId,
     }).catch((e) => { console.warn("metadataSearch error:", e.message); return []; }),
   ]);
 

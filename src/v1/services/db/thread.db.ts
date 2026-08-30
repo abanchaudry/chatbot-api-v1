@@ -2,15 +2,15 @@ import type { D1Database } from '@cloudflare/workers-types';
 
 export const threaddb = {
 
-  async getThreadIdForUser(db: D1Database, userId: string): Promise<string | null> {
+  async getThreadIdForUser(db: D1Database, userId: string, clientId: string = "default"): Promise<string | null> {
     try {
+      const targetClient = clientId || "default";
       const result = await db
-        .prepare('SELECT thread_id FROM threads WHERE user_id = ? ORDER BY created_at DESC LIMIT 1')
-        .bind(userId)
+        .prepare('SELECT thread_id FROM threads WHERE user_id = ? AND (client_id = ? OR (client_id IS NULL AND ? = "default")) ORDER BY created_at DESC LIMIT 1')
+        .bind(userId, targetClient, targetClient)
         .first();
 
       const threadId = result && typeof result.thread_id === 'string' ? result.thread_id : null;
-      console.log('thread id is generated in thread db service' , threadId)
       return threadId;
     } catch (err) {
       console.error("  Failed to get thread ID for user:", err);
@@ -18,7 +18,7 @@ export const threaddb = {
     }
   },
 
-async saveThreadToDatabase(db: D1Database, userId: string, threadId: string): Promise<void> {
+async saveThreadToDatabase(db: D1Database, userId: string, threadId: string, clientId: string = "default"): Promise<void> {
   try {
     const existing = await db
       .prepare(`SELECT 1 FROM threads WHERE thread_id = ?`)
@@ -28,10 +28,10 @@ async saveThreadToDatabase(db: D1Database, userId: string, threadId: string): Pr
     if (!existing) {
       await db
         .prepare(`
-          INSERT INTO threads (user_id, thread_id, created_at)
-          VALUES (?, ?, datetime('now'))
+          INSERT INTO threads (user_id, thread_id, client_id, created_at)
+          VALUES (?, ?, ?, datetime('now'))
         `)
-        .bind(userId, threadId)
+        .bind(userId, threadId, clientId || "default")
         .run();
     } else {
       console.info(`ℹ️ Thread already exists: ${threadId}, skipping insert.`);
@@ -42,9 +42,10 @@ async saveThreadToDatabase(db: D1Database, userId: string, threadId: string): Pr
   }
 },
 
-  async getAllThreads(db: D1Database): Promise<any[]> {
+  async getAllThreads(db: D1Database, clientId?: string): Promise<any[]> {
     try {
-      const result = await db.prepare('SELECT * FROM threads ORDER BY created_at DESC').all();
+      const targetClient = clientId || "default";
+      const result = await db.prepare('SELECT * FROM threads WHERE (client_id = ? OR (client_id IS NULL AND ? = "default")) ORDER BY created_at DESC').bind(targetClient, targetClient).all();
       return result.results || [];
     } catch (err) {
       console.error("  Failed to fetch all threads:", err);

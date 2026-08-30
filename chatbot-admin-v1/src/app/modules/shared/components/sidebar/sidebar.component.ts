@@ -5,7 +5,6 @@ import { environment } from "src/environments/environment";
 
 declare const $: any;
 
-//Metadata
 export interface RouteInfo {
   path: string;
   title: string;
@@ -22,8 +21,22 @@ export interface ChildrenItems {
   type?: string;
 }
 
-//Menu Items
-export const ROUTES: RouteInfo[] = [
+export const SUPER_ADMIN_ROUTES: RouteInfo[] = [
+  {
+    path: "/dashboard/super-admin/dashboard",
+    title: "Businesses & Tenants",
+    type: "link",
+    icontype: "domain",
+  },
+  {
+    path: "/dashboard/super-admin/add-client",
+    title: "Register Business",
+    type: "link",
+    icontype: "add_business",
+  },
+];
+
+export const CLIENT_ROUTES: RouteInfo[] = [
   {
     path: "/dashboard",
     title: "Dashboard",
@@ -48,7 +61,6 @@ export const ROUTES: RouteInfo[] = [
     type: "link",
     icontype: "psychology_alt",
   },
-  // chunks
   {
     path: "/dashboard/chunks/view-all",
     title: "All Chunks",
@@ -73,24 +85,25 @@ export const ROUTES: RouteInfo[] = [
     type: "link",
     icontype: "radar",
   },
-  // {
-  //   path: "/dashboard/profile-setting",
-  //   title: "Setting",
-  //   type: "link",
-  //   icontype: "settings",
-  // },
-
 ];
+
+export const ROUTES: RouteInfo[] = [...SUPER_ADMIN_ROUTES, ...CLIENT_ROUTES];
+
 @Component({
   selector: "app-sidebar",
   templateUrl: "./sidebar.component.html",
   styleUrls: ["./sidebar.component.scss"],
 })
 export class SidebarComponent implements OnInit {
-  public menuItems: any[];
+  public menuItems: any[] = [];
+  public superAdminItems: any[] = [];
   ps: any;
-  appName = environment.appName || "Chatbot Admin"
-  
+  appName = environment.appName || "Chatbot Admin";
+  isSuperAdmin: boolean = false;
+  activeClientName: string | null = null;
+  activeClientId: string | null = null;
+  user: any;
+
   isMobileMenu() {
     if ($(window).width() > 991) {
       return false;
@@ -98,26 +111,58 @@ export class SidebarComponent implements OnInit {
     return true;
   }
 
-  constructor(private utility: utilityService) { }
+  constructor(public utility: utilityService) {}
 
-  user;
   ngOnInit() {
-    this.utility.userDetail.subscribe((res) => {
+    this.utility.userDetail$.subscribe((res) => {
       this.user = res;
     });
-    this.menuItems = ROUTES.filter((menuItem) => menuItem);
+
+    this.utility.userRole$.subscribe((role) => {
+      this.isSuperAdmin = role === "super_admin";
+      this.buildMenu();
+    });
+
+    this.utility.activeClientName$.subscribe((name) => {
+      this.activeClientName = name;
+    });
+
+    this.utility.activeClientId$.subscribe((id) => {
+      this.activeClientId = id;
+    });
+
+    this.buildMenu();
+
     if (window.matchMedia(`(min-width: 960px)`).matches && !this.isMac()) {
       const elemSidebar = <HTMLElement>(
         document.querySelector(".sidebar .sidebar-wrapper")
       );
-      this.ps = new PerfectScrollbar(elemSidebar);
+      if (elemSidebar) {
+        this.ps = new PerfectScrollbar(elemSidebar);
+      }
     }
   }
+
+  buildMenu() {
+    if (this.isSuperAdmin) {
+      this.superAdminItems = SUPER_ADMIN_ROUTES;
+      this.menuItems = CLIENT_ROUTES;
+    } else {
+      this.superAdminItems = [];
+      this.menuItems = CLIENT_ROUTES;
+    }
+  }
+
+  resetToAllClients() {
+    this.utility.setActiveClient(null, null);
+  }
+
   updatePS(): void {
     if (window.matchMedia(`(min-width: 960px)`).matches && !this.isMac()) {
       this.ps.update();
     }
   }
+
   isMac(): boolean {
     let bool = false;
     if (
@@ -128,11 +173,14 @@ export class SidebarComponent implements OnInit {
     }
     return bool;
   }
-  expandOrCollapseMenu(id) {
+
+  expandOrCollapseMenu(id: string) {
     let parent = document.getElementById(id + "-p");
     let child = document.getElementById(id);
-    parent.ariaExpanded = parent.ariaExpanded === "true" ? "false" : "true";
-    child.style.height =
-      child.style.height === "0px" || child.style.height === "" ? "100%" : "0";
+    if (parent && child) {
+      parent.ariaExpanded = parent.ariaExpanded === "true" ? "false" : "true";
+      child.style.height =
+        child.style.height === "0px" || child.style.height === "" ? "100%" : "0";
+    }
   }
 }

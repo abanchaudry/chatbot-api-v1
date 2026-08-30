@@ -249,8 +249,9 @@ async function persistDirectRoute(args: {
   answer: string;
   tokensUsed: number;
   trace: any;
+  clientId?: string;
 }) {
-  const { c, userId, threadId, message, answer, tokensUsed, trace } = args;
+  const { c, userId, threadId, message, answer, tokensUsed, trace, clientId = "default" } = args;
 
   const db = c.env.DB as unknown as D1Database;
   const keepDev = true;
@@ -266,7 +267,8 @@ async function persistDirectRoute(args: {
       "",
       tokensUsed,
       true,
-      JSON.stringify(finalTrace)
+      JSON.stringify(finalTrace),
+      clientId
     ).catch((e) => {
       logError("persist_failed", e, { userId, threadId });
     })
@@ -298,14 +300,12 @@ async function runSharedAskLogic(
   /* ------------------------------------------------------------------ */
   if (c.env.CACHE && rawMessage && !payload?.bypassCache && !prep.directRoute) {
     try {
-      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature);
+      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature, prep.clientId);
       if (cached) {
-        console.log(JSON.stringify({ level: "INFO", label: "fast_cache_hit_L1_exact", latencyMs: cached.latencyMs, query: rawMessage.slice(0, 80) }));
-
-        const db = c.env.DB as unknown as D1Database;
+        console.log(JSON.stringify({ level: "INFO", label: "fast_cache_hit_L1_exact", latencyMs: cached.latencyMs, query: rawMessage.slice(0, 80) }));        const db = c.env.DB as unknown as D1Database;
         if (db) {
           c.executionCtx.waitUntil(
-            persist(db, prep.userId, prep.threadId, rawMessage, cached.answer, cached.context || "", 0, true, "{}")
+            persist(db, prep.userId, prep.threadId, rawMessage, cached.answer, cached.context || "", 0, true, "{}", prep.clientId)
               .catch((e) => logError("persist_fast_cache_hit_failed", e))
           );
         }
@@ -344,6 +344,7 @@ async function runSharedAskLogic(
       answer: prep.directRoute.answer,
       tokensUsed: prep.directRoute.tokensUsed,
       trace: prep.trace,
+      clientId: prep.clientId,
     });
 
     const isDirectFallback =
@@ -359,7 +360,8 @@ async function runSharedAskLogic(
         query: prep.message || prep.query || "",
         threadId: prep.threadId,
         userId: prep.userId,
-        reason: prep.route || "direct_out_of_scope"
+        reason: prep.route || "direct_out_of_scope",
+        clientId: prep.clientId,
       });
     }
 
@@ -391,7 +393,7 @@ async function runSharedAskLogic(
 
         const db = c.env.DB as unknown as D1Database;
         c.executionCtx.waitUntil(
-          persist(db, prep.userId, prep.threadId, prep.message, semHit.answer, "", 0, true, JSON.stringify(finalizeTrace(prep.trace, true)))
+          persist(db, prep.userId, prep.threadId, prep.message, semHit.answer, "", 0, true, JSON.stringify(finalizeTrace(prep.trace, true)), prep.clientId)
             .catch((e) => logError("persist_cache_hit_failed", e))
         );
 
@@ -459,6 +461,7 @@ async function runSharedAskLogic(
     chains: prep.chains,
     startedAt: prep.startedAt,
     localEvidence: retrieve.localEvidence,
+    clientId: prep.clientId,
   });
 
   /* ------------------------------------------------------------------ */
@@ -478,7 +481,8 @@ async function runSharedAskLogic(
       query: prep.message || prep.query || "",
       threadId: prep.threadId,
       userId: prep.userId,
-      reason: executed.outcome || "final_fallback"
+      reason: executed.outcome || "final_fallback",
+      clientId: prep.clientId,
     });
   }
 
@@ -495,10 +499,10 @@ async function runSharedAskLogic(
 
           // Writeback Layer 1: KV Exact (save under raw message AND rewritten query with dataset signature)
           if (prep.message) {
-            await saveQueryResponseToCache(c.env.CACHE, prep.message, cachePayload, prep.datasetSignature);
+            await saveQueryResponseToCache(c.env.CACHE, prep.message, cachePayload, prep.datasetSignature, prep.clientId);
           }
           if (prep.query && prep.query !== prep.message) {
-            await saveQueryResponseToCache(c.env.CACHE, prep.query, cachePayload, prep.datasetSignature);
+            await saveQueryResponseToCache(c.env.CACHE, prep.query, cachePayload, prep.datasetSignature, prep.clientId);
           }
 
           // Writeback Layer 2: Semantic Vectorize
@@ -564,7 +568,7 @@ async function runStreamingPreparation(
   // Signature-aware Layer 1 KV Exact Cache check
   if (c.env.CACHE && rawMessage && !payload?.bypassCache && !prep.directRoute) {
     try {
-      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature);
+      const cached = await getCachedQueryResponse(c.env.CACHE, rawMessage, prep.datasetSignature, prep.clientId);
       if (cached) {
         console.log(JSON.stringify({ level: "INFO", label: "stream_fast_cache_hit_L1", latencyMs: cached.latencyMs }));
         return { ok: true, prep, cachedAnswer: cached.answer, cachedSources: cached.sources, cacheLayer: "L1_KV_EXACT" };
@@ -768,7 +772,7 @@ export const askController = {
             // Persist cached answer into conversation history
             const db = c.env.DB as unknown as D1Database;
             c.executionCtx.waitUntil(
-              persist(db, prep.userId, prep.threadId, prep.message, result.cachedAnswer, "", 0, true, JSON.stringify(finalizeTrace(prep.trace, true)))
+              persist(db, prep.userId, prep.threadId, prep.message, result.cachedAnswer, "", 0, true, JSON.stringify(finalizeTrace(prep.trace, true)), prep.clientId)
                 .catch((e) => logError("persist_stream_cache_hit_failed", e))
             );
 
@@ -801,6 +805,7 @@ export const askController = {
             chains: prep.chains,
             startedAt: prep.startedAt,
             localEvidence: retrieve.localEvidence,
+            clientId: prep.clientId,
           });
 
           let answer = "";
@@ -822,7 +827,8 @@ export const askController = {
               query: prep.message || prep.query || "",
               threadId: prep.threadId,
               userId: prep.userId,
-              reason: executed.outcome || "final_fallback"
+              reason: executed.outcome || "final_fallback",
+              clientId: prep.clientId,
             });
           }
 
@@ -839,10 +845,10 @@ export const askController = {
                 const rawMsg = prep.message;
                 const rewrittenQuery = prep.query;
 
-                await saveQueryResponseToCache(c.env.CACHE, rawMsg, cachePayload, prep.datasetSignature);
+                await saveQueryResponseToCache(c.env.CACHE, rawMsg, cachePayload, prep.datasetSignature, prep.clientId);
 
                 if (rewrittenQuery && rewrittenQuery.toLowerCase().trim() !== rawMsg.toLowerCase().trim()) {
-                  await saveQueryResponseToCache(c.env.CACHE, rewrittenQuery, cachePayload, prep.datasetSignature);
+                  await saveQueryResponseToCache(c.env.CACHE, rewrittenQuery, cachePayload, prep.datasetSignature, prep.clientId);
                 }
 
                 if (c.env.VECTORIZE_CACHE && prep.embedding) {
@@ -864,7 +870,8 @@ export const askController = {
                 retrieve?.context || "",
                 executed.tokensUsed || 0,
                 true,
-                finalTraceJson
+                finalTraceJson,
+                prep.clientId
               );
             })().catch((err) => logError("stream_persist_and_cache_failed", err))
           );

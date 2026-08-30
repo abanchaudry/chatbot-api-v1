@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import type { Env } from "../types/env";
 import { ChatAnalyticsController } from "../controllers/analytics.controller";
+import { requireAuthOrApiKey, resolveTenantContext } from "../middleware/unifiedAuth.middleware";
 
 import { getFallbackClustersHandler, triggerFallbackClusteringHandler, getClusterQueriesHandler, getFallbackQueryCountHandler } from "../controllers/fallback-analytics.controller";
 
 const chatAnalyticsRoutes = new Hono<Env>();
+
+chatAnalyticsRoutes.use("*", requireAuthOrApiKey, resolveTenantContext);
 
 chatAnalyticsRoutes.get("/stats", ChatAnalyticsController.stats);
 chatAnalyticsRoutes.get("/daily-breakdown", ChatAnalyticsController.dailyBreakdown);

@@ -8,12 +8,14 @@ import authRoutes from "./auth.route";
 import threadRoutes from "./thread.route";
 import settingsRoutes from "./settings.routes";
 import crawlerRoutes from "./crawler.routes";
+import superAdminRoutes from "./super-admin.routes";
 
 import type { Env } from "../types/env";
 
 export const v1Routes = (app: Hono<Env>) => {
   const mountRoutes = (prefix = "") => {
     app.route(`${prefix}/auth`, authRoutes);
+    app.route(`${prefix}/super-admin`, superAdminRoutes);
     app.route(`${prefix}/thread`, threadRoutes);
     app.route(`${prefix}/data`, dataRoutes);
     app.route(`${prefix}/ask`, askRoutes);

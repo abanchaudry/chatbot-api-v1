@@ -6,6 +6,7 @@ export interface FallbackQueryRecord {
   id: string;
   thread_id?: string | null;
   user_id?: string | null;
+  client_id?: string | null;
   query_text: string;
   reason?: string | null;
   cluster_id?: string | null;
@@ -14,6 +15,7 @@ export interface FallbackQueryRecord {
 
 export interface FallbackClusterRecord {
   id: string;
+  client_id?: string | null;
   cluster_name: string;
   summary: string;
   query_count: number;
@@ -31,18 +33,19 @@ export const fallbackDb = {
    */
   async logFallbackQuery(
     db: D1Database,
-    args: { query: string; threadId?: string; userId?: string; reason?: string }
+    args: { query: string; threadId?: string; userId?: string; reason?: string; clientId?: string }
   ) {
     if (!args.query || !args.query.trim()) return null;
     const id = nanoid();
+    const client = args.clientId || "default";
 
     try {
       await db
         .prepare(
-          `INSERT INTO fallback_queries (id, thread_id, user_id, query_text, reason, created_at)
-           VALUES (?, ?, ?, ?, ?, datetime())`
+          `INSERT INTO fallback_queries (id, thread_id, user_id, client_id, query_text, reason, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, datetime())`
         )
-        .bind(id, args.threadId || null, args.userId || null, args.query.trim(), args.reason || "final_fallback")
+        .bind(id, args.threadId || null, args.userId || null, client, args.query.trim(), args.reason || "final_fallback")
         .run();
       return id;
     } catch (err) {
@@ -54,16 +57,18 @@ export const fallbackDb = {
   /**
    * Fetch unclustered fallback queries for a given period (in days).
    */
-  async getUnclusteredQueries(db: D1Database, periodDays: number = 7) {
+  async getUnclusteredQueries(db: D1Database, periodDays: number = 7, clientId: string = "default") {
     try {
+      const targetClient = clientId || "default";
       const { results } = await db
         .prepare(
-          `SELECT id, thread_id, user_id, query_text, reason, created_at
+          `SELECT id, thread_id, user_id, client_id, query_text, reason, created_at
            FROM fallback_queries
-           WHERE cluster_id IS NULL
+           WHERE cluster_id IS NULL AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
            ORDER BY created_at DESC
            LIMIT 2000`
         )
+        .bind(targetClient, targetClient)
         .all();
 
       return (results || []) as unknown as FallbackQueryRecord[];
@@ -78,11 +83,15 @@ export const fallbackDb = {
    */
   async getFallbackQueriesByFilter(
     db: D1Database,
-    filter: { startDate?: string; endDate?: string; unclusteredOnly?: boolean; limit?: number }
+    filter: { startDate?: string; endDate?: string; unclusteredOnly?: boolean; limit?: number; clientId?: string }
   ) {
     try {
       const conditions: string[] = [];
       const params: any[] = [];
+      const targetClient = filter.clientId || "default";
+
+      conditions.push("(client_id = ? OR (client_id IS NULL AND ? = 'default'))");
+      params.push(targetClient, targetClient);
 
       if (filter.unclusteredOnly !== false) {
         conditions.push("cluster_id IS NULL");
@@ -100,7 +109,7 @@ export const fallbackDb = {
       const limitVal = filter.limit || 2000;
 
       const query = `
-        SELECT id, thread_id, user_id, query_text, reason, cluster_id, created_at
+        SELECT id, thread_id, user_id, client_id, query_text, reason, cluster_id, created_at
         FROM fallback_queries
         ${whereClause}
         ORDER BY created_at DESC
@@ -121,11 +130,15 @@ export const fallbackDb = {
    */
   async resetClusterIdsForDateRange(
     db: D1Database,
-    filter: { startDate?: string; endDate?: string }
+    filter: { startDate?: string; endDate?: string; clientId?: string }
   ) {
     try {
       const conditions: string[] = [];
       const params: any[] = [];
+      const targetClient = filter.clientId || "default";
+
+      conditions.push("(client_id = ? OR (client_id IS NULL AND ? = 'default'))");
+      params.push(targetClient, targetClient);
 
       if (filter.startDate) {
         conditions.push("created_at >= ?");
@@ -157,11 +170,15 @@ export const fallbackDb = {
    */
   async getFallbackQueryCount(
     db: D1Database,
-    filter: { startDate?: string; endDate?: string; unclusteredOnly?: boolean }
+    filter: { startDate?: string; endDate?: string; unclusteredOnly?: boolean; clientId?: string }
   ) {
     try {
       const conditions: string[] = [];
       const params: any[] = [];
+      const targetClient = filter.clientId || "default";
+
+      conditions.push("(client_id = ? OR (client_id IS NULL AND ? = 'default'))");
+      params.push(targetClient, targetClient);
 
       if (filter.unclusteredOnly !== false) {
         conditions.push("cluster_id IS NULL");
@@ -202,21 +219,24 @@ export const fallbackDb = {
       suggestedCategoryName?: string;
       frequencyPeriod: 'daily' | 'weekly' | 'monthly' | 'manual';
       linkedQueryIds: string[];
+      clientId?: string;
     }
   ) {
     const clusterId = nanoid();
     const sampleJson = JSON.stringify(cluster.sampleQueries || []);
+    const client = cluster.clientId || "default";
 
     try {
       await db
         .prepare(
           `INSERT INTO fallback_clusters (
-            id, cluster_name, summary, query_count, sample_queries,
+            id, client_id, cluster_name, summary, query_count, sample_queries,
             suggested_action, is_new_category, suggested_category_name, frequency_period, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime())`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime())`
         )
         .bind(
           clusterId,
+          client,
           cluster.name,
           cluster.summary,
           cluster.queryCount,
@@ -248,14 +268,17 @@ export const fallbackDb = {
    * Fetch saved clusters for display on the Admin UI with pagination support.
    * Filters out orphaned historical clusters and computes exact active query counts.
    */
-  async getLatestClusters(db: D1Database, limit: number = 6, page: number = 1) {
+  async getLatestClusters(db: D1Database, limit: number = 6, page: number = 1, clientId: string = "default") {
     try {
-      // 1. Clean up orphaned clusters from past re-clustering runs
+      const targetClient = clientId || "default";
+      // 1. Clean up orphaned clusters from past re-clustering runs for this client
       await db
         .prepare(
           `DELETE FROM fallback_clusters 
-           WHERE id NOT IN (SELECT DISTINCT cluster_id FROM fallback_queries WHERE cluster_id IS NOT NULL)`
+           WHERE (client_id = ? OR (client_id IS NULL AND ? = 'default'))
+             AND id NOT IN (SELECT DISTINCT cluster_id FROM fallback_queries WHERE cluster_id IS NOT NULL)`
         )
+        .bind(targetClient, targetClient)
         .run()
         .catch(() => {});
 
@@ -264,23 +287,25 @@ export const fallbackDb = {
       // 2. Query active clusters linked to current fallback_queries with pagination
       const { results } = await db
         .prepare(
-          `SELECT c.id, c.cluster_name, c.summary, 
+          `SELECT c.id, c.client_id, c.cluster_name, c.summary, 
                   COUNT(q.id) as query_count, 
                   c.sample_queries, c.suggested_action, 
                   c.is_new_category, c.suggested_category_name, 
                   c.frequency_period, c.created_at
            FROM fallback_clusters c
            INNER JOIN fallback_queries q ON q.cluster_id = c.id
+           WHERE (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))
            GROUP BY c.id
            HAVING COUNT(q.id) > 0
            ORDER BY c.created_at DESC
            LIMIT ? OFFSET ?`
         )
-        .bind(limit, offset)
+        .bind(targetClient, targetClient, limit, offset)
         .all();
 
       return (results || []).map((row: any) => ({
         id: row.id,
+        client_id: row.client_id,
         cluster_name: row.cluster_name,
         summary: row.summary,
         query_count: Number(row.query_count || 0),
@@ -300,14 +325,17 @@ export const fallbackDb = {
   /**
    * Get total count of active clusters currently linked to queries.
    */
-  async getActiveClustersCount(db: D1Database) {
+  async getActiveClustersCount(db: D1Database, clientId: string = "default") {
     try {
+      const targetClient = clientId || "default";
       const row: any = await db
         .prepare(
           `SELECT COUNT(DISTINCT c.id) as cnt
            FROM fallback_clusters c
-           INNER JOIN fallback_queries q ON q.cluster_id = c.id`
+           INNER JOIN fallback_queries q ON q.cluster_id = c.id
+           WHERE (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))`
         )
+        .bind(targetClient, targetClient)
         .first();
       return Number(row?.cnt || 0);
     } catch (err) {
@@ -318,12 +346,13 @@ export const fallbackDb = {
   /**
    * Fetch all raw fallback queries belonging to a specific cluster ID.
    */
-  async getQueriesForCluster(db: D1Database, clusterId: string) {
+  async getQueriesForCluster(db: D1Database, clusterId: string, clientId: string = "default") {
     try {
+      const targetClient = clientId || "default";
       // 1. Fetch cluster sample queries for fallback matching
       const clusterRow = await db
-        .prepare(`SELECT sample_queries FROM fallback_clusters WHERE id = ?`)
-        .bind(clusterId)
+        .prepare(`SELECT sample_queries FROM fallback_clusters WHERE id = ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))`)
+        .bind(clusterId, targetClient, targetClient)
         .first<{ sample_queries: string }>();
 
       let sampleQueries: string[] = [];
@@ -334,12 +363,12 @@ export const fallbackDb = {
       // 2. Fetch queries explicitly assigned to cluster_id
       const { results } = await db
         .prepare(
-          `SELECT id, thread_id, user_id, query_text, reason, created_at
+          `SELECT id, thread_id, user_id, client_id, query_text, reason, created_at
            FROM fallback_queries
-           WHERE cluster_id = ?
+           WHERE cluster_id = ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
            ORDER BY created_at DESC`
         )
-        .bind(clusterId)
+        .bind(clusterId, targetClient, targetClient)
         .all();
 
       let queries = (results || []) as unknown as FallbackQueryRecord[];
@@ -353,12 +382,12 @@ export const fallbackDb = {
           if (!existingTexts.has(sampleText.trim().toLowerCase())) {
             const matchRow = await db
               .prepare(
-                `SELECT id, thread_id, user_id, query_text, reason, created_at
+                `SELECT id, thread_id, user_id, client_id, query_text, reason, created_at
                  FROM fallback_queries
-                 WHERE LOWER(query_text) = LOWER(?)
+                 WHERE LOWER(query_text) = LOWER(?) AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
                  ORDER BY created_at DESC LIMIT 1`
               )
-              .bind(sampleText.trim())
+              .bind(sampleText.trim(), targetClient, targetClient)
               .first<FallbackQueryRecord>();
 
             if (matchRow) {
@@ -370,6 +399,7 @@ export const fallbackDb = {
                 id: nanoid(),
                 thread_id: null,
                 user_id: "system_sample",
+                client_id: targetClient,
                 query_text: sampleText,
                 reason: "sample_fallback",
                 created_at: new Date().toISOString(),
@@ -390,10 +420,12 @@ export const fallbackDb = {
   /**
    * Get total count of unclustered fallback queries.
    */
-  async getUnclusteredCount(db: D1Database) {
+  async getUnclusteredCount(db: D1Database, clientId: string = "default") {
     try {
+      const targetClient = clientId || "default";
       const row = await db
-        .prepare(`SELECT COUNT(*) as total FROM fallback_queries WHERE cluster_id IS NULL`)
+        .prepare(`SELECT COUNT(*) as total FROM fallback_queries WHERE cluster_id IS NULL AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))`)
+        .bind(targetClient, targetClient)
         .first<{ total: number }>();
       return row?.total || 0;
     } catch {

@@ -1,27 +1,62 @@
 <div class="logo">
   <a href="javascript:void(0)" [routerLink]="['/dashboard']" class="logo-text">
-    {{appName}}
+    {{ appName }}
   </a>
 </div>
+
 <div class="sidebar-wrapper">
+  <!-- Active Tenant Workspace Indicator for Super Admin -->
+  <div *ngIf="isSuperAdmin && activeClientId" class="px-3 py-2 mx-3 mb-2 rounded border" style="background: rgba(49, 103, 243, 0.12); border-color: rgba(49, 103, 243, 0.25) !important;">
+    <div class="d-flex justify-content-between align-items-center">
+      <div class="text-truncate" style="max-width: 140px;">
+        <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: #3167f3; display: block;">Active Business</span>
+        <strong style="font-size: 12px; color: #1e293b;" [title]="activeClientName">{{ activeClientName }}</strong>
+      </div>
+      <button (click)="resetToAllClients()" class="btn btn-link btn-sm p-0 text-danger" title="Exit to Global View" style="font-size: 14px;">
+        <i class="ri-close-circle-fill"></i>
+      </button>
+    </div>
+    <div class="mt-1 pt-1 border-top" style="border-color: rgba(49, 103, 243, 0.2) !important;">
+      <a [routerLink]="['/dashboard/super-admin/clients', activeClientId]" style="font-size: 11px; font-weight: 600; color: #3167f3; text-decoration: none;">
+        <i class="ri-settings-4-line me-1"></i> Edit Creds & Secrets
+      </a>
+    </div>
+  </div>
+
   <ul class="nav">
-    <li routerLinkActive="active" [routerLinkActiveOptions]="
-        menuitem.path === '/dashboard' ? { exact: true } : {}
-      " *ngFor="let menuitem of menuItems" class="nav-item">
-      <!--If is a single link-->
+    <!-- 🏢 Super Admin Navigation Section -->
+    <li *ngIf="isSuperAdmin" class="nav-section-header px-3 mt-2 mb-1">
+      <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 800; color: #94a3b8;">Super Admin</span>
+    </li>
+
+    <li *ngFor="let superitem of superAdminItems" routerLinkActive="active" class="nav-item">
+      <a [routerLink]="[superitem.path]" class="nav-link">
+        <i class="material-icons">{{ superitem.icontype }}</i>
+        <p>{{ superitem.title }}</p>
+      </a>
+    </li>
+
+    <!-- 🤖 Tenant AI Playground Section Header -->
+    <li class="nav-section-header px-3 mt-3 mb-1">
+      <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 800; color: #94a3b8;">
+        {{ isSuperAdmin ? 'Client Playground' : 'AI Workspace' }}
+      </span>
+    </li>
+
+    <!-- Standard Menu Items -->
+    <li routerLinkActive="active" [routerLinkActiveOptions]="menuitem.path === '/dashboard' ? { exact: true } : {}" *ngFor="let menuitem of menuItems" class="nav-item">
+      <!-- If single link -->
       <a [routerLink]="[menuitem.path]" *ngIf="menuitem.type === 'link'" class="nav-link">
         <i class="material-icons">{{ menuitem.icontype }}</i>
-
         <p>{{ menuitem.title }}</p>
       </a>
-      <!--If it have a submenu-->
-      <a data-toggle="collapse" href="#{{ menuitem.collapse }}" id="{{ menuitem.collapse }}-p"
-        *ngIf="menuitem.type === 'sub'" (click)="updatePS(); expandOrCollapseMenu(menuitem.collapse)" class="nav-link">
+
+      <!-- If submenu -->
+      <a data-toggle="collapse" href="#{{ menuitem.collapse }}" id="{{ menuitem.collapse }}-p" *ngIf="menuitem.type === 'sub'" (click)="updatePS(); expandOrCollapseMenu(menuitem.collapse)" class="nav-link">
         <i class="material-icons">{{ menuitem.icontype }}</i>
         <p>{{ menuitem.title }}<b class="caret"></b></p>
       </a>
 
-      <!--Display the submenu items-->
       <div id="{{ menuitem.collapse }}" class="collapse" *ngIf="menuitem.type === 'sub'">
         <ul class="nav">
           <li routerLinkActive="" *ngFor="let childitem of menuitem.children" class="nav-item">

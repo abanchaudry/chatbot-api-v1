@@ -44,19 +44,20 @@ const daysInclusive = (from: Date, to: Date) => {
 };
 
 export const chatAnalyticsDb = {
-  async getTotals(db: D1Database, from: Date, to: Date): Promise<Totals> {
+  async getTotals(db: D1Database, from: Date, to: Date, clientId: string = "default"): Promise<Totals> {
     const fromTs = startOfDayISO(from);
     const toTsExclusive = nextDayStartISO(to);
+    const targetClient = clientId || "default";
 
     const sessionsRes = await db
       .prepare(
         `
         SELECT COUNT(*) AS n
         FROM threads
-        WHERE created_at >= ? AND created_at < ?
+        WHERE created_at >= ? AND created_at < ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
       `
       )
-      .bind(fromTs, toTsExclusive)
+      .bind(fromTs, toTsExclusive, targetClient, targetClient)
       .first();
 
     const messagesRes = await db
@@ -64,10 +65,10 @@ export const chatAnalyticsDb = {
         `
         SELECT COUNT(*) AS n
         FROM messages
-        WHERE created_at >= ? AND created_at < ?
+        WHERE created_at >= ? AND created_at < ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
       `
       )
-      .bind(fromTs, toTsExclusive)
+      .bind(fromTs, toTsExclusive, targetClient, targetClient)
       .first();
 
     const busiestRes = await db
@@ -75,13 +76,13 @@ export const chatAnalyticsDb = {
         `
         SELECT date(created_at) AS d, COUNT(*) AS n
         FROM threads
-        WHERE created_at >= ? AND created_at < ?
+        WHERE created_at >= ? AND created_at < ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
         GROUP BY date(created_at)
         ORDER BY n DESC, d DESC
         LIMIT 1
       `
       )
-      .bind(fromTs, toTsExclusive)
+      .bind(fromTs, toTsExclusive, targetClient, targetClient)
       .first();
 
     const total_sessions = Number((sessionsRes as any)?.n || 0);
@@ -98,20 +99,21 @@ export const chatAnalyticsDb = {
     return { total_sessions, total_messages, avg_sessions_per_day, busiest_day };
   },
 
-  async getDailyBreakdown(db: D1Database, from: Date, to: Date): Promise<DailyRow[]> {
+  async getDailyBreakdown(db: D1Database, from: Date, to: Date, clientId: string = "default"): Promise<DailyRow[]> {
     const fromTs = startOfDayISO(from);
     const toTsExclusive = nextDayStartISO(to);
+    const targetClient = clientId || "default";
 
     const sessionsByDay = await db
       .prepare(
         `
         SELECT date(created_at) AS d, COUNT(*) AS sessions
         FROM threads
-        WHERE created_at >= ? AND created_at < ?
+        WHERE created_at >= ? AND created_at < ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
         GROUP BY date(created_at)
       `
       )
-      .bind(fromTs, toTsExclusive)
+      .bind(fromTs, toTsExclusive, targetClient, targetClient)
       .all();
 
     const messagesByDay = await db
@@ -119,11 +121,11 @@ export const chatAnalyticsDb = {
         `
         SELECT date(created_at) AS d, COUNT(*) AS messages
         FROM messages
-        WHERE created_at >= ? AND created_at < ?
+        WHERE created_at >= ? AND created_at < ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default'))
         GROUP BY date(created_at)
       `
       )
-      .bind(fromTs, toTsExclusive)
+      .bind(fromTs, toTsExclusive, targetClient, targetClient)
       .all();
 
     const sessionsMap = new Map<string, number>();
@@ -154,11 +156,12 @@ export const chatAnalyticsDb = {
     return rows;
   },
 
-  async getThreadsByDate(db: D1Database, dateISO: string): Promise<ThreadRow[]> {
+  async getThreadsByDate(db: D1Database, dateISO: string, clientId: string = "default"): Promise<ThreadRow[]> {
     const dayStart = `${dateISO} 00:00:00`;
     const nextDay = new Date(dateISO);
     nextDay.setDate(nextDay.getDate() + 1);
     const dayEndExclusive = `${toISODate(nextDay)} 00:00:00`;
+    const targetClient = clientId || "default";
 
     const res = await db
       .prepare(
@@ -173,11 +176,11 @@ export const chatAnalyticsDb = {
             WHERE m.thread_id = t.thread_id
           ) AS message_count
         FROM threads t
-        WHERE t.created_at >= ? AND t.created_at < ?
+        WHERE t.created_at >= ? AND t.created_at < ? AND (t.client_id = ? OR (t.client_id IS NULL AND ? = 'default'))
         ORDER BY t.created_at DESC
       `
       )
-      .bind(dayStart, dayEndExclusive)
+      .bind(dayStart, dayEndExclusive, targetClient, targetClient)
       .all();
 
     return (res.results || []).map((r: any) => ({

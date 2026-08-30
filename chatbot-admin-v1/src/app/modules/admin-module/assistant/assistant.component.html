@@ -1,13 +1,13 @@
 <div class="main-content">
   <div class="container-fluid">
 
-    <!-- 🔵 Royal Blue Hero Banner Box (Matches Chat Analytics 1:1) -->
+    <!-- Hero Banner Box -->
     <div class="row mb-4">
       <div class="col-12">
         <div class="ai-knowledge-box">
-          <div class="content">
+          <div>
             <h1 class="ai-title">Business & AI Persona</h1>
-            <p class="ai-subtitle">Configure company branding, persona tone, language, and dynamic AI domain instructions</p>
+            <p class="ai-subtitle">Configure company branding, persona tone, language, and AI domain instructions</p>
           </div>
           <div class="quick-stat d-none d-md-block">
             <span class="badge-live">Active Persona</span>
@@ -16,7 +16,7 @@
       </div>
     </div>
 
-    <!-- 📊 Persona Quick Overview Cards (Matches Chat Analytics 1:1) -->
+    <!-- Persona Quick Overview Cards -->
     <div class="row justify-content-center mb-4">
       <!-- Company Name Card -->
       <div class="col-md-4">
@@ -82,7 +82,7 @@
       </div>
     </div>
 
-    <!-- 🏢 Business Profile & Persona Configuration Card -->
+    <!-- Business Profile & Persona Configuration Card -->
     <div class="row mb-4">
       <div class="col-md-12">
         <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
@@ -126,48 +126,33 @@
                 </div>
               </div>
 
-              <!-- ✨ AI DOMAIN PROMPT GENERATOR SECTION -->
-              <div class="row mt-3 mb-3">
+              <!-- Assistant Intro & Role Briefing (Domain Hint) -->
+              <div class="row mt-3">
                 <div class="col-md-12">
-                  <div class="p-4 rounded border" style="background: #f0f9ff; border-color: #bae6fd !important;">
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                      <i class="ri-sparkling-fill text-primary fs-5"></i>
-                      <h5 style="font-size: 15px; font-weight: 700; color: #1e293b;" class="mb-0">AI Domain System Instruction Generator</h5>
+                  <div class="p-3 mb-3 rounded" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                      <i class="ri-information-line text-primary fs-5"></i>
+                      <h6 class="mb-0 fw-bold" style="color: #1e293b; font-size: 14px;">What is the Domain Hint? (Intro & Role Briefing)</h6>
                     </div>
-                    <p style="font-size: 13px; color: #475569;" class="mb-3">
-                      Type a brief summary of what your business does, and click <strong>Generate System Prompt with AI</strong> to automatically synthesize structured domain instructions for your RAG chatbot.
+                    <p class="mb-0 text-muted" style="font-size: 12.5px; line-height: 1.5;">
+                      Briefly describe who your AI represents, your industry, and its core role (e.g. <em>"Official customer support and knowledge assistant for Acme Corp, a digital marketing agency"</em>). 
+                      All factual answers and data are automatically retrieved from your uploaded files and crawled web pages.
                     </p>
-
-                    <mat-form-field class="example-full-width custom-border w-100 bg-white rounded" appearance="outline">
-                      <mat-label>Raw Business Summary (for AI Generator)</mat-label>
-                      <textarea matInput placeholder="e.g. We are an e-commerce store selling wireless headphones. We assist with order tracking, returns, warranty claims, and troubleshooting." name="rawBusinessDescription" [(ngModel)]="rawBusinessDescription" rows="2"></textarea>
-                    </mat-form-field>
-
-                    <div class="d-flex justify-content-end mt-2">
-                      <button type="button" class="apply-action-btn d-flex align-items-center gap-2" (click)="onGenerateDomainPrompt()" [disabled]="isGeneratingDomain" style="background: #3167f3;">
-                        <i class="ri-sparkling-line" [class.ri-loader-4-line]="isGeneratingDomain" [class.spin]="isGeneratingDomain"></i>
-                        <span>{{ isGeneratingDomain ? 'Generating Prompt...' : '✨ Generate System Prompt with AI' }}</span>
-                      </button>
-                    </div>
                   </div>
-                </div>
-              </div>
 
-              <!-- Active System Prompt Domain Instructions -->
-              <div class="row">
-                <div class="col-md-12">
                   <mat-form-field class="example-full-width custom-border w-100" appearance="outline">
-                    <mat-label>Active System Prompt Domain Instructions (domain_hint)</mat-label>
-                    <textarea matInput placeholder="Generated or custom domain instruction prompt..." name="domainHint" [(ngModel)]="settings.domain_hint" rows="5" required></textarea>
+                    <mat-label>Assistant Intro & Role Briefing (Domain Hint)</mat-label>
+                    <textarea matInput placeholder="e.g. Official customer support and knowledge assistant for Acme Corp. Answer questions accurately, helpfully, and professionally based on the company's knowledge base." name="domainHint" [(ngModel)]="settings.domain_hint" rows="4" required></textarea>
+                    <mat-hint>1–2 sentences introducing your assistant's identity, brand, and role.</mat-hint>
                   </mat-form-field>
                 </div>
               </div>
 
               <!-- Save Action Button -->
               <div class="col-12 d-flex justify-content-end mt-3 pt-3 border-top">
-                <button type="submit" class="apply-action-btn d-flex align-items-center gap-2" [disabled]="isSavingSettings" style="background: #3167f3; font-size: 14px; padding: 10px 24px;">
+                <button type="submit" class="button-primary" [disabled]="isSavingSettings" style="font-size: 14px; padding: 9px 24px;">
                   <i class="ri-save-line" [class.ri-loader-4-line]="isSavingSettings" [class.spin]="isSavingSettings"></i>
-                  <span>{{ isSavingSettings ? 'Saving Settings...' : '💾 Save Business Settings' }}</span>
+                  <span>{{ isSavingSettings ? 'Saving...' : 'Save Business Settings' }}</span>
                 </button>
               </div>
             </form>

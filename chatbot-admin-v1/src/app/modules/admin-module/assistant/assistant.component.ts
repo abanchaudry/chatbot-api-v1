@@ -29,9 +29,6 @@ export class AssistantComponent implements OnInit {
     primary_language: 'english'
   };
   isLoadingSettings: boolean = true;
-
-  rawBusinessDescription: string = '';
-  isGeneratingDomain: boolean = false;
   isSavingSettings: boolean = false;
 
   constructor(private assistantService: AssistantService, private cdr: ChangeDetectorRef, private alert: alert) {}
@@ -55,30 +52,6 @@ export class AssistantComponent implements OnInit {
         this.isLoadingSettings = false;
         this.cdr.detectChanges();
       }
-    });
-  }
-
-  onGenerateDomainPrompt() {
-    if (!this.rawBusinessDescription.trim()) {
-      this.alert.responseAlert('Please enter a brief business summary first.', 'warning');
-      return;
-    }
-    this.isGeneratingDomain = true;
-    this.assistantService.generateDomainPrompt({
-      companyName: this.settings.company_name,
-      rawDescription: this.rawBusinessDescription
-    }).subscribe((res: any) => {
-      this.isGeneratingDomain = false;
-      if (res && res.ok && res.generatedDomainHint) {
-        this.settings.domain_hint = res.generatedDomainHint;
-        this.alert.responseAlert('AI Domain System Instructions generated successfully!', 'success');
-        this.cdr.detectChanges();
-      } else {
-        this.alert.responseAlert(res?.error || 'Failed to generate AI prompt', 'error');
-      }
-    }, (err) => {
-      this.isGeneratingDomain = false;
-      this.alert.responseAlert('Failed to connect to AI generator', 'error');
     });
   }
 

@@ -19,12 +19,13 @@ const extractSection = (text?: string | null) =>
 
 const ALLOWED_TABLES = new Set(["files", "chunks", "threads", "messages", "ingest_jobs", "ingest_logs", "auth"]);
 
-async function safeCount(db: D1Database, table: string): Promise<number> {
+async function safeCount(db: D1Database, table: string, clientId?: string): Promise<number> {
   if (!ALLOWED_TABLES.has(table)) {
     throw new Error(`Invalid table name: ${table}`);
   }
   try {
-    const row = await db.prepare(`SELECT COUNT(*) AS total FROM ${table}`).first();
+    const targetClient = clientId || "default";
+    const row = await db.prepare(`SELECT COUNT(*) AS total FROM ${table} WHERE (client_id = ? OR (client_id IS NULL AND ? = 'default'))`).bind(targetClient, targetClient).first();
     return (row as any)?.total || 0;
   } catch {
     return 0;
@@ -64,17 +65,18 @@ export const fileDb = {
     }
   },
 
-  async saveFile(db: D1Database, name: string, size: number, status: string, uuid: string, path: string, dataset: string = "admin") {
+  async saveFile(db: D1Database, name: string, size: number, status: string, uuid: string, path: string, dataset: string = "admin", clientId: string = "default") {
     await this.ensureFilesSchema(db);
     await db.prepare(
-      `INSERT INTO files (file_name, file_size, file_status, file_id, file_path, dataset, source, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime(), datetime())`
-    ).bind(name, size, status, uuid, path, dataset, dataset).run();
+      `INSERT INTO files (file_name, file_size, file_status, file_id, file_path, dataset, source, client_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime(), datetime())`
+    ).bind(name, size, status, uuid, path, dataset, dataset, clientId || "default").run();
     return uuid;
   },
 
-  async getAllFilesWithChunkCount(db: D1Database) {
+  async getAllFilesWithChunkCount(db: D1Database, clientId?: string) {
     await this.ensureFilesSchema(db);
+    const targetClient = clientId || "default";
     const result = await db.prepare(
       `SELECT 
          f.file_id,
@@ -87,9 +89,10 @@ export const fileDb = {
          COUNT(c.chunk_id) AS chunk_count
        FROM files f
        LEFT JOIN chunks c ON c.file_id = f.file_id
+       WHERE (f.client_id = ? OR (f.client_id IS NULL AND ? = 'default'))
        GROUP BY f.file_id, f.file_name, f.file_size, f.file_status, f.created_at, f.file_path, f.dataset
        ORDER BY f.created_at DESC`
-    ).all();
+    ).bind(targetClient, targetClient).all();
     return result.results || [];
   },
 
@@ -98,11 +101,12 @@ export const fileDb = {
     return await db.prepare(`SELECT * FROM files WHERE file_id = ? LIMIT 1`).bind(fileId).first();
   },
 
-  async findByChecksum(db: D1Database, checksum: string) {
+  async findByChecksum(db: D1Database, checksum: string, clientId?: string) {
     await this.ensureFilesSchema(db);
+    const targetClient = clientId || "default";
     return await db
-      .prepare(`SELECT * FROM files WHERE checksum = ? ORDER BY created_at DESC LIMIT 1`)
-      .bind(checksum)
+      .prepare(`SELECT * FROM files WHERE checksum = ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default')) ORDER BY created_at DESC LIMIT 1`)
+      .bind(checksum, targetClient, targetClient)
       .first();
   },
 
@@ -120,24 +124,27 @@ export const fileDb = {
       upload_id?: string | null;
       chunk_method?: string | null;
       embedding_model?: string | null;
+      clientId?: string;
     }
   ) {
     await this.ensureFilesSchema(db);
 
+    const targetClient = f.clientId || "default";
     const existing = await db
-      .prepare(`SELECT * FROM files WHERE file_name = ? AND checksum = ? ORDER BY created_at DESC LIMIT 1`)
-      .bind(f.name, f.checksum)
+      .prepare(`SELECT * FROM files WHERE file_name = ? AND checksum = ? AND (client_id = ? OR (client_id IS NULL AND ? = 'default')) ORDER BY created_at DESC LIMIT 1`)
+      .bind(f.name, f.checksum, targetClient, targetClient)
       .first();
 
     if (existing) return existing;
 
     const dataset = f.dataset || (f.source === "admin" ? "admin" : "web");
+    const tenant = f.clientId || "default";
 
     await db.prepare(
       `INSERT INTO files (
          file_id, file_name, file_size, file_status, created_at, updated_at,
-         dataset, source, version, checksum, file_path, upload_id, chunk_method, embedding_model, chunk_count
-       ) VALUES (?, ?, ?, 'received', datetime(), datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         dataset, source, version, checksum, file_path, upload_id, chunk_method, embedding_model, chunk_count, client_id
+       ) VALUES (?, ?, ?, 'received', datetime(), datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       f.id,
       f.name,
@@ -150,7 +157,8 @@ export const fileDb = {
       f.upload_id || null,
       f.chunk_method || null,
       f.embedding_model || null,
-      0
+      0,
+      tenant
     ).run();
 
     return f;
@@ -294,12 +302,12 @@ export const fileDb = {
     await db.prepare(`DELETE FROM files WHERE file_id = ?`).bind(fileId).run();
   },
 
-  async getStats(db: D1Database) {
+  async getStats(db: D1Database, clientId?: string) {
     const [files, chunks, threads, messages] = await Promise.all([
-      safeCount(db, "files"),
-      safeCount(db, "chunks"),
-      safeCount(db, "threads"),
-      safeCount(db, "messages"),
+      safeCount(db, "files", clientId),
+      safeCount(db, "chunks", clientId),
+      safeCount(db, "threads", clientId),
+      safeCount(db, "messages", clientId),
     ]);
     return { totalFiles: files, totalChunks: chunks, totalThreads: threads, totalMessages: messages };
   },
@@ -316,10 +324,12 @@ export const fileDb = {
       chunkMethod: string;
       dataset?: "admin" | "pdf" | "web" | string;
       source?: "admin" | "cron" | "wp";
+      clientId?: string;
     }
   ) {
     const origin = args.source || "admin";
     const dataset = args.dataset || (origin === "admin" ? "admin" : "web");
+    const tenant = args.clientId || "default";
 
     const statements = await Promise.all(
       args.chunks.map(async (ch) => {
@@ -335,8 +345,8 @@ export const fileDb = {
              tags, topic, first_sentence, section, chunk_index,
              section_number, section_keywords, priority_level,
              content_hash, embedding_model, chunk_method,
-             tier, parent_id
-           ) VALUES (?, ?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+             tier, parent_id, client_id
+           ) VALUES (?, ?, ?, ?, ?, ?, datetime(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           chunk_id,
           args.fileId,
@@ -356,7 +366,8 @@ export const fileDb = {
           args.embeddingModel,
           args.chunkMethod,
           ch.tier || "standard",
-          ch.parentId || null
+          ch.parentId || null,
+          tenant
         );
       })
     );

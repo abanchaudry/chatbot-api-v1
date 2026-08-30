@@ -13,7 +13,8 @@ export const messagesdb = {
     answer: string,
     context: string,
     tokenUsage: number,
-    isAnswered = 1
+    isAnswered = 1,
+    clientId: string = "default"
   ): Promise<string> {
     const res = await db
       .prepare(
@@ -21,16 +22,17 @@ export const messagesdb = {
         INSERT INTO messages (
           thread_id,
           user_id,
+          client_id,
           question,
           answer,
           context,
           token_usage,
           is_answered,
           created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime())
       `
       )
-      .bind(threadId, userId, question, answer, context, tokenUsage, isAnswered)
+      .bind(threadId, userId, clientId || "default", question, answer, context, tokenUsage, isAnswered)
       .run();
 
     const lastRowId = (res as any)?.meta?.last_row_id;

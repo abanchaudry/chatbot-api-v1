@@ -32,7 +32,7 @@ import {
   type LocalEvidenceAssessment,
 } from "../utils/ask-helper";
 
-import { traceSpan, traceStepEnd, traceStepFail, traceSetFinalContext, finalizeTrace, traceLogFinalContextDetail, traceLogAnswerGeneration } from "../utils/trace";
+import { traceSpan, traceStepStart, traceStepEnd, traceStepFail, traceSetFinalContext, finalizeTrace, traceLogFinalContextDetail, traceLogAnswerGeneration } from "../utils/trace";
 
 import { persist } from "../utils/ask-helper";
 
@@ -519,6 +519,7 @@ export async function executePipeline(args: {
   chains: any;
   startedAt: number;
   localEvidence: LocalEvidenceAssessment;
+  clientId?: string;
 }): Promise<ExecuteResult> {
   const {
     c,
@@ -536,7 +537,13 @@ export async function executePipeline(args: {
     chains,
     startedAt,
     localEvidence,
+    clientId = "default",
   } = args;
+
+  const t0 = now();
+  traceStepStart(trace, "final_execution", {
+    hasContext: !!context && context.trim().length > 0,
+  });
 
   // ==== Zero Evidence Guard: If no context or insufficient local evidence, immediately fallback ====
   if (!context || !context.trim() || !localEvidence.sufficient) {
@@ -555,7 +562,8 @@ export async function executePipeline(args: {
         "",
         0,
         "degraded",
-        JSON.stringify(finalizeTrace(trace, true))
+        JSON.stringify(finalizeTrace(trace, true)),
+        clientId
       ).catch((e) => logError("persist_zero_evidence_fallback_failed", e))
     );
 
@@ -671,7 +679,8 @@ export async function executePipeline(args: {
           trimmed.context,
           primaryAnswer.tokensUsed,
           "success",
-          JSON.stringify(finalTrace)
+          JSON.stringify(finalTrace),
+          clientId
         ).catch((e) => {
           logError("persist_failed", e, { userId, threadId });
         })
@@ -739,7 +748,8 @@ export async function executePipeline(args: {
         "",
         rescue.tokensUsed,
         rescue.ok ? "success" : "degraded",
-        JSON.stringify(finalTrace)
+        JSON.stringify(finalTrace),
+        clientId
       ).catch((e) => {
         logError("persist_failed", e, { userId, threadId });
       })
@@ -782,7 +792,8 @@ export async function executePipeline(args: {
       trimmed.context,
       primaryAnswer.tokensUsed,
       "success",
-      JSON.stringify(finalTrace)
+      JSON.stringify(finalTrace),
+      clientId
     ).catch((e) => {
       logError("persist_failed", e, { userId, threadId });
     })

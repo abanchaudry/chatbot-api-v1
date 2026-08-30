@@ -2,6 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 export interface SystemSettings {
   id: string;
+  client_id?: string;
   company_name: string;
   assistant_name: string;
   domain_hint: string;
@@ -19,6 +20,7 @@ export interface SystemSettings {
 
 export const DEFAULT_SETTINGS: SystemSettings = {
   id: "default",
+  client_id: "default",
   company_name: "Enterprise Assistant",
   assistant_name: "C",
   domain_hint: "Official customer support and knowledge base assistant.",
@@ -44,21 +46,41 @@ export function getDatasetSignature(settings?: Partial<SystemSettings>): string 
 }
 
 export class SettingsDbService {
-  async getSettings(db: D1Database): Promise<SystemSettings> {
+  async getSettings(db: D1Database, clientId: string = "default"): Promise<SystemSettings> {
     try {
-      const row = await db
-        .prepare("SELECT id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at FROM system_settings WHERE id = 'default' LIMIT 1")
+      let row = await db
+        .prepare(
+          `SELECT id, client_id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at 
+           FROM system_settings 
+           WHERE client_id = ? LIMIT 1`
+        )
+        .bind(clientId)
         .first<SystemSettings>();
 
-      return row ? { ...DEFAULT_SETTINGS, ...row } : DEFAULT_SETTINGS;
+      // Fallback: if no custom row for this client_id, check by id or default
+      if (!row && clientId === "default") {
+        row = await db
+          .prepare(
+            `SELECT id, client_id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at 
+             FROM system_settings 
+             WHERE id = 'default' LIMIT 1`
+          )
+          .first<SystemSettings>();
+      }
+
+      return row ? { ...DEFAULT_SETTINGS, ...row } : { ...DEFAULT_SETTINGS, client_id: clientId };
     } catch (err: any) {
       console.warn("SettingsDbService.getSettings warning:", err?.message || err);
-      return DEFAULT_SETTINGS;
+      return { ...DEFAULT_SETTINGS, client_id: clientId };
     }
   }
 
-  async saveSettings(db: D1Database, settings: Partial<SystemSettings>): Promise<SystemSettings> {
-    const current = await this.getSettings(db);
+  async saveSettings(
+    db: D1Database,
+    settings: Partial<SystemSettings>,
+    clientId: string = "default"
+  ): Promise<SystemSettings> {
+    const current = await this.getSettings(db, clientId);
     const company = String(settings.company_name !== undefined ? settings.company_name : current.company_name).trim();
     const assistant = String(settings.assistant_name !== undefined ? settings.assistant_name : current.assistant_name).trim();
     const domain = String(settings.domain_hint !== undefined ? settings.domain_hint : current.domain_hint).trim();
@@ -72,11 +94,14 @@ export class SettingsDbService {
     const webEnabled = settings.dataset_web_enabled !== undefined ? Number(settings.dataset_web_enabled) : (current.dataset_web_enabled ?? 1);
     const webWeight = settings.dataset_web_weight !== undefined ? Number(settings.dataset_web_weight) : (current.dataset_web_weight ?? 1.00);
 
+    const settingId = current.id && current.id !== "default" ? current.id : `settings_${clientId}`;
+
     await db
       .prepare(
-        `INSERT INTO system_settings (id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at)
-         VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `INSERT INTO system_settings (id, client_id, company_name, assistant_name, domain_hint, brand_tone, primary_language, fallback_schedule, dataset_admin_enabled, dataset_admin_weight, dataset_pdf_enabled, dataset_pdf_weight, dataset_web_enabled, dataset_web_weight, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
          ON CONFLICT(id) DO UPDATE SET
+           client_id = excluded.client_id,
            company_name = excluded.company_name,
            assistant_name = excluded.assistant_name,
            domain_hint = excluded.domain_hint,
@@ -91,9 +116,9 @@ export class SettingsDbService {
            dataset_web_weight = excluded.dataset_web_weight,
            updated_at = CURRENT_TIMESTAMP`
       )
-      .bind(company, assistant, domain, tone, lang, schedule, adminEnabled, adminWeight, pdfEnabled, pdfWeight, webEnabled, webWeight)
+      .bind(settingId, clientId, company, assistant, domain, tone, lang, schedule, adminEnabled, adminWeight, pdfEnabled, pdfWeight, webEnabled, webWeight)
       .run();
 
-    return this.getSettings(db);
+    return this.getSettings(db, clientId);
   }
 }

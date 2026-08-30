@@ -3,6 +3,7 @@ import { CloudflareVectorizeStore } from "@langchain/cloudflare";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import type { VectorizeIndex } from "@cloudflare/workers-types";
 import { Document } from "@langchain/core/documents";
+import { cloudflareVectorizeRestService, type VectorizeRestRecord } from "./cloudflare-vectorize-rest.service";
 
 export type Chunk = {
   id: string;
@@ -24,6 +25,12 @@ export type VectorHit = {
   score100: number;  // 0..100
   rawScore: number;  // underlying score from store
 };
+
+export interface ByokVectorConfig {
+  cfAccountId: string;
+  cfApiToken: string;
+  indexName?: string;
+}
 
 import { INGEST_CONFIG, RETRY_CONFIG } from "../constants";
 import { sleep, backoff } from "../utils/retry";
@@ -57,6 +64,7 @@ function buildDoc(c: Chunk): Document {
     pageContent: contentStr,
     metadata: {
       chunk_id: c?.id || "",
+      text: contentStr,
       topic: c?.topic || "general",
       section: c?.section || "",
       section_number: c?.sectionNumber ?? "",
@@ -87,19 +95,56 @@ export const vectorService = {
   async storeChunks(
     chunks: Chunk[],
     apiKey: string,
-    vectorIndex: VectorizeIndex,
-    opts?: { batchSize?: number; embeddingModel?: string }
+    vectorIndex?: VectorizeIndex,
+    opts?: { batchSize?: number; embeddingModel?: string; byokConfig?: ByokVectorConfig }
   ): Promise<void> {
     if (!Array.isArray(chunks) || chunks.length === 0) return;
-    if (!vectorIndex) {
-      console.warn("Vectorize binding (c.env.VECTORIZE) is not active/bound in local dev mode — skipping Vectorize store.");
-      return;
-    }
 
     const batchSize = Math.max(
       1,
       Math.min(opts?.batchSize ?? DEFAULT_UPSERT_BATCH_SIZE, MAX_UPSERT_BATCH_SIZE)
     );
+
+    // 1. Check if client is using their OWN Cloudflare Vectorize account (BYOK REST Mode)
+    if (opts?.byokConfig?.cfAccountId && opts?.byokConfig?.cfApiToken) {
+      console.log(`[VectorService] Routing vector upsert to Client Cloudflare Account [${opts.byokConfig.cfAccountId}] via REST API.`);
+      const indexName = opts.byokConfig.indexName || "chatbot-vector-index";
+
+      // Ensure all chunks have embeddings
+      const haveAllVectors = chunks.every((b) => Array.isArray(b.values) && (b.values?.length || 0) > 0);
+      if (!haveAllVectors) {
+        const embeddings = new OpenAIEmbeddings({ apiKey, model: opts?.embeddingModel });
+        const textsToEmbed = chunks.map((c) => String(c.content || (c as any).text || ""));
+        const computedVectors = await embeddings.embedDocuments(textsToEmbed);
+        chunks.forEach((c, idx) => {
+          c.values = computedVectors[idx];
+        });
+      }
+
+      const restRecords: VectorizeRestRecord[] = chunks.map((c) => {
+        const doc = buildDoc(c);
+        return {
+          id: c.id,
+          values: c.values!,
+          metadata: doc.metadata,
+        };
+      });
+
+      await cloudflareVectorizeRestService.upsertVectors(
+        opts.byokConfig.cfAccountId,
+        opts.byokConfig.cfApiToken,
+        indexName,
+        restRecords,
+        batchSize
+      );
+      return;
+    }
+
+    // 2. Standard Platform Native Worker Binding Mode
+    if (!vectorIndex) {
+      console.warn("Vectorize binding (c.env.VECTORIZE) is not active/bound in local dev mode — skipping Vectorize store.");
+      return;
+    }
 
     let vectorStore: any = null;
 
@@ -165,11 +210,42 @@ export const vectorService = {
   async searchChunks(
     embedding: number[],
     apiKey: string,
-    vectorIndex: VectorizeIndex,
-    topK = 20
+    vectorIndex?: VectorizeIndex,
+    topK = 20,
+    byokConfig?: ByokVectorConfig
   ): Promise<VectorHit[]> {
     if (!Array.isArray(embedding) || embedding.length === 0) {
       throw new Error("vectorService.searchChunks: invalid query embedding");
+    }
+
+    // 1. Check if client is using their OWN Cloudflare Vectorize account (BYOK REST Mode)
+    if (byokConfig?.cfAccountId && byokConfig?.cfApiToken) {
+      const indexName = byokConfig.indexName || "chatbot-vector-index";
+      const matches = await cloudflareVectorizeRestService.queryVectors(
+        byokConfig.cfAccountId,
+        byokConfig.cfApiToken,
+        indexName,
+        embedding,
+        topK
+      );
+
+      return matches.map((m) => {
+        const score01 = normalizeScore01(Number(m.score || 0));
+        const metadata = m.metadata || {};
+        const text = metadata.text || metadata.content || metadata.pageContent || "";
+        return {
+          text,
+          metadata,
+          rawScore: Number(m.score || 0),
+          score01,
+          score100: Math.round(score01 * 100),
+        };
+      });
+    }
+
+    // 2. Standard Platform Native Worker Binding Mode
+    if (!vectorIndex) {
+      return [];
     }
 
     const embeddings = new OpenAIEmbeddings({ apiKey });
@@ -196,16 +272,23 @@ export const vectorService = {
     apiKey: string,
     env: any,
     activeDatasets: DatasetType[] = ["admin", "pdf", "web"],
-    topKPerIndex = 15
+    topKPerIndex = 15,
+    byokConfig?: ByokVectorConfig
   ): Promise<VectorHit[]> {
     if (!Array.isArray(embedding) || embedding.length === 0) {
       return [];
     }
 
+    // 1. BYOK Mode: Query the client's own Cloudflare account directly
+    if (byokConfig?.cfAccountId && byokConfig?.cfApiToken) {
+      console.log(`[VectorService] Executing BYOK Vector search on Client Account [${byokConfig.cfAccountId}].`);
+      return await this.searchChunks(embedding, apiKey, undefined, topKPerIndex * 2, byokConfig);
+    }
+
+    // 2. Platform Mode: Query active dataset indexes in parallel with Promise.all
     const uniqueDatasets = Array.from(new Set(activeDatasets.filter(Boolean)));
     if (uniqueDatasets.length === 0) return [];
 
-    // Query active dataset indexes in parallel with Promise.all
     const searchPromises = uniqueDatasets.map(async (ds) => {
       const idx = getVectorIndexForDataset(env, ds);
       if (!idx) return [];
@@ -230,10 +313,25 @@ export const vectorService = {
 
   async deleteByIds(
     ids: string[],
-    vectorIndex: VectorizeIndex,
-    opts?: { batchSize?: number; retryLimit?: number }
+    vectorIndex?: VectorizeIndex,
+    opts?: { batchSize?: number; retryLimit?: number; byokConfig?: ByokVectorConfig }
   ): Promise<{ processed: number; deleted: number }> {
     if (!Array.isArray(ids) || ids.length === 0) return { processed: 0, deleted: 0 };
+
+    // 1. BYOK Mode: Delete from client's Cloudflare Vectorize account via REST
+    if (opts?.byokConfig?.cfAccountId && opts?.byokConfig?.cfApiToken) {
+      const indexName = opts.byokConfig.indexName || "chatbot-vector-index";
+      return await cloudflareVectorizeRestService.deleteVectors(
+        opts.byokConfig.cfAccountId,
+        opts.byokConfig.cfApiToken,
+        indexName,
+        ids,
+        opts?.batchSize ?? 100
+      );
+    }
+
+    // 2. Platform Mode: Delete from native worker binding
+    if (!vectorIndex) return { processed: 0, deleted: 0 };
 
     const hardMax = 100;
     const batchSize = Math.max(1, Math.min(opts?.batchSize ?? hardMax, hardMax));
@@ -270,3 +368,4 @@ export const vectorService = {
     return { processed, deleted };
   },
 };
+

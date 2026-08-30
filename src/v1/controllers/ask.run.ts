@@ -429,8 +429,9 @@ export async function runAsk(
 
   const db = c.env.DB as unknown as D1Database;
   const apiKey = c.env.OPENAI_API_KEY;
+  const clientId = (c as any).get("clientId") || "default";
 
-  let threadId = clientThreadId || (await threaddb.getThreadIdForUser(db, userId));
+  let threadId = clientThreadId || (await threaddb.getThreadIdForUser(db, userId, clientId));
   if (!threadId) {
     threadId = makeThreadId(userId, null);
   }
@@ -492,7 +493,8 @@ export async function runAsk(
         args.context,
         args.tokensUsed,
         args.ok,
-        JSON.stringify(finalTrace)
+        JSON.stringify(finalTrace),
+        clientId
       ).catch((e) => {
         logError("persist_failed", e, { userId, threadId });
       })

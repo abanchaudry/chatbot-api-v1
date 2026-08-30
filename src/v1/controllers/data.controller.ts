@@ -451,6 +451,20 @@ export const DataController = {
           continue;
         }
 
+        const clientId = (c as any).get("clientId") || "default";
+        let byokConfig: any = undefined;
+        try {
+          const { tenantService } = await import("../services/tenant.service");
+          const tenantCtx = await tenantService.resolveContext(c);
+          if (tenantCtx.isByok && tenantCtx.cfAccountId && tenantCtx.cfApiToken) {
+            byokConfig = {
+              cfAccountId: tenantCtx.cfAccountId,
+              cfApiToken: tenantCtx.cfApiToken,
+              indexName: "chatbot-vector-index",
+            };
+          }
+        } catch {}
+
         // 2) Now insert file metadata WITH correct file_path & dataset
         await fileDb.insertFile(c.env.DB, {
           id: fileId,
@@ -464,6 +478,7 @@ export const DataController = {
           upload_id: uploadId,
           chunk_method: chunkMethod,
           embedding_model: embeddingModel,
+          clientId,
         });
 
         if (size < 50) {
@@ -516,6 +531,7 @@ export const DataController = {
           chunkMethod,
           dataset,
           source: "admin",
+          clientId,
         });
 
         // 6) Save to Vectorize in stable batches (target specific dataset index)
@@ -537,7 +553,7 @@ export const DataController = {
           let attempt = 0;
           for (;;) {
             try {
-              await vectorService.storeChunks(batch, key, targetVectorIndex, { embeddingModel });
+              await vectorService.storeChunks(batch, key, targetVectorIndex, { embeddingModel, byokConfig });
               break;
             } catch (e: any) {
               attempt++;
@@ -686,6 +702,8 @@ export const DataController = {
         return c.json({ ok: false, message: errorMsg }, 500);
       }
 
+      const clientId = (c as any).get("clientId") || "default";
+
       // Insert file with guaranteed file_path & dataset (never null)
       await fileDb.insertFile(c.env.DB, {
         id: fileId,
@@ -699,6 +717,7 @@ export const DataController = {
         upload_id: uploadId || null,
         chunk_method: chunkMethod,
         embedding_model: embeddingModel,
+        clientId,
       });
 
       await fileDb.updateFile(c.env.DB, fileId, { file_status: "processing", chunk_count: normalized.length });
@@ -730,6 +749,7 @@ export const DataController = {
         chunkMethod,
         dataset,
         source: "admin",
+        clientId,
       });
 
       // Save to Vectorize (route to dataset index in direct high-speed batches of 100)
@@ -745,6 +765,7 @@ export const DataController = {
             chunk_id: String(chunkId),
             topic: String(ch?.topic || "general"),
             dataset: String(dataset),
+            client_id: String(clientId),
           };
           if (ch?.section) meta.section = String(ch.section);
           if (sectionNumber) meta.section_number = String(sectionNumber);
@@ -762,27 +783,45 @@ export const DataController = {
         })
       );
 
-      // Sequential lock-free Vectorize batches of 50
-      for (let i = 0; i < allVectorRecords.length; i += 50) {
-        const batch = allVectorRecords.slice(i, i + 50);
-        if (targetVectorIndex && typeof targetVectorIndex.upsert === "function") {
-          try {
-            const cleanVectorizeBatch = batch.map((b) => ({
-              id: b.id,
-              values: b.values,
-              metadata: b.metadata,
-            }));
-            await targetVectorIndex.upsert(cleanVectorizeBatch);
-          } catch (upsertErr: any) {
-            console.warn(`[Vectorize.upsert] Direct batch failed (${upsertErr.message}), falling back to vectorService:`, upsertErr);
+      // Resolve BYOK Context if configured
+      let byokConfig: any = undefined;
+      try {
+        const { tenantService } = await import("../services/tenant.service");
+        const tenantCtx = await tenantService.resolveContext(c);
+        if (tenantCtx.isByok && tenantCtx.cfAccountId && tenantCtx.cfApiToken) {
+          byokConfig = {
+            cfAccountId: tenantCtx.cfAccountId,
+            cfApiToken: tenantCtx.cfApiToken,
+            indexName: "chatbot-vector-index",
+          };
+        }
+      } catch {}
+
+      if (byokConfig) {
+        await vectorService.storeChunks(allVectorRecords as any, key, targetVectorIndex, { embeddingModel, byokConfig });
+      } else {
+        // Sequential lock-free Vectorize batches of 50
+        for (let i = 0; i < allVectorRecords.length; i += 50) {
+          const batch = allVectorRecords.slice(i, i + 50);
+          if (targetVectorIndex && typeof targetVectorIndex.upsert === "function") {
             try {
-              await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
-            } catch (fallbackErr: any) {
-              console.error(`[Vectorize fallback error]:`, fallbackErr.message);
+              const cleanVectorizeBatch = batch.map((b) => ({
+                id: b.id,
+                values: b.values,
+                metadata: b.metadata,
+              }));
+              await targetVectorIndex.upsert(cleanVectorizeBatch);
+            } catch (upsertErr: any) {
+              console.warn(`[Vectorize.upsert] Direct batch failed (${upsertErr.message}), falling back to vectorService:`, upsertErr);
+              try {
+                await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
+              } catch (fallbackErr: any) {
+                console.error(`[Vectorize fallback error]:`, fallbackErr.message);
+              }
             }
+          } else if (targetVectorIndex) {
+            await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
           }
-        } else if (targetVectorIndex) {
-          await vectorService.storeChunks(batch as any, key, targetVectorIndex, { embeddingModel });
         }
       }
 
@@ -866,6 +905,8 @@ export const DataController = {
       return c.json({ ok: false, message: errorMsg }, 500);
     }
 
+    const clientId = (c as any).get("clientId") || "default";
+
     // Now insert file with correct file_path (NEVER null)
     await fileDb.insertFile(c.env.DB, {
       id: fileId,
@@ -878,6 +919,7 @@ export const DataController = {
       upload_id: uploadId,
       chunk_method: chunkMethod,
       embedding_model: embeddingModel,
+      clientId,
     });
 
     await fileDb.updateFile(c.env.DB, fileId, { file_status: "processing", error_message: null });
@@ -911,6 +953,7 @@ finalizeChunksOnly: async (c: Context) => {
     const fileId = String(body.fileId || "").trim();
     const fileName = String(body.fileName || "").trim();
     const uploadId = body.uploadId ? String(body.uploadId) : null;
+    const clientId = (c as any).get("clientId") || "default";
 
     const chunkMethod = String(body.chunkMethod || "semantic");
     const embeddingModel = String(body.embeddingModel || "text-embedding-3-small");
@@ -964,6 +1007,7 @@ finalizeChunksOnly: async (c: Context) => {
       embeddingModel,
       chunkMethod,
       source: "admin",
+      clientId,
     });
 
     for (let offset = 0; offset < normalized.length; offset += BATCH_SIZE) {
@@ -1042,8 +1086,9 @@ getAllChunks: async (c: Context) => {
       const page = Math.max(parseInt(c.req.query("page") || "1", 10), 1);
       const perPage = Math.min(Math.max(parseInt(c.req.query("perPage") || "50", 10), 1), 500);
       const search = (c.req.query("search") || "").trim();
+      const clientId = (c as any).get("clientId") || "default";
 
-      const { results, total } = await chunkDb.getAllChunksPaged(c.env.DB, page, perPage, search);
+      const { results, total } = await chunkDb.getAllChunksPaged(c.env.DB, page, perPage, search, clientId);
 
       return c.json({
         ok: true,
@@ -1063,7 +1108,8 @@ getAllChunks: async (c: Context) => {
    */
   listFilesWithChunkCount: async (c: Context) => {
     try {
-      const files = await fileDb.getAllFilesWithChunkCount(c.env.DB);
+      const clientId = (c as any).get("clientId") || "default";
+      const files = await fileDb.getAllFilesWithChunkCount(c.env.DB, clientId);
       return c.json({ ok: true, message: "Files with chunk count fetched successfully.", files, total: files.length });
     } catch (err: any) {
       return c.json({ ok: false, message: "Failed to fetch files", error: err.message }, 500);
@@ -1102,7 +1148,8 @@ getAllChunks: async (c: Context) => {
    */
   getDashboardStats: async (c: Context) => {
     try {
-      const stats = await fileDb.getStats(c.env.DB);
+      const clientId = (c as any).get("clientId") || "default";
+      const stats = await fileDb.getStats(c.env.DB, clientId);
       return c.json({ ok: true, message: "Stats fetched successfully.", ...stats });
     } catch (err: any) {
       return c.json({ ok: false, message: "Failed to fetch stats", error: err.message }, 500);
@@ -1144,11 +1191,24 @@ getAllChunks: async (c: Context) => {
 
       await ingestDb.log(c.env.DB, jobId, fileId, "INFO", `Delete start: ${fileName}`);
 
-      // 2. Vectorize Deletion (Non-blocking fallback for local dev)
+      // 2. Vectorize Deletion (Non-blocking fallback for local dev & BYOK accounts)
       let vectorsDeleted = 0;
       let totalChunkIds = 0;
 
-      if (c.env.VECTORIZE) {
+      let byokConfig: any = undefined;
+      try {
+        const { tenantService } = await import("../services/tenant.service");
+        const tenantCtx = await tenantService.resolveContext(c);
+        if (tenantCtx.isByok && tenantCtx.cfAccountId && tenantCtx.cfApiToken) {
+          byokConfig = {
+            cfAccountId: tenantCtx.cfAccountId,
+            cfApiToken: tenantCtx.cfApiToken,
+            indexName: "chatbot-vector-index",
+          };
+        }
+      } catch {}
+
+      if (c.env.VECTORIZE || byokConfig) {
         try {
           const CHUNK_PAGE_SIZE = 500;
           const VEC_BATCH_SIZE = 100;
@@ -1162,6 +1222,7 @@ getAllChunks: async (c: Context) => {
             const res = await vectorService.deleteByIds(ids, c.env.VECTORIZE, {
               batchSize: VEC_BATCH_SIZE,
               retryLimit: 2,
+              byokConfig,
             });
             vectorsDeleted += res.deleted;
             offset += CHUNK_PAGE_SIZE;

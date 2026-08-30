@@ -87,6 +87,7 @@ export type PrepareResult = {
   // Always present
   threadId: string;
   userId: string;
+  clientId: string;
   route: Route;
   message: string;
   language: "english" | "spanish";
@@ -159,7 +160,8 @@ function logError(label: string, error: any, context?: Record<string, any>) {
  */
 async function stageValidateAndSetupThread(
   c: Context<Env>,
-  payload: any
+  payload: any,
+  clientId: string = "default"
 ): Promise<{ ok: boolean; error?: string; userId: string; threadId: string }> {
   const userId = String(payload?.userId || "").trim();
   const clientThreadId = payload?.threadId ? String(payload.threadId) : null;
@@ -177,7 +179,7 @@ async function stageValidateAndSetupThread(
   const db = c.env.DB as unknown as D1Database;
 
   // Get or create thread
-  let threadId = clientThreadId || (await threaddb.getThreadIdForUser(db, userId));
+  let threadId = clientThreadId || (await threaddb.getThreadIdForUser(db, userId, clientId));
   if (!threadId) {
     threadId = makeThreadId(userId, null);
   }
@@ -441,11 +443,13 @@ export async function preparePipeline(
   const message = String(payload?.message || "").trim();
   const language = normalizeLanguage(payload?.language);
 
-  // Load dynamic system settings from DB if not explicitly passed in request payload
+  // Dynamic Multi-Tenant Context Resolution
   let companyName = c.env.COMPANY_NAME || "Enterprise Assistant";
   let assistantName = String(payload?.assistantName || "").trim();
   let domainHint = String(payload?.domainHint || "").trim();
+  let apiKey = c.env.OPENAI_API_KEY;
 
+  let activeClientId = "default";
   let activeDatasets: Array<"admin" | "pdf" | "web"> = ["admin", "pdf", "web"];
   let datasetWeights: Record<string, number> = {
     admin: 1.25,
@@ -455,12 +459,12 @@ export async function preparePipeline(
 
   let datasetSignature: string = getDatasetSignature();
 
-  // D1 System Settings take FIRST priority over wrangler.toml defaults
   try {
-    const db = c.env.DB as any;
-    if (db) {
-      const { SettingsDbService } = await import("../services/db/settings.db");
-      const settings = await new SettingsDbService().getSettings(db);
+    const { tenantService } = await import("../services/tenant.service");
+    const tenantCtx = await tenantService.resolveContext(c);
+    if (tenantCtx) {
+      if (tenantCtx.clientId) activeClientId = tenantCtx.clientId;
+      const settings = tenantCtx.settings;
       if (settings) {
         datasetSignature = getDatasetSignature(settings);
         if (settings.company_name) companyName = settings.company_name;
@@ -479,6 +483,15 @@ export async function preparePipeline(
           web: Number(settings.dataset_web_weight) || 1.00,
         };
       }
+
+      if (tenantCtx.openaiApiKey) {
+        apiKey = tenantCtx.openaiApiKey;
+      }
+
+      if (tenantCtx.isByok && tenantCtx.cfAccountId && tenantCtx.cfApiToken) {
+        (c as any).set("cfAccountId", tenantCtx.cfAccountId);
+        (c as any).set("cfApiToken", tenantCtx.cfApiToken);
+      }
     }
   } catch {}
 
@@ -489,8 +502,6 @@ export async function preparePipeline(
   const fallbackMessage = String(
     payload?.fallbackMessage || c.env.FALLBACK_MESSAGE || FALLBACK_MESSAGE_DEFAULT
   ).trim();
-
-  const apiKey = c.env.OPENAI_API_KEY;
 
   // Initialize trace
   const trace: TraceShape = newTrace({
@@ -511,13 +522,14 @@ export async function preparePipeline(
 
   try {
     // ==== STAGE 1: Validate + Setup Thread ====
-    const validation = await stageValidateAndSetupThread(c, payload);
+    const validation = await stageValidateAndSetupThread(c, payload, activeClientId);
     if (!validation.ok) {
       return {
         ok: false,
         error: validation.error,
         threadId: "",
         userId: "",
+        clientId: activeClientId,
         route: "ANSWER_WITH_RAG",
         message: "",
         language: "english",
@@ -590,6 +602,7 @@ export async function preparePipeline(
         ok: true,
         threadId,
         userId: validUserId,
+        clientId: activeClientId,
         route,
         message,
         language,
@@ -627,6 +640,7 @@ export async function preparePipeline(
       ok: true,
       threadId,
       userId: validUserId,
+      clientId: activeClientId,
       route,
       message,
       language,
@@ -655,6 +669,7 @@ export async function preparePipeline(
       error: "Preparation failed: " + String(e?.message || e),
       threadId: "",
       userId: "",
+      clientId: activeClientId,
       route: "ANSWER_WITH_RAG",
       message: "",
       language: "english",

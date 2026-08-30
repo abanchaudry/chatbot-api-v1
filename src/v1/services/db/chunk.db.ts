@@ -169,23 +169,28 @@ export const chunkDb = {
     return { results: data.results || [], total };
   },
 
-  async getAllChunksPaged(db: D1Database, page = 1, perPage = 50, search = "") {
+  async getAllChunksPaged(db: D1Database, page = 1, perPage = 50, search = "", clientId?: string) {
     const safePage = Number.isFinite(page) && page > 0 ? page : 1;
     const safePerPage = Number.isFinite(perPage) ? Math.min(Math.max(perPage, 1), 200) : 50;
     const offset = (safePage - 1) * safePerPage;
 
     const q = (search || "").trim();
     const hasSearch = q.length > 0;
+    const targetClient = clientId || "default";
 
-    const where = hasSearch
-      ? `WHERE (
+    let where = `WHERE (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))`;
+    const args: any[] = [targetClient, targetClient];
+
+    if (hasSearch) {
+      where += ` AND (
           LOWER(c.content) LIKE '%' || LOWER(?) || '%'
           OR LOWER(c.section) LIKE '%' || LOWER(?) || '%'
           OR LOWER(c.topic) LIKE '%' || LOWER(?) || '%'
           OR LOWER(f.file_name) LIKE '%' || LOWER(?) || '%'
           OR LOWER(c.section_number) LIKE '%' || LOWER(?) || '%'
-        )`
-      : "";
+        )`;
+      args.push(q, q, q, q, q);
+    }
 
     const countSql = `
       SELECT COUNT(1) AS total
@@ -217,7 +222,6 @@ export const chunkDb = {
       LIMIT ? OFFSET ?
     `;
 
-    const args = hasSearch ? [q, q, q, q, q] : [];
     const countRow: any = await db.prepare(countSql).bind(...args).first();
     const total = Number(countRow?.total || 0);
 
@@ -354,12 +358,14 @@ export const chunkDb = {
       exactPhrases: string[];
       maxResults: number;
       datasets?: string[];
+      clientId?: string;
     }
   ): Promise<SearchChunkRow[]> {
     const terms = Array.from(new Set((args.terms || []).filter(Boolean))).slice(0, 12);
     const phrases = Array.from(new Set((args.exactPhrases || []).filter(Boolean))).slice(0, 6);
     const maxResults = Math.max(1, Math.min(args.maxResults || 12, 30));
     const activeDatasets = (args.datasets || []).filter(Boolean);
+    const targetClient = args.clientId || "default";
     const hasFts = await tableExists(db, "chunks_fts");
 
     let datasetFtsClause = "";
@@ -387,9 +393,10 @@ export const chunkDb = {
              LEFT JOIN files f ON f.file_id = ch.file_id
              WHERE chunks_fts MATCH ?
              ${datasetFtsClause}
+               AND (ch.client_id = ? OR (ch.client_id IS NULL AND ? = 'default'))
              ORDER BY rank
              LIMIT ?`
-          ).bind(ftsQuery, ...datasetFtsArgs, maxResults * 2).all();
+          ).bind(ftsQuery, ...datasetFtsArgs, targetClient, targetClient, maxResults * 2).all();
 
           const rows = (res.results || []) as SearchChunkRow[];
           if (rows.length) {
@@ -430,6 +437,8 @@ export const chunkDb = {
       ...phrases.flatMap((phrase) => searchColumns.map(() => normalizeSearchText(phrase))),
       ...terms.flatMap((term) => searchColumns.map(() => normalizeSearchText(term))),
       ...datasetLikeArgs,
+      targetClient,
+      targetClient,
       maxResults,
     ];
 
@@ -439,6 +448,7 @@ export const chunkDb = {
        LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereSql})
          ${datasetLikeClause}
+         AND (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))
          AND LENGTH(c.content) <= 8000
        ORDER BY LENGTH(c.content) ASC, c.chunk_id ASC
        LIMIT ?`
@@ -464,8 +474,9 @@ export const chunkDb = {
            LEFT JOIN files f ON f.file_id = dc.document_id
            WHERE (${docTermClauses})
              ${docDatasetClause}
+             AND (f.client_id = ? OR (f.client_id IS NULL AND ? = 'default'))
            LIMIT ?`
-        ).bind(...terms.map((t) => normalizeSearchText(t)), ...docDatasetArgs, maxResults).all();
+        ).bind(...terms.map((t) => normalizeSearchText(t)), ...docDatasetArgs, targetClient, targetClient, maxResults).all();
 
         const docRows = (docRes.results || []).map((r: any) => ({
           chunk_id: r.chunk_id,
@@ -485,7 +496,6 @@ export const chunkDb = {
     return legacyRows;
   },
 
-
   async metadataSearch(
     db: D1Database,
     args: {
@@ -494,6 +504,7 @@ export const chunkDb = {
       sectionRef: string | null;
       maxResults: number;
       datasets?: string[];
+      clientId?: string;
     }
   ): Promise<SearchChunkRow[]> {
     const entities = Array.from(new Set((args.entities || []).map(normalizeSearchText).filter(Boolean))).slice(0, 8);
@@ -501,6 +512,7 @@ export const chunkDb = {
     const maxResults = Math.max(1, Math.min(args.maxResults || 10, 20));
     const sectionRef = normalizeSearchText(args.sectionRef || "");
     const activeDatasets = (args.datasets || []).filter(Boolean);
+    const targetClient = args.clientId || "default";
 
     if (!entities.length && !phrases.length && !sectionRef) return [];
 
@@ -543,6 +555,7 @@ export const chunkDb = {
        LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereClauses.join(" OR ")})
          ${datasetMetaClause}
+         AND (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))
        ORDER BY
          CASE WHEN ? != '' AND LOWER(COALESCE(c.section_number, '')) = ? THEN 4 ELSE 0 END DESC,
          CASE WHEN ? != '' AND LOWER(COALESCE(c.section, '')) LIKE '%' || ? || '%' THEN 3 ELSE 0 END DESC,
@@ -553,6 +566,8 @@ export const chunkDb = {
        LIMIT ?`
     ).bind(
       ...bindings,
+      targetClient,
+      targetClient,
       sectionRef,
       sectionRef,
       phrases[0] || entities[0] || "",
@@ -587,8 +602,9 @@ export const chunkDb = {
            LEFT JOIN files f ON f.file_id = dc.document_id
            WHERE (${docClauses})
              ${docDatasetClause}
+             AND (f.client_id = ? OR (f.client_id IS NULL AND ? = 'default'))
            LIMIT ?`
-        ).bind(...bindValues, ...docDatasetArgs, maxResults).all();
+        ).bind(...bindValues, ...docDatasetArgs, targetClient, targetClient, maxResults).all();
 
         const docRows = (docRes.results || []).map((r: any) => ({
           chunk_id: r.chunk_id,

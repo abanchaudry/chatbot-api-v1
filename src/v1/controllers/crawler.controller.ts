@@ -19,7 +19,9 @@ async function crawlAndIndexUrl(
   env: any,
   targetUrl: string,
   client: ScalableRagClient,
-  openAiKey: string | null
+  openAiKey: string | null,
+  clientId: string = "default",
+  byokConfig?: { cfAccountId: string; cfApiToken: string; indexName?: string }
 ): Promise<{
   url: string;
   fileId: string;
@@ -41,7 +43,8 @@ async function crawlAndIndexUrl(
     "processing",
     fileId,
     targetUrl,
-    "web"
+    "web",
+    clientId
   );
 
   // 2. Process Markdown into 3-Tier Agentic AI Chunks via Scalable RAG
@@ -86,85 +89,68 @@ async function crawlAndIndexUrl(
 
   // Final deterministic fallback if still empty:
   if (!ferventChunks || ferventChunks.length === 0) {
-    const paragraphs = markdownText.split(/\n\n+/).filter((p: string) => p.trim().length > 30);
-    const parts = paragraphs.length > 0 ? paragraphs : [markdownText];
-    ferventChunks = parts.map((p: string, i: number) => ({
-      section: `Page Content Part ${i + 1}`,
-      content: p.trim(),
-      topic: "Web Ingestion",
-      tags: ["web-crawl"],
-      tier: "small",
-      parentId: null,
-    }));
+    ferventChunks = [
+      {
+        section: "Page Content",
+        content: markdownText.slice(0, 1500),
+        topic: "Web Page Overview",
+        tags: ["web"],
+        tier: "small",
+        parentId: null,
+      },
+    ];
   }
 
-  // 3. Format Chunks
-  const formattedChunks = ferventChunks.map((ch, idx) => ({
-    chunk_id: `chk_${nanoid(12)}`,
-    file_id: fileId,
-    section: ch.section || "Web Content",
-    section_number: null,
-    topic: ch.topic || "Web Ingestion",
-    first_sentence: (ch.content || "").slice(0, 100).replace(/\n/g, " "),
-    content: ch.content || "",
-    tags: Array.isArray(ch.tags) ? ch.tags : [],
-    chunk_index: idx,
-    tier: ch.tier || "small",
-    parentId: ch.parentId || null,
-  }));
-
-  // 4. Save to `chunks` table with dataset = 'web'
-  await fileDb.saveChunksBatch(env.DB, {
-    fileId: fileId,
-    fileName: fileName,
-    version: "v1",
-    chunks: formattedChunks.map((ch) => ({
-      index: ch.chunk_index,
-      content: ch.content,
-      section: ch.section,
-      tags: ch.tags,
-      topic: ch.topic,
-      tier: ch.tier,
-      parentId: ch.parentId,
-    })),
-    embeddingModel: "text-embedding-3-small",
-    chunkMethod: "ai",
-    dataset: "web",
-    source: "admin",
+  // 3. Format Chunks for D1 & Vectorize
+  const formattedChunks = ferventChunks.map((chunk, index) => {
+    const chunkId = `web_${nanoid(16)}`;
+    return {
+      chunk_id: chunkId,
+      chunk_index: index,
+      section: chunk.section || "Web Page",
+      content: chunk.content,
+      topic: chunk.topic || "General Web",
+      tags: chunk.tags || [],
+      tier: chunk.tier || "small",
+      parent_id: chunk.parentId || null,
+      char_count: chunk.content.length,
+      token_count: Math.ceil(chunk.content.length / 4),
+    };
   });
 
-  // 5. Save to `document_chunks` table
-  for (const ch of formattedChunks) {
-    try {
-      await env.DB.prepare(
-        `INSERT INTO document_chunks (id, document_id, tier, content, category, parent_id, token_count, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        ch.chunk_id,
-        fileId,
-        ch.tier || "small",
-        ch.content,
-        ch.topic,
-        ch.parentId || null,
-        Math.ceil(ch.content.length / 4),
-        new Date().toISOString()
-      ).run();
-    } catch (insertErr: any) {
-      console.warn("[Crawler] document_chunks insert warning:", insertErr?.message);
-    }
-  }
+  // 4. Save Chunks into D1 SQLite
+  await chunkDb.saveChunks(
+    env.DB,
+    fileId,
+    formattedChunks.map(c => ({
+      chunk_id: c.chunk_id,
+      chunk_index: c.chunk_index,
+      section: c.section,
+      content: c.content,
+      topic: c.topic,
+      tags: c.tags,
+      tier: c.tier,
+      parent_id: c.parent_id,
+      char_count: c.char_count,
+      token_count: c.token_count,
+    })),
+    "web",
+    clientId
+  );
 
-  await fileDb.updateFileStatus(env.DB, fileId, "completed", formattedChunks.length);
+  // 5. Update File Status to Completed in D1
+  await fileDb.updateFile(env.DB, fileId, {
+    file_status: "completed",
+    chunk_count: formattedChunks.length,
+  });
 
-  // 6. Vector Embeddings (target VECTORIZE_WEB)
+  // 6. Generate Embeddings & Upsert into Vectorize (web dataset)
   let vectorsUpserted = 0;
-  const webVectorIndex = (getVectorIndexForDataset(env, "web") || env.VECTORIZE) as any;
+  const webVectorIndex = getVectorIndexForDataset(env, "web");
 
-  if (openAiKey && webVectorIndex) {
+  if (openAiKey && (webVectorIndex || byokConfig)) {
     try {
-      const detailChunks = formattedChunks.filter(c => c.tier === "small" || !c.tier);
-      const chunkToEmbed = detailChunks.length > 0 ? detailChunks : formattedChunks;
-
+      const chunkToEmbed = formattedChunks.filter(ch => ch.tier === "small");
       const textsToEmbed = chunkToEmbed.map(ch => `${ch.section ? `[${ch.section}] ` : ""}${ch.content}`);
       const embeddings = await EmbeddingService.generate(textsToEmbed, openAiKey);
 
@@ -186,10 +172,12 @@ async function crawlAndIndexUrl(
             dataset: "web",
             source_type: "web",
             url: targetUrl,
+            client_id: clientId,
           },
         })),
         openAiKey,
-        webVectorIndex
+        webVectorIndex,
+        { byokConfig }
       );
       vectorsUpserted = chunkToEmbed.length;
     } catch (vErr: any) {
@@ -224,6 +212,7 @@ export const CrawlerController = {
       const body = await c.req.json().catch(() => ({}));
       const rawUrl = String(body.url || "").trim();
       const crawlSchedule = String(body.crawlSchedule || "manual").toLowerCase();
+      const clientId = (c as any).get("clientId") || "default";
 
       if (!rawUrl) {
         return c.json({ ok: false, message: "URL is required" }, 400);
@@ -238,8 +227,23 @@ export const CrawlerController = {
       const scalableTarget = (c.env as any).SCALABLE_RAG || c.env.SCALABLE_RAG_URL || "https://scalable-rag.hassanwaqar475.workers.dev";
       const client = new ScalableRagClient(scalableTarget);
 
-      console.log(`[Crawler] Starting crawl for: ${targetUrl} (Schedule: ${crawlSchedule})`);
-      const result = await crawlAndIndexUrl(c.env, targetUrl, client, openAiKey);
+      let byokConfig: any = undefined;
+      let effectiveKey = openAiKey;
+      try {
+        const { tenantService } = await import("../services/tenant.service");
+        const tenantCtx = await tenantService.resolveContext(c);
+        if (tenantCtx.openaiApiKey) effectiveKey = tenantCtx.openaiApiKey;
+        if (tenantCtx.isByok && tenantCtx.cfAccountId && tenantCtx.cfApiToken) {
+          byokConfig = {
+            cfAccountId: tenantCtx.cfAccountId,
+            cfApiToken: tenantCtx.cfApiToken,
+            indexName: "chatbot-vector-index",
+          };
+        }
+      } catch {}
+
+      console.log(`[Crawler] Starting crawl for: ${targetUrl} (Schedule: ${crawlSchedule}, Tenant: ${clientId})`);
+      const result = await crawlAndIndexUrl(c.env, targetUrl, client, effectiveKey, clientId, byokConfig);
 
       if (c.env.CACHE) {
         try {
@@ -341,6 +345,22 @@ export const CrawlerController = {
       const openAiKey = getOpenAIKey(c.env);
       const scalableTarget = (c.env as any).SCALABLE_RAG || c.env.SCALABLE_RAG_URL || "https://scalable-rag.hassanwaqar475.workers.dev";
       const client = new ScalableRagClient(scalableTarget);
+      const clientId = (c as any).get("clientId") || "default";
+
+      let byokConfig: any = undefined;
+      let effectiveKey = openAiKey;
+      try {
+        const { tenantService } = await import("../services/tenant.service");
+        const tenantCtx = await tenantService.resolveContext(c);
+        if (tenantCtx.openaiApiKey) effectiveKey = tenantCtx.openaiApiKey;
+        if (tenantCtx.isByok && tenantCtx.cfAccountId && tenantCtx.cfApiToken) {
+          byokConfig = {
+            cfAccountId: tenantCtx.cfAccountId,
+            cfApiToken: tenantCtx.cfApiToken,
+            indexName: "chatbot-vector-index",
+          };
+        }
+      } catch {}
 
       const batchSize = CRAWLER_CONFIG.CONCURRENT_CRAWL_BATCH_SIZE;
       for (let i = 0; i < pages.length; i += batchSize) {
@@ -351,7 +371,7 @@ export const CrawlerController = {
               const targetUrl = String(pageUrl).trim();
               if (!targetUrl) return;
 
-              const res = await crawlAndIndexUrl(c.env, targetUrl, client, openAiKey);
+              const res = await crawlAndIndexUrl(c.env, targetUrl, client, effectiveKey, clientId, byokConfig);
               crawled++;
               totalChunks += res.chunks;
               totalVectors += res.vectors;

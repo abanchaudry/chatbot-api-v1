@@ -21,6 +21,7 @@ export interface ClusteringOptions {
   endDate?: string;
   recluster?: boolean;
   unclusteredOnly?: boolean;
+  clientId?: string;
 }
 
 /**
@@ -98,6 +99,7 @@ export async function runFallbackClustering(
 ): Promise<{ success: boolean; message: string; clustersCount: number; queriesProcessed: number }> {
   const options: ClusteringOptions = typeof opts === "string" ? { period: opts } : opts || {};
   const period = options.period || "manual";
+  const clientId = options.clientId || "default";
 
   const apiKey = (env as any).OPENAI_API_KEY || (typeof process !== "undefined" ? process.env.OPENAI_API_KEY : "");
   if (!apiKey) {
@@ -109,6 +111,7 @@ export async function runFallbackClustering(
     await fallbackDb.resetClusterIdsForDateRange(env.DB, {
       startDate: options.startDate,
       endDate: options.endDate,
+      clientId,
     });
   }
 
@@ -119,8 +122,9 @@ export async function runFallbackClustering(
       endDate: options.endDate,
       unclusteredOnly: options.recluster ? false : (options.unclusteredOnly !== false),
       limit: 100000,
+      clientId,
     }),
-    fallbackDb.getLatestClusters(env.DB, 50).catch(() => [])
+    fallbackDb.getLatestClusters(env.DB, 50, 1, clientId).catch(() => [])
   ]);
 
   if (unclustered.length === 0) {
@@ -292,6 +296,7 @@ Respond ONLY with raw JSON matching:
       suggestedCategoryName: cl.suggestedCategoryName || undefined,
       frequencyPeriod: period,
       linkedQueryIds: linkedQueryIds,
+      clientId,
     });
     savedCount++;
   }

@@ -24,7 +24,8 @@ export async function generateSha256Hash(message: string): Promise<string> {
 export async function getCachedQueryResponse(
   cache: KVNamespace,
   question: string,
-  datasetSignature?: string
+  datasetSignature?: string,
+  clientId?: string
 ): Promise<CachedQueryResponse | null> {
   const start = performance.now();
   const normalized = normalizeQuery(question);
@@ -35,7 +36,9 @@ export async function getCachedQueryResponse(
 
   try {
     const hash = await generateSha256Hash(normalized);
-    const key = datasetSignature ? `qcache:${datasetSignature}:${hash}` : `qcache:${hash}`;
+    const tenant = clientId || "default";
+    const sig = datasetSignature || "default";
+    const key = `qcache:${tenant}:${sig}:${hash}`;
     const data = await cache.get(key, 'json');
 
     if (data) {
@@ -80,7 +83,8 @@ export async function saveQueryResponseToCache(
   cache: KVNamespace,
   question: string,
   payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string },
-  datasetSignature?: string
+  datasetSignature?: string,
+  clientId?: string
 ): Promise<boolean> {
   const normalized = normalizeQuery(question);
 
@@ -90,7 +94,9 @@ export async function saveQueryResponseToCache(
 
   try {
     const hash = await generateSha256Hash(normalized);
-    const key = datasetSignature ? `qcache:${datasetSignature}:${hash}` : `qcache:${hash}`;
+    const tenant = clientId || "default";
+    const sig = datasetSignature || "default";
+    const key = `qcache:${tenant}:${sig}:${hash}`;
     const fullPayload = { ...payload, question };
     await cache.put(key, JSON.stringify(fullPayload), { expirationTtl: 86400 });
     return true;

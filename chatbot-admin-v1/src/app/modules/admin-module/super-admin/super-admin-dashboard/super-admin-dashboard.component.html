@@ -1,0 +1,225 @@
+<div class="main-content">
+  <div class="container-fluid">
+
+    <!-- Hero Banner Box (Matches All Other Admin Pages) -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="ai-knowledge-box">
+          <div>
+            <h1 class="ai-title">Super Admin Management</h1>
+            <p class="ai-subtitle">Manage client businesses, tenants, BYOK credentials, and workspaces</p>
+          </div>
+          <div class="ai-stats">
+            <div class="ai-stat-item">
+              <span>Total Businesses: {{ stats.total_clients }}</span>
+            </div>
+            <div class="ai-stat-item">
+              <span>Active Tenants: {{ stats.active_clients }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 KPI Stat Cards (Matching Dashboard 1:1) -->
+    <div class="row justify-content-center mb-4" *ngIf="!isLoading">
+      <div
+        class="col-md-3 col-sm-6 mb-3 mb-md-0"
+        *ngFor="let stat of statCards"
+      >
+        <div class="card bg-corner-img dashboard-card">
+          <div class="card-body">
+            <div class="row d-flex justify-content-center">
+              <div class="col-9">
+                <p class="text-uppercase mb-0 card-h">{{ stat.title }}</p>
+                <h4 class="mt-1 mb-0 price">{{ stat.value | number }}</h4>
+              </div>
+              <div class="col-3 align-self-center">
+                <div
+                  class="d-flex justify-content-center align-items-center thumb-md border-dashed rounded mx-auto"
+                  [ngClass]="stat.borderClass"
+                >
+                  <i
+                    class="{{ stat.icon }} fs-22"
+                    [ngClass]="stat.colorClass"
+                  ></i>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Registered Businesses List -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+            <h4 class="card-title m-0" style="font-size: 16px; font-weight: 600; color: #1e293b;">
+              Registered Businesses
+            </h4>
+            <a routerLink="/dashboard/super-admin/add-client" class="button-primary d-flex align-items-center gap-1">
+              <i class="ri-add-line"></i> Register Business
+            </a>
+          </div>
+
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <div>
+                <span class="text-muted" style="font-size: 13px;">Showing {{ filteredClients.length }} registered business accounts</span>
+              </div>
+
+              <div class="form-group mb-0 position-relative search-wrapper">
+                <i class="ri-search-2-line search-icon"></i>
+                <input
+                  type="text"
+                  class="form-control pl-4"
+                  placeholder="Search businesses..."
+                  [(ngModel)]="searchText"
+                />
+              </div>
+            </div>
+
+            <div *ngIf="isLoading" class="text-center p-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+              </div>
+              <p class="text-muted mt-2">Loading businesses...</p>
+            </div>
+
+            <div *ngIf="!isLoading && filteredClients.length === 0" class="text-center p-5">
+              <i class="ri-building-line fs-48 text-muted mb-2 d-block" style="font-size: 40px; color: #94a3b8;"></i>
+              <h5 style="color: #475569;">No Businesses Found</h5>
+              <p class="text-muted" style="font-size: 13px;">
+                {{ searchText ? 'No businesses matched your search query.' : 'Register your first business to begin.' }}
+              </p>
+              <a *ngIf="!searchText" routerLink="/dashboard/super-admin/add-client" class="button-primary mt-2">
+                <i class="ri-add-line"></i> Register Business
+              </a>
+            </div>
+
+            <div *ngIf="!isLoading && filteredClients.length > 0" class="table-container">
+              <table class="table table-light">
+                <thead style="background-color: #f4f6f9; border-radius: 12px">
+                  <tr>
+                    <th># ID</th>
+                    <th>Business Name</th>
+                    <th>Slug</th>
+                    <th>Domain</th>
+                    <th>Billing Mode</th>
+                    <th>Public Token</th>
+                    <th>Knowledge</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    *ngFor="
+                      let client of filteredClients
+                        | paginate : { itemsPerPage: entries, currentPage: page };
+                      let i = index
+                    "
+                  >
+                    <td>
+                      <span class="index-cell">{{ (page - 1) * entries + i + 1 }}</span>
+                    </td>
+                    <td>
+                      <span style="font-weight: 600; color: #1e293b;">{{ client.name }}</span>
+                    </td>
+                    <td>
+                      <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #475569;">{{ client.slug }}</code>
+                    </td>
+                    <td>
+                      <span *ngIf="client.domain" style="color: #334155;">{{ client.domain }}</span>
+                      <span *ngIf="!client.domain" class="text-muted" style="font-style: italic; font-size: 12px;">Not set</span>
+                    </td>
+                    <td>
+                      <span
+                        *ngIf="client.billing_mode === 'byok'"
+                        class="badge d-inline-flex align-items-center gap-1"
+                        style="background-color: #fef3c7; color: #92400e; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #fde68a;"
+                      >
+                        <i class="ri-key-2-line"></i> BYOK
+                      </span>
+                      <span
+                        *ngIf="client.billing_mode === 'platform'"
+                        class="badge d-inline-flex align-items-center gap-1"
+                        style="background-color: #e0f2fe; color: #0369a1; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #bae6fd;"
+                      >
+                        <i class="ri-cloud-line"></i> Platform
+                      </span>
+                    </td>
+                    <td>
+                      <code class="user-select-all" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px; font-size: 11.5px; color: #334155;">
+                        {{ client.public_token }}
+                      </code>
+                    </td>
+                    <td>
+                      <span class="badge" style="background-color: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #e2e8f0;">
+                        {{ client.total_chunks || 0 }} chunks
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        *ngIf="client.status === 'active'"
+                        class="badge"
+                        style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #bbf7d0;"
+                      >
+                        Active
+                      </span>
+                      <span
+                        *ngIf="client.status === 'suspended'"
+                        class="badge"
+                        style="background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fecaca;"
+                      >
+                        Suspended
+                      </span>
+                    </td>
+                    <td class="text-end td-actions">
+                      <button
+                        (click)="manageClientWorkspace(client)"
+                        type="button"
+                        class="view-btn"
+                        title="Switch to this Business Playground"
+                      >
+                        <i class="ri-login-box-line me-1"></i> Switch
+                      </button>
+                      <a
+                        [routerLink]="['/dashboard/super-admin/clients', client.id]"
+                        class="view-btn ml-1"
+                        style="background: #64748b;"
+                        title="Business Settings"
+                      >
+                        <i class="ri-settings-4-line"></i>
+                      </a>
+                      <button
+                        *ngIf="client.id !== 'default'"
+                        (click)="onDeleteClient(client)"
+                        type="button"
+                        class="view-btn ml-1"
+                        style="background: #ef4444;"
+                        title="Delete Business"
+                      >
+                        <i class="ri-delete-bin-line"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="pagination-block text-right mt-3" *ngIf="filteredClients.length > entries">
+                <pagination-controls
+                  class="custom-pagination"
+                  (pageChange)="page = $event"
+                ></pagination-controls>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

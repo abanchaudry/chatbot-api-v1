@@ -1,8 +1,8 @@
 export const environment = {
-  production: true,
+  production: false,
   tenant: "chatbot-admin",
   appName: "Chatbot Admin",
-  api_url: "https://chatbot-api-dev.hassanwaqar475.workers.dev/",
+  api_url: "http://127.0.0.1:8787/",
   admin_api_key: "",
   token_label: "__chatbot_admin_auth",
 };

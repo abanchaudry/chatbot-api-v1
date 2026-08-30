@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { DataController } from "../controllers/data.controller";
 import { progressTrackerKV } from "../utils/progress-tracker";
-import { requireAuthOrApiKey } from "../middleware/unifiedAuth.middleware";
+import { requireAuthOrApiKey, resolveTenantContext } from "../middleware/unifiedAuth.middleware";
 import type { Env } from "../types/env";
 
 const router = new Hono<Env>();
@@ -12,41 +12,44 @@ const noStore = async (c: Context<Env>, next: () => Promise<void>) => {
 };
 
 // Ingestion & File creation
-router.post("/file-chunks", requireAuthOrApiKey, DataController.getFileChunks);
-router.get("/preview-chunks/:uploadId", requireAuthOrApiKey, noStore, DataController.getPreviewChunksByUploadId);
-router.post("/save-file", requireAuthOrApiKey, DataController.saveNewFile);
-router.post("/save-file-chunks", requireAuthOrApiKey, DataController.finalizeChunks);
-router.post("/save-file-chunks-only", requireAuthOrApiKey, DataController.finalizeChunksOnly);
-router.get("/files/:fileId/download", requireAuthOrApiKey, DataController.downloadFile);
+router.post("/file-chunks", requireAuthOrApiKey, resolveTenantContext, DataController.getFileChunks);
+router.get("/preview-chunks/:uploadId", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getPreviewChunksByUploadId);
+router.post("/save-file", requireAuthOrApiKey, resolveTenantContext, DataController.saveNewFile);
+router.post("/save-file-chunks", requireAuthOrApiKey, resolveTenantContext, DataController.finalizeChunks);
+router.post("/save-file-chunks-only", requireAuthOrApiKey, resolveTenantContext, DataController.finalizeChunksOnly);
+router.get("/files/:fileId/download", requireAuthOrApiKey, resolveTenantContext, DataController.downloadFile);
 
 // Batch & Jobs
-router.post("/admin-ingest", requireAuthOrApiKey, DataController.adminIngestBatch);
-router.get("/ingest-jobs/:jobId", requireAuthOrApiKey, noStore, DataController.getIngestJobById);
-router.get("/ingest-events", requireAuthOrApiKey, noStore, DataController.getIngestEvents);
-router.post("/ingest/log", requireAuthOrApiKey, DataController.logIngestEvent);
-router.post("/ingest/job/start", requireAuthOrApiKey, DataController.startIngestJob);
-router.post("/ingest/job/finish", requireAuthOrApiKey, DataController.finishIngestJob);
+router.post("/admin-ingest", requireAuthOrApiKey, resolveTenantContext, DataController.adminIngestBatch);
+router.get("/ingest-jobs/:jobId", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getIngestJobById);
+router.get("/ingest-events", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getIngestEvents);
+router.post("/ingest/log", requireAuthOrApiKey, resolveTenantContext, DataController.logIngestEvent);
+router.post("/ingest/job/start", requireAuthOrApiKey, resolveTenantContext, DataController.startIngestJob);
+router.post("/ingest/job/finish", requireAuthOrApiKey, resolveTenantContext, DataController.finishIngestJob);
 
 // Knowledge management
-router.get("/list", requireAuthOrApiKey, noStore, DataController.listFilesWithChunkCount);
-router.get("/chunks-all", requireAuthOrApiKey, noStore, DataController.getAllChunks);
-router.get("/chunks", requireAuthOrApiKey, noStore, DataController.getChunksByFileId);
-router.get("/chunks/:chunkId/related", requireAuthOrApiKey, noStore, DataController.getRelatedTiers);
-router.patch("/chunks/:chunkId", requireAuthOrApiKey, noStore, DataController.updateChunk);
-router.delete("/chunks/:chunkId", requireAuthOrApiKey, noStore, DataController.deleteChunk);
-router.get("/stats", requireAuthOrApiKey, noStore, DataController.getDashboardStats);
+router.get("/list", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.listFilesWithChunkCount);
+router.get("/chunks-all", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getAllChunks);
+router.get("/chunks", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getChunksByFileId);
+router.get("/chunks/:chunkId/related", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getRelatedTiers);
+router.patch("/chunks/:chunkId", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.updateChunk);
+router.delete("/chunks/:chunkId", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.deleteChunk);
+router.get("/stats", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.getDashboardStats);
 
 // File deletion (REST DELETE + backward-compat POST)
-router.delete("/files/:fileId", requireAuthOrApiKey, noStore, DataController.deleteFile);
-router.post("/files/:fileId", requireAuthOrApiKey, noStore, DataController.deleteFile);
+router.delete("/files/:fileId", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.deleteFile);
+router.post("/files/:fileId", requireAuthOrApiKey, resolveTenantContext, noStore, DataController.deleteFile);
 
 // Upload progress
 router.get("/progress/:uploadId", noStore, async (c) => {
   const uploadId = c.req.param("uploadId");
-  const kv = progressTrackerKV(c.env.CACHE);
-  const progress = await kv.get(uploadId);
-  if (!progress) return c.json({ ok: false, message: "Invalid upload ID" }, 404);
-  return c.json({ ok: true, ...progress });
+  if (!uploadId) return c.json({ ok: false, message: "uploadId required" }, 400);
+
+  const tracker = progressTrackerKV(c.env.CACHE);
+  const state = await tracker.get(uploadId);
+
+  if (!state) return c.json({ ok: false, message: "Progress not found" }, 404);
+  return c.json({ ok: true, progress: state });
 });
 
 export default router;

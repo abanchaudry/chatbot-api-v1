@@ -466,7 +466,9 @@ export async function retrieveVector(
   apiKey: string,
   embedding: number[],
   topK: number,
-  activeDatasets: Array<"admin" | "pdf" | "web"> = ["admin", "pdf", "web"]
+  activeDatasets: Array<"admin" | "pdf" | "web"> = ["admin", "pdf", "web"],
+  clientId: string = "default",
+  byokConfig?: { cfAccountId: string; cfApiToken: string; indexName?: string }
 ): Promise<Piece[]> {
   try {
     const hits: VectorHit[] = await vectorService.searchMultiIndex(
@@ -474,10 +476,18 @@ export async function retrieveVector(
       apiKey,
       env,
       activeDatasets,
-      Math.max(10, Math.ceil(topK / (activeDatasets.length || 1)))
+      Math.max(10, Math.ceil(topK / (activeDatasets.length || 1))),
+      byokConfig
     );
 
-    return (hits || []).map((h, i) => ({
+    const filteredHits = hits.filter((h) => {
+      // If BYOK direct account, all vectors belong to this tenant
+      if (byokConfig?.cfAccountId) return true;
+      const tag = h?.metadata?.client_id;
+      return tag === clientId || (!tag && clientId === "default");
+    });
+
+    return (filteredHits || []).map((h, i) => ({
       sourceType: "vector",
       sourceId: String(h?.metadata?.chunk_id || h?.metadata?.id || `vec_${i}`),
       score: clamp100(h?.score100 ?? 0),
@@ -1645,10 +1655,11 @@ export async function persist(
   context: string,
   tokensUsed: number,
   status: PersistStatus | boolean,
-  traceJson?: string
+  traceJson?: string,
+  clientId: string = "default"
 ): Promise<number | null> {
   try {
-    await threaddb.saveThreadToDatabase(db, userId, threadId);
+    await threaddb.saveThreadToDatabase(db, userId, threadId, clientId);
   } catch (e) {
     logger.warn("persist:thread", { err: String(e), threadId, userId });
   }
@@ -1671,7 +1682,8 @@ export async function persist(
       String(answer ?? ""),
       String(context ?? ""),
       Number(tokensUsed ?? 0),
-      statusCode
+      statusCode,
+      clientId
     );
 
     const parsedId =

@@ -17,17 +17,37 @@ export const authController = {
         return c.json({ message: "Invalid credentials" }, 401);
       }
 
+      if (user.status === "suspended") {
+        return c.json({ message: "Account is suspended. Please contact your system administrator." }, 403);
+      }
+
       await authdb.updateLastLogin(c.env.DB, username);
+
+      const role = user.role || "client_admin";
+      const clientId = user.client_id || null;
 
       const jwtSecretStr = getJwtSecret(c.env);
       const jwtSecret = new TextEncoder().encode(jwtSecretStr);
-      const token = await new SignJWT({ id: user.id, username: user.username })
+      const token = await new SignJWT({
+        id: user.id,
+        username: user.username,
+        role: role,
+        clientId: clientId,
+      })
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
         .setExpirationTime("30d")
         .sign(jwtSecret);
 
-      return c.json({ token });
+      return c.json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: role,
+          clientId: clientId,
+        },
+      });
     } catch (error: any) {
       console.error("Auth login error:", error?.message || error);
       return c.json({ message: "Internal Server Error." }, 500);
@@ -36,7 +56,7 @@ export const authController = {
 
   signup: async (c: Context) => {
     try {
-      const { username, password } = await c.req.json();
+      const { username, password, role = "client_admin", clientId = null } = await c.req.json();
       if (!username) return c.json({ message: "User name is required." }, 400);
       if (!password) return c.json({ message: "Password is required." }, 400);
 
@@ -46,7 +66,7 @@ export const authController = {
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      await authdb.saveUser(c.env.DB, username, hashedPassword);
+      await authdb.saveUser(c.env.DB, username, hashedPassword, role, clientId);
 
       return c.json({ message: "User registered successfully!" }, 201);
     } catch (error: any) {
@@ -63,7 +83,7 @@ export const authController = {
       const user = await authdb.getUserById(c.env.DB, userId);
       if (!user) return c.json({ message: "User not found." }, 404);
 
-      return c.json({ user });
+      return c.json({ user, data: user });
     } catch (error: any) {
       console.error("Auth getUserById error:", error?.message || error);
       return c.json({ message: "Internal Server Error." }, 500);
