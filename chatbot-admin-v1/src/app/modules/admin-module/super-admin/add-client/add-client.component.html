@@ -6,8 +6,8 @@
       <div class="col-12">
         <div class="ai-knowledge-box">
           <div>
-            <h1 class="ai-title">Register Business</h1>
-            <p class="ai-subtitle">Create a dedicated AI workspace, credentials, and infrastructure for a new tenant</p>
+            <h1 class="ai-title">Register Business Wizard</h1>
+            <p class="ai-subtitle">Guided 5-step onboarding with automated dedicated Cloudflare resource provisioning</p>
           </div>
           <div>
             <a routerLink="/dashboard/super-admin/dashboard" class="button-primary back-nav-btn">
@@ -18,173 +18,766 @@
       </div>
     </div>
 
-    <!-- Registration Form -->
+    <!-- Stepper Navigation Header -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card stepper-container shadow-sm border-0">
+          
+          <!-- Progress Bar Top Line -->
+          <div class="stepper-progress-track">
+            <div
+              class="stepper-progress-fill"
+              [style.width.%]="((currentStep - 1) / (steps.length - 1)) * 100"
+            ></div>
+          </div>
+
+          <!-- Stepper Steps Items -->
+          <div class="card-body p-3">
+            <div class="steps-row">
+              <div
+                *ngFor="let s of steps"
+                class="step-block"
+                [class.active]="currentStep === s.number"
+                [class.completed]="currentStep > s.number"
+                (click)="goToStep(s.number)"
+              >
+                <div class="step-icon-circle">
+                  <i *ngIf="currentStep > s.number" class="ri-check-line"></i>
+                  <i *ngIf="currentStep <= s.number" class="{{ s.icon }}"></i>
+                </div>
+                <div class="step-meta">
+                  <span class="step-tag">Step {{ s.number }}</span>
+                  <span class="step-label">{{ s.title }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Step Content Form -->
     <form (ngSubmit)="onSubmit()">
-      <div class="row">
-        <!-- Card 1: Business Profile -->
-        <div class="col-md-6 mb-4">
-          <div class="card h-100">
-            <div class="card-header card-header-icon m-0">
-              <h4 class="card-title m-0">
-                <i class="ri-building-4-line text-primary me-2"></i> 1. Business Profile
-              </h4>
-            </div>
-            <div class="card-body p-4">
-              <div class="form-group mb-3">
-                <label class="form-label">Business / Company Name *</label>
-                <input type="text" class="form-control custom-input w-100" placeholder="e.g. Acme Corporation" name="name" [(ngModel)]="clientForm.name" (ngModelChange)="onNameChange()" required />
+      <div class="row justify-content-center">
+        <div class="col-lg-10 col-12">
+
+          <!-- ============================================================ -->
+          <!-- STEP 1: BUSINESS PROFILE                                     -->
+          <!-- ============================================================ -->
+          <div *ngIf="currentStep === 1" class="step-card-animate">
+            <div class="card step-card shadow-sm border-0">
+              <div class="card-header bg-white border-bottom p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="step-chip">STEP 1 OF 5</span>
+                    <div>
+                      <h4 class="m-0 fw-bold text-dark" style="font-size: 17px;">Business Profile & Branding</h4>
+                      <p class="text-muted m-0" style="font-size: 13px;">Enter organization identity and workspace identification</p>
+                    </div>
+                  </div>
+                  <span *ngIf="clientForm.name" class="badge bg-success-soft text-success">
+                    <i class="ri-check-line me-1"></i> Name Configured
+                  </span>
+                </div>
               </div>
 
-              <div class="form-group mb-3">
-                <label class="form-label">URL Slug *</label>
-                <input type="text" class="form-control custom-input w-100" placeholder="e.g. acme" name="slug" [(ngModel)]="clientForm.slug" required />
-                <small class="text-muted d-block mt-1">Unique identifier used for isolating database records and vector collections.</small>
-              </div>
+              <div class="card-body p-4">
+                <div class="row g-3">
+                  <!-- Business Name -->
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Business / Company Name <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                      <span class="input-group-text input-icon-addon">
+                        <i class="ri-building-4-line"></i>
+                      </span>
+                      <input
+                        type="text"
+                        class="form-control custom-input"
+                        placeholder="e.g. Apex Health Solutions"
+                        name="name"
+                        [(ngModel)]="clientForm.name"
+                        (ngModelChange)="onNameChange()"
+                        required
+                      />
+                    </div>
+                    <small class="text-muted d-block mt-1">Official name displayed on client dashboards and chat widget headers.</small>
+                  </div>
 
-              <div class="form-group mb-0">
-                <label class="form-label">Website Domain</label>
-                <input type="text" class="form-control custom-input w-100" placeholder="e.g. acme.com" name="domain" [(ngModel)]="clientForm.domain" />
+                  <!-- Slug -->
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Workspace Identifier (URL Slug) <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                      <span class="input-group-text input-prefix-addon">tenant/</span>
+                      <input
+                        type="text"
+                        class="form-control custom-input"
+                        placeholder="apex-health"
+                        name="slug"
+                        [(ngModel)]="clientForm.slug"
+                        required
+                      />
+                    </div>
+                    <small class="text-muted d-block mt-1">Unique slug used to name all Cloudflare databases and vector collections.</small>
+                  </div>
+
+                  <!-- Website Domain -->
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Website Domain</label>
+                    <div class="input-group">
+                      <span class="input-group-text input-prefix-addon">https://</span>
+                      <input
+                        type="text"
+                        class="form-control custom-input"
+                        placeholder="apexhealth.com"
+                        name="domain"
+                        [(ngModel)]="clientForm.domain"
+                      />
+                    </div>
+                    <small class="text-muted d-block mt-1">Primary website URL for crawler knowledge ingestion.</small>
+                  </div>
+
+                  <!-- Admin Email -->
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Contact Email</label>
+                    <div class="input-group">
+                      <span class="input-group-text input-icon-addon">
+                        <i class="ri-mail-line"></i>
+                      </span>
+                      <input
+                        type="email"
+                        class="form-control custom-input"
+                        placeholder="owner@apexhealth.com"
+                        name="contact_email"
+                        [(ngModel)]="clientForm.contact_email"
+                      />
+                    </div>
+                    <small class="text-muted d-block mt-1">Primary contact for business owner notifications.</small>
+                  </div>
+
+                  <!-- Logo URL -->
+                  <div class="col-12">
+                    <label class="form-label fw-semibold">Custom Logo URL (Optional)</label>
+                    <div class="input-group">
+                      <span class="input-group-text input-icon-addon">
+                        <i class="ri-image-line"></i>
+                      </span>
+                      <input
+                        type="url"
+                        class="form-control custom-input"
+                        placeholder="https://apexhealth.com/assets/logo.png"
+                        name="logo_url"
+                        [(ngModel)]="clientForm.logo_url"
+                      />
+                    </div>
+                    <small class="text-muted d-block mt-1">Direct image URL for custom branding on the customer chat widget.</small>
+                  </div>
+                </div>
+
+                <!-- Live Slug Resource Preview Callout -->
+                <div *ngIf="clientForm.name" class="mt-4 p-3 rounded bg-light-preview border">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="ri-server-line text-primary fs-5"></i>
+                      <span style="font-size: 13px; color: #1e293b;">
+                        <strong>Target Resource Namespace:</strong> <code>chatbot-{{ clientForm.slug || 'business' }}-*</code>
+                      </span>
+                    </div>
+                    <span class="badge bg-primary-soft text-primary font-monospace">Ready for Step 2</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Card 2: Initial Admin Credentials -->
-        <div class="col-md-6 mb-4">
-          <div class="card h-100">
-            <div class="card-header card-header-icon m-0">
-              <h4 class="card-title m-0">
-                <i class="ri-user-settings-line text-primary me-2"></i> 2. Admin Login Credentials
-              </h4>
-            </div>
-            <div class="card-body p-4">
-              <p class="text-muted mb-3" style="font-size: 12.5px; line-height: 1.5;">
-                Initial credentials for the business owner to access their private administrative dashboard.
-              </p>
-
-              <div class="form-group mb-3">
-                <label class="form-label">Admin Username *</label>
-                <input type="text" class="form-control custom-input w-100" placeholder="e.g. acme_admin" name="admin_username" [(ngModel)]="clientForm.admin_username" required />
+          <!-- ============================================================ -->
+          <!-- STEP 2: DEDICATED CLOUD RESOURCES PREVIEW                    -->
+          <!-- ============================================================ -->
+          <div *ngIf="currentStep === 2" class="step-card-animate">
+            <div class="card step-card shadow-sm border-0">
+              <div class="card-header bg-white border-bottom p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="step-chip">STEP 2 OF 5</span>
+                    <div>
+                      <h4 class="m-0 fw-bold text-dark" style="font-size: 17px;">Dedicated Cloudflare Infrastructure</h4>
+                      <p class="text-muted m-0" style="font-size: 13px;">Preview of isolated cloud resources provisioned on your platform Cloudflare account</p>
+                    </div>
+                  </div>
+                  <span class="badge bg-success-soft text-success px-3 py-2 fw-semibold">
+                    <i class="ri-shield-check-line me-1"></i> 100% Tenant Isolation
+                  </span>
+                </div>
               </div>
 
-              <div class="form-group mb-0">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                  <label class="form-label mb-0">Admin Password *</label>
-                  <button type="button" (click)="generateRandomPassword()" class="btn btn-link btn-sm p-0 text-primary generate-pwd-btn">
-                    <i class="ri-magic-line"></i> Generate Password
-                  </button>
+              <div class="card-body p-4">
+                <div class="alert alert-info-sleek mb-4">
+                  <div class="d-flex gap-2 align-items-start">
+                    <i class="ri-cloud-line fs-5 text-primary mt-1"></i>
+                    <div>
+                      <strong>Automated Platform Cloudflare Provisioning:</strong> These 7 isolated resources will be created automatically via Cloudflare REST APIs on your platform account. The client business will never interact with Cloudflare.
+                    </div>
+                  </div>
                 </div>
-                <div class="input-group">
-                  <input [type]="showPassword ? 'text' : 'password'" class="form-control custom-input" placeholder="Password" name="admin_password" [(ngModel)]="clientForm.admin_password" required />
-                  <button type="button" class="btn input-addon-btn" (click)="showPassword = !showPassword" title="Toggle password visibility">
-                    <i [class]="showPassword ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
-                  </button>
+
+                <div class="row g-3">
+                  <!-- D1 SQL Database -->
+                  <div class="col-md-6">
+                    <div class="infra-card">
+                      <div class="infra-icon d1-theme">
+                        <i class="ri-database-2-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">D1 SQL Database</strong>
+                          <span class="badge bg-primary-soft text-primary">Isolated DB</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.d1 }}</code>
+                        <p class="infra-desc">Private SQLite database for documents, chunks, threads, traces, and system settings.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- KV Fast Cache -->
+                  <div class="col-md-6">
+                    <div class="infra-card">
+                      <div class="infra-icon kv-theme">
+                        <i class="ri-flashlight-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">KV Fast Query Cache</strong>
+                          <span class="badge bg-warning-soft text-warning">L1 Cache</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.kv }}</code>
+                        <p class="infra-desc">Sub-millisecond global key-value store for exact repeated query retrieval.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Vectorize Admin -->
+                  <div class="col-md-6">
+                    <div class="infra-card">
+                      <div class="infra-icon vec-theme">
+                        <i class="ri-brain-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">Vectorize: Admin Knowledge</strong>
+                          <span class="badge bg-info-soft text-info">1536-dim Cosine</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.vecAdmin }}</code>
+                        <p class="infra-desc">Dedicated vector index for curated admin knowledge base articles.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Vectorize PDF -->
+                  <div class="col-md-6">
+                    <div class="infra-card">
+                      <div class="infra-icon vec-theme">
+                        <i class="ri-file-pdf-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">Vectorize: PDF Documents</strong>
+                          <span class="badge bg-info-soft text-info">1536-dim Cosine</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.vecPdf }}</code>
+                        <p class="infra-desc">Semantic vector index for uploaded PDF manuals and compliance laws.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Vectorize Web -->
+                  <div class="col-md-6">
+                    <div class="infra-card">
+                      <div class="infra-icon vec-theme">
+                        <i class="ri-global-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">Vectorize: Web Crawl</strong>
+                          <span class="badge bg-info-soft text-info">1536-dim Cosine</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.vecWeb }}</code>
+                        <p class="infra-desc">Real-time vector index for crawled website documentation and FAQs.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Vectorize Semantic Cache -->
+                  <div class="col-md-6">
+                    <div class="infra-card">
+                      <div class="infra-icon vec-theme">
+                        <i class="ri-search-eye-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">Vectorize: Semantic Cache</strong>
+                          <span class="badge bg-purple-soft text-purple">L2 Cache</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.vecQCache }}</code>
+                        <p class="infra-desc">Vector similarity query cache (≥95% cosine threshold for fast answers).</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- R2 Storage -->
+                  <div class="col-12">
+                    <div class="infra-card">
+                      <div class="infra-icon r2-theme">
+                        <i class="ri-archive-line"></i>
+                      </div>
+                      <div class="infra-details">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <strong class="infra-title">R2 Object Storage Vault</strong>
+                          <span class="badge bg-warning-soft text-warning">S3-Compatible</span>
+                        </div>
+                        <code class="infra-tag">{{ resourceNames.r2 }}</code>
+                        <p class="infra-desc">Encrypted Cloudflare R2 bucket for raw file storage and original document assets.</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Card 3: Billing & Resource Infrastructure -->
-        <div class="col-12 mb-4">
-          <div class="card">
-            <div class="card-header card-header-icon m-0">
-              <h4 class="card-title m-0">
-                <i class="ri-bank-card-line text-primary me-2"></i> 3. Billing & Resource Infrastructure
-              </h4>
-            </div>
-            <div class="card-body p-4">
-              <!-- Billing Mode Radio Options -->
-              <div class="row mb-4">
-                <div class="col-md-6 mb-3 mb-md-0">
-                  <div class="billing-mode-card" [class.selected]="clientForm.billing_mode === 'platform'" (click)="clientForm.billing_mode = 'platform'">
-                    <div class="d-flex align-items-center gap-2">
-                      <input class="form-check-input mt-0" type="radio" name="billing_mode" id="modePlatform" value="platform" [(ngModel)]="clientForm.billing_mode">
-                      <label class="form-check-label fw-bold mb-0" for="modePlatform" style="color: #1e293b; font-size: 14px; cursor: pointer;">
-                        Platform Billed (Managed)
-                      </label>
+          <!-- ============================================================ -->
+          <!-- STEP 3: AI INTELLIGENCE / OPENAI KEY                         -->
+          <!-- ============================================================ -->
+          <div *ngIf="currentStep === 3" class="step-card-animate">
+            <div class="card step-card shadow-sm border-0">
+              <div class="card-header bg-white border-bottom p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="step-chip">STEP 3 OF 5</span>
+                    <div>
+                      <h4 class="m-0 fw-bold text-dark" style="font-size: 17px;">AI Intelligence & Billing Mode</h4>
+                      <p class="text-muted m-0" style="font-size: 13px;">Choose whether this business uses platform AI quota or provides their own OpenAI key</p>
                     </div>
-                    <p class="text-muted mt-2 mb-0" style="font-size: 12.5px; line-height: 1.5;">
-                      Routes queries through your platform's shared API keys and Cloudflare Vectorize infrastructure.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="col-md-6">
-                  <div class="billing-mode-card" [class.selected]="clientForm.billing_mode === 'byok'" (click)="clientForm.billing_mode = 'byok'">
-                    <div class="d-flex align-items-center gap-2">
-                      <input class="form-check-input mt-0" type="radio" name="billing_mode" id="modeByok" value="byok" [(ngModel)]="clientForm.billing_mode">
-                      <label class="form-check-label fw-bold mb-0" for="modeByok" style="color: #1e293b; font-size: 14px; cursor: pointer;">
-                        Bring Your Own Key (BYOK)
-                      </label>
-                    </div>
-                    <p class="text-muted mt-2 mb-0" style="font-size: 12.5px; line-height: 1.5;">
-                      The tenant links their own OpenAI API key and Cloudflare account. Keys are securely encrypted with AES-GCM (256-bit).
-                    </p>
                   </div>
                 </div>
               </div>
 
-              <!-- BYOK Secret Inputs -->
-              <div *ngIf="clientForm.billing_mode === 'byok'" class="byok-box mb-4">
-                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                  <div class="d-flex align-items-center gap-2">
-                    <i class="ri-lock-2-line text-primary fs-5"></i>
-                    <h6 class="m-0 fw-bold" style="color: #1e293b; font-size: 14px;">Tenant BYOK Infrastructure Credentials</h6>
+              <div class="card-body p-4">
+                <!-- Selectable Choice Cards -->
+                <div class="row g-3 mb-4">
+                  <!-- Option 1: Platform Managed AI -->
+                  <div class="col-md-6">
+                    <div
+                      class="choice-card"
+                      [class.selected]="clientForm.billing_mode === 'platform'"
+                      (click)="clientForm.billing_mode = 'platform'"
+                    >
+                      <div class="choice-header">
+                        <div class="choice-icon platform-icon">
+                          <i class="ri-cpu-line"></i>
+                        </div>
+                        <div class="choice-radio">
+                          <input
+                            type="radio"
+                            class="form-check-input"
+                            name="billing_mode"
+                            id="modePlatform"
+                            value="platform"
+                            [(ngModel)]="clientForm.billing_mode"
+                          />
+                        </div>
+                      </div>
+                      <h5 class="choice-title">Platform Managed AI</h5>
+                      <span class="badge bg-primary-soft text-primary mb-2">Recommended for SaaS</span>
+                      <p class="choice-desc">
+                        Queries run through your platform's master OpenAI API key. Zero API key configuration required for the client business.
+                      </p>
+                    </div>
                   </div>
-                  <span class="badge badge-encryption">AES-GCM 256-bit Encrypted</span>
+
+                  <!-- Option 2: BYOK -->
+                  <div class="col-md-6">
+                    <div
+                      class="choice-card"
+                      [class.selected]="clientForm.billing_mode === 'byok'"
+                      (click)="clientForm.billing_mode = 'byok'"
+                    >
+                      <div class="choice-header">
+                        <div class="choice-icon byok-icon">
+                          <i class="ri-key-2-line"></i>
+                        </div>
+                        <div class="choice-radio">
+                          <input
+                            type="radio"
+                            class="form-check-input"
+                            name="billing_mode"
+                            id="modeByok"
+                            value="byok"
+                            [(ngModel)]="clientForm.billing_mode"
+                          />
+                        </div>
+                      </div>
+                      <h5 class="choice-title">Bring Your Own Key (BYOK)</h5>
+                      <span class="badge bg-warning-soft text-warning mb-2">Client Provides OpenAI Key</span>
+                      <p class="choice-desc">
+                        The client links their own OpenAI API key. Model token usage bills directly to their OpenAI account. Keys are AES-GCM 256-bit encrypted.
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div class="byok-info-box mb-3">
-                  <i class="ri-information-line fs-5 text-primary mt-1"></i>
-                  <div>
-                    <p class="mb-0">
-                      <strong>Dedicated Resource Linking:</strong> Under BYOK mode, vector storage and AI model queries run directly on the client's own cloud accounts. Enter their OpenAI API key and Cloudflare Account credentials to link their infrastructure.
-                    </p>
+                <!-- BYOK Input Panel -->
+                <div *ngIf="clientForm.billing_mode === 'byok'" class="byok-panel p-4 rounded mb-3">
+                  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="ri-shield-keyhole-line text-primary fs-5"></i>
+                      <strong style="color: #1e293b; font-size: 14px;">Client OpenAI API Key</strong>
+                    </div>
+                    <span class="badge bg-white text-dark border">AES-GCM 256-bit Encrypted</span>
                   </div>
-                </div>
 
-                <div class="form-group mb-3">
-                  <label class="form-label">Client OpenAI API Key *</label>
                   <div class="input-group">
-                    <input [type]="showOpenAIKey ? 'text' : 'password'" class="form-control custom-input bg-white" placeholder="sk-proj-..." name="openai_api_key" [(ngModel)]="clientForm.openai_api_key" />
-                    <button type="button" class="btn input-addon-btn" (click)="showOpenAIKey = !showOpenAIKey" title="Toggle key visibility">
+                    <span class="input-group-text input-icon-addon">
+                      <i class="ri-lock-password-line"></i>
+                    </span>
+                    <input
+                      [type]="showOpenAIKey ? 'text' : 'password'"
+                      class="form-control custom-input bg-white"
+                      placeholder="sk-proj-..."
+                      name="openai_api_key"
+                      [(ngModel)]="clientForm.openai_api_key"
+                      required
+                    />
+                    <button
+                      type="button"
+                      class="btn input-addon-btn"
+                      (click)="showOpenAIKey = !showOpenAIKey"
+                      title="Toggle key visibility"
+                    >
                       <i [class]="showOpenAIKey ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
                     </button>
                   </div>
-                  <small class="text-muted d-block mt-1">Used for AI answer generation and query rewriting under the client's own OpenAI quota.</small>
-                </div>
 
-                <div class="row">
-                  <div class="col-md-6 mb-3 mb-md-0">
-                    <label class="form-label">Cloudflare Account ID (Optional)</label>
-                    <input type="text" class="form-control custom-input w-100 bg-white" placeholder="e.g. 4121119f090b8f412431fa..." name="cf_account_id" [(ngModel)]="clientForm.cf_account_id" />
-                    <small class="text-muted d-block mt-1">Optional: Links vector queries to the client's own Cloudflare account.</small>
-                  </div>
-
-                  <div class="col-md-6">
-                    <label class="form-label">Cloudflare API Token (Optional)</label>
-                    <div class="input-group">
-                      <input [type]="showCfToken ? 'text' : 'password'" class="form-control custom-input bg-white" placeholder="Cloudflare API Token" name="cf_api_token" [(ngModel)]="clientForm.cf_api_token" />
-                      <button type="button" class="btn input-addon-btn" (click)="showCfToken = !showCfToken" title="Toggle token visibility">
-                        <i [class]="showCfToken ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
-                      </button>
-                    </div>
-                    <small class="text-muted d-block mt-1">Optional: API Token with Vectorize / AI permissions for their account.</small>
+                  <div *ngIf="clientForm.openai_api_key && clientForm.openai_api_key.startsWith('sk-')" class="mt-2 text-success" style="font-size: 12.5px;">
+                    <i class="ri-checkbox-circle-line me-1"></i> Valid OpenAI Key Format Detected
                   </div>
                 </div>
-              </div>
 
-              <!-- Submit Buttons -->
-              <div class="d-flex justify-content-end align-items-center gap-2 pt-3 border-top">
-                <a routerLink="/dashboard/super-admin/dashboard" class="btn btn-cancel">Cancel</a>
-                <button type="submit" class="button-primary" [disabled]="isSaving">
-                  <i class="ri-save-line" [class.ri-loader-4-line]="isSaving" [class.spin]="isSaving"></i>
-                  <span>{{ isSaving ? 'Registering...' : 'Register Business' }}</span>
-                </button>
+                <!-- Policy Tip Box -->
+                <div class="policy-tip-box">
+                  <i class="ri-information-line text-primary fs-5 mt-1"></i>
+                  <div style="font-size: 13px; color: #475569;">
+                    <strong>Flexible Key Management:</strong> Clients can update their API key or request to switch back to platform billing at any time from their <strong>Business Persona</strong> settings.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- ============================================================ -->
+          <!-- STEP 4: ADMIN LOGIN CREDENTIALS                              -->
+          <!-- ============================================================ -->
+          <div *ngIf="currentStep === 4" class="step-card-animate">
+            <div class="card step-card shadow-sm border-0">
+              <div class="card-header bg-white border-bottom p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="step-chip">STEP 4 OF 5</span>
+                    <div>
+                      <h4 class="m-0 fw-bold text-dark" style="font-size: 17px;">Admin Account Credentials</h4>
+                      <p class="text-muted m-0" style="font-size: 13px;">Create initial login credentials for the business owner</p>
+                    </div>
+                  </div>
+                  <span *ngIf="clientForm.admin_username && clientForm.admin_password" class="badge bg-success-soft text-success">
+                    <i class="ri-check-line me-1"></i> Credentials Ready
+                  </span>
+                </div>
+              </div>
+
+              <div class="card-body p-4">
+                <div class="row g-3">
+                  <!-- Admin Username -->
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold">Admin Username <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                      <span class="input-group-text input-icon-addon">
+                        <i class="ri-user-line"></i>
+                      </span>
+                      <input
+                        type="text"
+                        class="form-control custom-input"
+                        placeholder="e.g. apex_admin"
+                        name="admin_username"
+                        [(ngModel)]="clientForm.admin_username"
+                        required
+                      />
+                    </div>
+                    <small class="text-muted d-block mt-1">Username the business administrator will use to sign in.</small>
+                  </div>
+
+                  <!-- Admin Password -->
+                  <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label class="form-label fw-semibold mb-0">Admin Password <span class="text-danger">*</span></label>
+                      <button
+                        type="button"
+                        (click)="generateRandomPassword()"
+                        class="btn btn-link btn-sm p-0 text-primary fw-semibold"
+                        style="font-size: 12.5px;"
+                      >
+                        <i class="ri-magic-line me-1"></i> Generate Password
+                      </button>
+                    </div>
+                    <div class="input-group">
+                      <span class="input-group-text input-icon-addon">
+                        <i class="ri-key-line"></i>
+                      </span>
+                      <input
+                        [type]="showPassword ? 'text' : 'password'"
+                        class="form-control custom-input"
+                        placeholder="Enter secure password"
+                        name="admin_password"
+                        [(ngModel)]="clientForm.admin_password"
+                        required
+                      />
+                      <button
+                        type="button"
+                        class="btn input-addon-btn"
+                        (click)="showPassword = !showPassword"
+                        title="Toggle password visibility"
+                      >
+                        <i [class]="showPassword ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
+                      </button>
+                    </div>
+                    <small class="text-muted d-block mt-1">Initial password for private workspace login.</small>
+                  </div>
+                </div>
+
+                <!-- Password Info Callout -->
+                <div class="security-info-box mt-4 p-3 rounded">
+                  <div class="d-flex gap-2 align-items-start">
+                    <i class="ri-shield-check-line text-success fs-5"></i>
+                    <div style="font-size: 13px; color: #166534;">
+                      <strong>Zero Knowledge Security:</strong> Passwords are salt-hashed using bcrypt (10 rounds). The client will receive their own private dashboard view scoped strictly to their isolated tenant database.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================ -->
+          <!-- STEP 5: REVIEW & CONFIRM                                     -->
+          <!-- ============================================================ -->
+          <div *ngIf="currentStep === 5" class="step-card-animate">
+            <div class="card step-card shadow-sm border-0">
+              <div class="card-header bg-white border-bottom p-4">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                  <div class="d-flex align-items-center gap-3">
+                    <span class="step-chip">STEP 5 OF 5</span>
+                    <div>
+                      <h4 class="m-0 fw-bold text-dark" style="font-size: 17px;">Review & Provision Manifest</h4>
+                      <p class="text-muted m-0" style="font-size: 13px;">Final verification before orchestrating Cloudflare infrastructure creation</p>
+                    </div>
+                  </div>
+                  <span class="badge bg-primary-soft text-primary px-3 py-2 fw-semibold">
+                    <i class="ri-check-double-line me-1"></i> Ready to Provision
+                  </span>
+                </div>
+              </div>
+
+              <div class="card-body p-4">
+                <!-- Summary Manifest Grid -->
+                <div class="row g-3 mb-4">
+                  <!-- Profile Box -->
+                  <div class="col-md-6">
+                    <div class="manifest-card">
+                      <div class="manifest-header">
+                        <i class="ri-building-4-line text-primary me-2"></i>
+                        <span>Business Profile</span>
+                      </div>
+                      <table class="manifest-table">
+                        <tr>
+                          <td class="text-muted">Business:</td>
+                          <td><strong>{{ clientForm.name }}</strong></td>
+                        </tr>
+                        <tr>
+                          <td class="text-muted">Slug:</td>
+                          <td><code>{{ clientForm.slug }}</code></td>
+                        </tr>
+                        <tr>
+                          <td class="text-muted">Domain:</td>
+                          <td>{{ clientForm.domain || 'None' }}</td>
+                        </tr>
+                        <tr>
+                          <td class="text-muted">Contact:</td>
+                          <td>{{ clientForm.contact_email || 'None' }}</td>
+                        </tr>
+                      </table>
+                    </div>
+                  </div>
+
+                  <!-- AI Billing & Admin Box -->
+                  <div class="col-md-6">
+                    <div class="manifest-card">
+                      <div class="manifest-header">
+                        <i class="ri-shield-keyhole-line text-primary me-2"></i>
+                        <span>Billing & Access</span>
+                      </div>
+                      <table class="manifest-table">
+                        <tr>
+                          <td class="text-muted">AI Billing:</td>
+                          <td>
+                            <span *ngIf="clientForm.billing_mode === 'platform'" class="badge bg-primary-soft text-primary">
+                              Platform Managed AI
+                            </span>
+                            <span *ngIf="clientForm.billing_mode === 'byok'" class="badge bg-warning-soft text-warning">
+                              BYOK (Client OpenAI Key)
+                            </span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="text-muted">Admin User:</td>
+                          <td><code>{{ clientForm.admin_username }}</code></td>
+                        </tr>
+                        <tr>
+                          <td class="text-muted">Password:</td>
+                          <td><span class="text-muted">••••••••••••</span></td>
+                        </tr>
+                        <tr>
+                          <td class="text-muted">Public Token:</td>
+                          <td><span class="text-success font-monospace" style="font-size: 11.5px;">Auto-generated pk_live_*</span></td>
+                        </tr>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 7 Isolated Resources Manifest Table -->
+                <div class="manifest-card mb-4">
+                  <div class="manifest-header d-flex justify-content-between align-items-center">
+                    <div>
+                      <i class="ri-server-line text-primary me-2"></i>
+                      <span>Dedicated Infrastructure Manifest (7 Resources)</span>
+                    </div>
+                    <span class="badge bg-success-soft text-success">Automated CF API</span>
+                  </div>
+                  <div class="table-responsive">
+                    <table class="table table-sm m-0" style="font-size: 13px;">
+                      <thead style="background: #f8fafc;">
+                        <tr class="text-muted">
+                          <th>Resource Type</th>
+                          <th>Resource Name</th>
+                          <th>Engine</th>
+                          <th class="text-end">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td><i class="ri-database-2-line text-primary me-1"></i> D1 Database</td>
+                          <td><code>{{ resourceNames.d1 }}</code></td>
+                          <td>Cloudflare SQLite Edge</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                        <tr>
+                          <td><i class="ri-flashlight-line text-warning me-1"></i> KV Cache</td>
+                          <td><code>{{ resourceNames.kv }}</code></td>
+                          <td>Cloudflare Global KV</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                        <tr>
+                          <td><i class="ri-brain-line text-info me-1"></i> Vectorize Admin</td>
+                          <td><code>{{ resourceNames.vecAdmin }}</code></td>
+                          <td>Vectorize v2 (1536-dim)</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                        <tr>
+                          <td><i class="ri-file-pdf-line text-danger me-1"></i> Vectorize PDF</td>
+                          <td><code>{{ resourceNames.vecPdf }}</code></td>
+                          <td>Vectorize v2 (1536-dim)</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                        <tr>
+                          <td><i class="ri-global-line text-success me-1"></i> Vectorize Web</td>
+                          <td><code>{{ resourceNames.vecWeb }}</code></td>
+                          <td>Vectorize v2 (1536-dim)</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                        <tr>
+                          <td><i class="ri-search-eye-line text-purple me-1"></i> Vectorize Cache</td>
+                          <td><code>{{ resourceNames.vecQCache }}</code></td>
+                          <td>Vectorize v2 (L2 Cache)</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                        <tr>
+                          <td><i class="ri-archive-line text-warning me-1"></i> R2 Object Storage</td>
+                          <td><code>{{ resourceNames.r2 }}</code></td>
+                          <td>Cloudflare R2 Bucket</td>
+                          <td class="text-end"><span class="badge bg-primary-soft text-primary">To Provision</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="text-center py-2">
+                  <p class="text-muted mb-0" style="font-size: 13px;">
+                    Clicking <strong>"Create Business & Provision Resources"</strong> will execute Cloudflare API calls, initialize the database schema, configure cache namespaces, and create administrative credentials.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================================ -->
+          <!-- BOTTOM STEPPER CONTROLS                                      -->
+          <!-- ============================================================ -->
+          <div class="d-flex justify-content-between align-items-center mt-4 mb-5">
+            <div>
+              <button
+                *ngIf="currentStep > 1"
+                type="button"
+                (click)="prevStep()"
+                class="btn btn-wizard-back"
+                [disabled]="isSaving"
+              >
+                <i class="ri-arrow-left-line me-1"></i> Back to Step {{ currentStep - 1 }}
+              </button>
+              <a
+                *ngIf="currentStep === 1"
+                routerLink="/dashboard/super-admin/dashboard"
+                class="btn btn-wizard-back"
+              >
+                Cancel
+              </a>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+              <span class="text-muted d-none d-sm-inline font-monospace" style="font-size: 13px;">
+                Step {{ currentStep }} / {{ steps.length }}
+              </span>
+
+              <button
+                *ngIf="currentStep < 5"
+                type="button"
+                (click)="nextStep()"
+                class="button-primary btn-wizard-next"
+              >
+                <span>Continue to Step {{ currentStep + 1 }}</span>
+                <i class="ri-arrow-right-line ms-1"></i>
+              </button>
+
+              <button
+                *ngIf="currentStep === 5"
+                type="submit"
+                class="button-primary btn-wizard-submit"
+                [disabled]="isSaving"
+              >
+                <i class="ri-check-double-line" [class.ri-loader-4-line]="isSaving" [class.spin]="isSaving"></i>
+                <span>{{ isSaving ? 'Provisioning Cloudflare Resources...' : 'Create Business & Provision Resources' }}</span>
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
     </form>

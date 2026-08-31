@@ -406,7 +406,7 @@ async function runSharedAskLogic(
           tokensUsed: 0,
           source: "cache_L2_semantic",
           startedAt: prep.startedAt,
-          sources: formatRetrievedSources(semHit.sources, semHit.answer, "completed"),
+          sources: formatRetrievedSources(semHit.sources || [], semHit.answer, "completed"),
           meta: { cacheHit: true, cacheLayer: "L2_SEMANTIC", cacheScore: semHit.score, cacheLatencyMs: semHit.latencyMs },
         };
       }
@@ -540,6 +540,7 @@ type StreamingAskSuccess = {
   prep: Awaited<ReturnType<typeof preparePipeline>>;
   retrieve?: Awaited<ReturnType<typeof retrievePipeline>>;
   cachedAnswer?: string;
+  cachedSources?: any[];
   cacheLayer?: string;
 };
 
@@ -783,7 +784,7 @@ export const askController = {
               ok: true,
               tokensUsed: 0,
               timing: { ms: now() - prep.startedAt },
-              sources: formatRetrievedSources(result.cachedSources, result.cachedAnswer, "completed"),
+              sources: formatRetrievedSources(result.cachedSources || [], result.cachedAnswer, "completed"),
             });
             return;
           }

@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
-import { SuperAdminService, PlatformStats, ClientRecord } from 'src/app/modules/core/services/super-admin.service';
+import { SuperAdminService, PlatformStats, ClientRecord, ApiKeyRequest } from 'src/app/modules/core/services/super-admin.service';
 import { utilityService } from 'src/app/modules/shared/services/utility.service';
 import Swal from 'sweetalert2';
 
@@ -16,6 +16,8 @@ export class SuperAdminDashboardComponent implements OnInit {
   entries: number = 10;
   itemPerPage: number = 10;
 
+  activeTab: 'businesses' | 'requests' = 'businesses';
+
   stats: PlatformStats = {
     total_clients: 0,
     active_clients: 0,
@@ -27,6 +29,11 @@ export class SuperAdminDashboardComponent implements OnInit {
     total_files: 0,
   };
   clients: ClientRecord[] = [];
+  apiKeyRequests: ApiKeyRequest[] = [];
+
+  get pendingRequestsCount(): number {
+    return this.apiKeyRequests.filter(r => r.status === 'pending').length;
+  }
 
   get filteredClients(): ClientRecord[] {
     if (!this.searchText || !this.searchText.trim()) {
@@ -107,11 +114,71 @@ export class SuperAdminDashboardComponent implements OnInit {
         this.isLoading = false;
       },
     });
+
+    this.loadApiKeyRequests();
+  }
+
+  loadApiKeyRequests(): void {
+    this.superAdminService.getApiKeyRequests().subscribe({
+      next: (res) => {
+        if (res.ok) {
+          this.apiKeyRequests = res.requests || [];
+        }
+      },
+    });
   }
 
   manageClientWorkspace(client: ClientRecord): void {
     this.utility.setActiveClient(client.id, client.name);
     this.router.navigate(['/dashboard/assistant-information']);
+  }
+
+  onApproveRequest(req: ApiKeyRequest): void {
+    Swal.fire({
+      title: 'Approve Switch Request?',
+      text: `Approve request for "${req.client_name || req.client_id}" to switch to platform-managed AI billing?`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      confirmButtonText: 'Yes, Approve',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        this.superAdminService.reviewApiKeyRequest(req.id, 'approved').subscribe({
+          next: () => {
+            Swal.fire('Approved!', `Business "${req.client_name}" has been switched to platform billing.`, 'success');
+            this.loadData();
+          },
+          error: (err) => {
+            Swal.fire('Error', err?.error?.error || 'Failed to approve request', 'error');
+          },
+        });
+      }
+    });
+  }
+
+  onRejectRequest(req: ApiKeyRequest): void {
+    Swal.fire({
+      title: 'Reject Switch Request?',
+      input: 'text',
+      inputPlaceholder: 'Reason for rejection (optional)...',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      confirmButtonText: 'Reject Request',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const notes = result.value || '';
+        this.superAdminService.reviewApiKeyRequest(req.id, 'rejected', notes).subscribe({
+          next: () => {
+            Swal.fire('Rejected', 'The switch request has been rejected.', 'info');
+            this.loadData();
+          },
+          error: (err) => {
+            Swal.fire('Error', err?.error?.error || 'Failed to reject request', 'error');
+          },
+        });
+      }
+    });
   }
 
   onDeleteClient(client: ClientRecord): void {
@@ -122,7 +189,7 @@ export class SuperAdminDashboardComponent implements OnInit {
 
     Swal.fire({
       title: `Delete "${client.name}"?`,
-      text: 'This will permanently remove the business, its encrypted API keys, admin logins, and uploaded documents. This cannot be undone!',
+      text: 'This will permanently remove the business, its dedicated Cloudflare D1/KV/Vectorize/R2 resources, and admin logins. This cannot be undone!',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',

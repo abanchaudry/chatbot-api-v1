@@ -22,7 +22,7 @@ export async function generateSha256Hash(message: string): Promise<string> {
 }
 
 export async function getCachedQueryResponse(
-  cache: KVNamespace,
+  cache: KVNamespace | any,
   question: string,
   datasetSignature?: string,
   clientId?: string
@@ -80,7 +80,7 @@ export function doIdentifiersMatch(query1: string, query2: string): boolean {
 }
 
 export async function saveQueryResponseToCache(
-  cache: KVNamespace,
+  cache: KVNamespace | any,
   question: string,
   payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string },
   datasetSignature?: string,
@@ -108,7 +108,7 @@ export async function saveQueryResponseToCache(
 export async function getSemanticCacheHit(
   vectorizeCache: VectorizeIndex | undefined,
   embedding: number[] | null,
-  kvCache: KVNamespace,
+  kvCache: KVNamespace | any,
   incomingQuestion?: string,
   datasetSignature?: string
 ): Promise<{ hit: boolean; answer?: string; sources?: any[]; score?: number; latencyMs?: number }> {
@@ -125,7 +125,7 @@ export async function getSemanticCacheHit(
       if (match.score >= 0.95) {
         const queryHash = match.id;
         const key = datasetSignature ? `qcache:${datasetSignature}:${queryHash}` : `qcache:${queryHash}`;
-        const data = await kvCache.get<{ answer: string; context: string; sources: any[]; question?: string }>(key, 'json');
+        const data = (await kvCache.get(key, 'json')) as { answer: string; context: string; sources: any[]; question?: string } | null;
 
         if (data) {
           // Safety Guard: If incoming question and cached question have differing section/law numbers, bypass semantic cache!
@@ -159,7 +159,7 @@ export async function getSemanticCacheHit(
 
 export async function saveSemanticCacheEntry(
   vectorizeCache: VectorizeIndex | undefined,
-  kvCache: KVNamespace,
+  kvCache: KVNamespace | any,
   queryHash: string,
   embedding: number[],
   payload: { answer: string; context: string; sources: any[]; tokensUsed?: number; question?: string },
@@ -189,7 +189,7 @@ export async function saveSemanticCacheEntry(
   }
 }
 
-export async function purgeAllQueryCache(cache: KVNamespace): Promise<boolean> {
+export async function purgeAllQueryCache(cache: KVNamespace | any): Promise<boolean> {
   try {
     let cursor: string | undefined = undefined;
     let complete = false;

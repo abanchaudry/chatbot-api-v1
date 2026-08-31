@@ -7,7 +7,7 @@
         <div class="ai-knowledge-box">
           <div>
             <h1 class="ai-title">Business & AI Persona</h1>
-            <p class="ai-subtitle">Configure company branding, persona tone, language, and AI domain instructions</p>
+            <p class="ai-subtitle">Configure company branding, persona tone, language, domain instructions, and OpenAI key</p>
           </div>
           <div class="quick-stat d-none d-md-block">
             <span class="badge-live">Active Persona</span>
@@ -82,14 +82,182 @@
       </div>
     </div>
 
+    <!-- AI Model Billing & OpenAI Key Management Card -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card ai-key-card shadow-sm border-0">
+          
+          <!-- Card Header -->
+          <div class="card-header custom-card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <div class="header-icon-circle">
+                <i class="ri-key-2-line"></i>
+              </div>
+              <div>
+                <h4 class="card-heading m-0">AI Intelligence & OpenAI API Key</h4>
+                <p class="card-subheading m-0">Manage AI generation credentials and model billing quotas</p>
+              </div>
+            </div>
+            
+            <!-- Status Badge -->
+            <div>
+              <span *ngIf="apiKeyStatus.billing_mode === 'platform'" class="pill-badge-platform">
+                <i class="ri-cpu-line me-1"></i> Platform Managed AI
+              </span>
+              <span *ngIf="apiKeyStatus.billing_mode === 'byok'" class="pill-badge-byok">
+                <i class="ri-shield-keyhole-line me-1"></i> BYOK (Custom OpenAI Key)
+              </span>
+            </div>
+          </div>
+
+          <div class="card-body p-4">
+
+            <!-- Pending Switch Request Notification -->
+            <div *ngIf="apiKeyStatus.has_pending_request" class="pending-alert mb-4">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="pending-icon-box">
+                    <i class="ri-time-line fs-4"></i>
+                  </div>
+                  <div>
+                    <strong class="text-dark d-block">Switch to Platform Billing Requested</strong>
+                    <span class="text-muted" style="font-size: 13px;">
+                      Your request to switch to platform-managed AI billing is awaiting Super Admin review and approval.
+                    </span>
+                  </div>
+                </div>
+                <span class="badge bg-warning text-dark px-3 py-2 fw-semibold">Pending Review</span>
+              </div>
+            </div>
+
+            <div class="row g-4 align-items-center">
+              
+              <!-- Left Column: Status Details -->
+              <div class="col-lg-6">
+                
+                <!-- BYOK Active State -->
+                <div *ngIf="apiKeyStatus.billing_mode === 'byok'">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="status-indicator-dot online"></span>
+                    <h5 class="fw-bold text-dark m-0" style="font-size: 15px;">Using Private OpenAI API Key</h5>
+                  </div>
+                  <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">
+                    Your workspace is operating on dedicated quota billed directly to your private OpenAI account. All keys are encrypted at rest with AES-GCM 256-bit.
+                  </p>
+
+                  <!-- Active Key Preview Box -->
+                  <div class="active-key-box">
+                    <div class="d-flex align-items-center justify-content-between">
+                      <div class="d-flex align-items-center gap-2">
+                        <i class="ri-lock-2-line text-primary"></i>
+                        <span class="text-muted" style="font-size: 12px; font-weight: 600;">ACTIVE KEY:</span>
+                        <code class="key-mask-text">{{ apiKeyStatus.openai_api_key_masked || 'sk-proj-••••••••' }}</code>
+                      </div>
+                      <span class="badge bg-success-soft text-success">
+                        <i class="ri-check-line me-1"></i> Verified
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Platform Managed State -->
+                <div *ngIf="apiKeyStatus.billing_mode === 'platform'">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="status-indicator-dot platform"></span>
+                    <h5 class="fw-bold text-dark m-0" style="font-size: 15px;">Operating on Platform AI Quota</h5>
+                  </div>
+                  <p class="text-muted mb-3" style="font-size: 13px; line-height: 1.5;">
+                    Your business currently uses shared platform AI capacity. To connect your own OpenAI billing account and unlock private model quotas, enter your OpenAI API key.
+                  </p>
+
+                  <div class="platform-included-box">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="ri-checkbox-circle-fill text-primary fs-5"></i>
+                      <span style="font-size: 13px; color: #1e293b; font-weight: 500;">
+                        Platform Managed AI Generation & Embeddings Active
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Right Column: Update Key Form & Actions -->
+              <div class="col-lg-6">
+                <div class="key-input-panel p-3 rounded">
+                  <label class="form-label fw-semibold text-dark mb-2" style="font-size: 13px;">
+                    {{ apiKeyStatus.billing_mode === 'byok' ? 'Replace / Update OpenAI API Key' : 'Enter OpenAI API Key (Bring Your Own Key)' }}
+                  </label>
+
+                  <!-- Input Group -->
+                  <div class="input-group mb-2">
+                    <span class="input-group-text key-addon-icon">
+                      <i class="ri-key-line"></i>
+                    </span>
+                    <input
+                      [type]="showNewKey ? 'text' : 'password'"
+                      class="form-control key-input-field"
+                      placeholder="sk-proj-..."
+                      [(ngModel)]="newOpenAIKey"
+                    />
+                    <button
+                      type="button"
+                      class="btn key-eye-btn"
+                      (click)="showNewKey = !showNewKey"
+                      title="Toggle key visibility"
+                    >
+                      <i [class]="showNewKey ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
+                    </button>
+                    <button
+                      type="button"
+                      (click)="onUpdateOpenAIKey()"
+                      class="button-primary key-submit-btn"
+                      [disabled]="isSavingApiKey || !newOpenAIKey.trim()"
+                    >
+                      <i class="ri-save-line" [class.ri-loader-4-line]="isSavingApiKey" [class.spin]="isSavingApiKey"></i>
+                      <span>{{ apiKeyStatus.billing_mode === 'byok' ? 'Update Key' : 'Save & Switch to BYOK' }}</span>
+                    </button>
+                  </div>
+
+                  <div class="d-flex align-items-center justify-content-between mt-2 pt-1">
+                    <span class="text-muted" style="font-size: 11.5px;">
+                      <i class="ri-shield-check-line text-success me-1"></i> AES-GCM 256-bit Encrypted
+                    </span>
+
+                    <!-- Request Switch Button for BYOK users -->
+                    <button
+                      *ngIf="apiKeyStatus.billing_mode === 'byok' && !apiKeyStatus.has_pending_request"
+                      type="button"
+                      (click)="onRequestPlatformSwitch()"
+                      class="btn btn-link switch-request-link p-0"
+                    >
+                      <i class="ri-swap-line me-1"></i> Request switch to Platform Billing
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Business Profile & Persona Configuration Card -->
     <div class="row mb-4">
       <div class="col-md-12">
         <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-          <div class="card-header card-header-icon m-0 border-bottom" style="display:flex; align-items:center; justify-content:space-between; padding: 18px 24px; background: #ffffff;">
-            <h4 class="card-title m-0 fw-bold" style="font-size: 16px; color: #1e293b;">
-              <i class="ri-user-settings-line text-primary me-2"></i> Business Profile & System Prompt Settings
-            </h4>
+          <div class="card-header custom-card-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+              <div class="header-icon-circle">
+                <i class="ri-user-settings-line"></i>
+              </div>
+              <div>
+                <h4 class="card-heading m-0">Business Profile & System Prompt Settings</h4>
+                <p class="card-subheading m-0">Configure company persona, primary language, and system prompt instructions</p>
+              </div>
+            </div>
           </div>
           <div class="card-body p-4">
             <form (ngSubmit)="onSaveBusinessSettings()">

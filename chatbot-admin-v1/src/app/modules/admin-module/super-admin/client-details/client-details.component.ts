@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { SuperAdminService, ClientRecord } from 'src/app/modules/core/services/super-admin.service';
+import { SuperAdminService, ClientRecord, ClientResources } from 'src/app/modules/core/services/super-admin.service';
 import { utilityService } from 'src/app/modules/shared/services/utility.service';
 import Swal from 'sweetalert2';
 
@@ -15,17 +15,17 @@ export class ClientDetailsComponent implements OnInit {
   isSaving: boolean = false;
   client: ClientRecord | null = null;
   secrets: any = {};
+  resources: ClientResources | null = null;
   users: any[] = [];
 
   editForm: any = {
     name: '',
     slug: '',
     domain: '',
+    contact_email: '',
     billing_mode: 'platform',
     status: 'active',
     openai_api_key: '',
-    cf_account_id: '',
-    cf_api_token: '',
   };
 
   newUserForm = {
@@ -34,7 +34,6 @@ export class ClientDetailsComponent implements OnInit {
   };
 
   showOpenAIKey: boolean = false;
-  showCfToken: boolean = false;
   showNewUserPwd: boolean = false;
   copiedToken: boolean = false;
 
@@ -62,17 +61,17 @@ export class ClientDetailsComponent implements OnInit {
         if (res.ok) {
           this.client = res.client;
           this.secrets = res.secrets || {};
+          this.resources = res.resources || null;
           this.users = res.users || [];
 
           this.editForm = {
             name: this.client.name,
             slug: this.client.slug,
             domain: this.client.domain || '',
+            contact_email: this.client.contact_email || '',
             billing_mode: this.client.billing_mode,
             status: this.client.status,
             openai_api_key: '',
-            cf_account_id: this.secrets.cf_account_id || '',
-            cf_api_token: '',
           };
         }
       },
@@ -188,7 +187,7 @@ export class ClientDetailsComponent implements OnInit {
   onDeleteClient(): void {
     Swal.fire({
       title: 'Are you sure?',
-      text: `Deleting "${this.client?.name}" will remove all associated credentials. This action cannot be undone!`,
+      text: `Deleting "${this.client?.name}" will remove all dedicated resources (D1 DB, KV, Vectorize indexes, R2 bucket) and associated credentials. This action cannot be undone!`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#d33',
@@ -198,7 +197,7 @@ export class ClientDetailsComponent implements OnInit {
       if (result.isConfirmed) {
         this.superAdminService.deleteClient(this.clientId).subscribe({
           next: () => {
-            Swal.fire('Deleted!', 'Business has been deleted.', 'success');
+            Swal.fire('Deleted!', 'Business and dedicated cloud resources have been deleted.', 'success');
             this.router.navigate(['/dashboard/super-admin/dashboard']);
           },
           error: (err) => {

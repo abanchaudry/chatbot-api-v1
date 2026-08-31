@@ -6,6 +6,7 @@ export interface ClientRecord {
   name: string;
   slug: string;
   domain?: string | null;
+  contact_email?: string | null;
   logo_url?: string | null;
   billing_mode: "platform" | "byok";
   public_token: string;
@@ -26,7 +27,7 @@ export const clientsDb = {
     try {
       const query = `
         SELECT 
-          c.id, c.name, c.slug, c.domain, c.logo_url, c.billing_mode, c.public_token, c.status, c.created_at, c.updated_at,
+          c.id, c.name, c.slug, c.domain, c.contact_email, c.logo_url, c.billing_mode, c.public_token, c.status, c.created_at, c.updated_at,
           (SELECT COUNT(*) FROM chunks WHERE client_id = c.id) AS total_chunks,
           (SELECT COUNT(*) FROM threads WHERE client_id = c.id) AS total_threads,
           (SELECT COUNT(*) FROM files WHERE client_id = c.id AND is_deleted = 0) AS total_files,
@@ -88,6 +89,7 @@ export const clientsDb = {
       name: string;
       slug: string;
       domain?: string;
+      contact_email?: string;
       logo_url?: string;
       billing_mode: "platform" | "byok";
       public_token: string;
@@ -97,14 +99,15 @@ export const clientsDb = {
     const status = client.status || "active";
     await db
       .prepare(
-        `INSERT INTO clients (id, name, slug, domain, logo_url, billing_mode, public_token, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+        `INSERT INTO clients (id, name, slug, domain, contact_email, logo_url, billing_mode, public_token, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
       )
       .bind(
         client.id,
         client.name.trim(),
         client.slug.toLowerCase().trim(),
         client.domain?.trim() || null,
+        client.contact_email?.trim() || null,
         client.logo_url?.trim() || null,
         client.billing_mode,
         client.public_token,
@@ -137,6 +140,7 @@ export const clientsDb = {
     const name = updates.name !== undefined ? updates.name.trim() : current.name;
     const slug = updates.slug !== undefined ? updates.slug.toLowerCase().trim() : current.slug;
     const domain = updates.domain !== undefined ? updates.domain?.trim() || null : current.domain;
+    const contactEmail = updates.contact_email !== undefined ? updates.contact_email?.trim() || null : current.contact_email;
     const logoUrl = updates.logo_url !== undefined ? updates.logo_url?.trim() || null : current.logo_url;
     const billingMode = updates.billing_mode !== undefined ? updates.billing_mode : current.billing_mode;
     const status = updates.status !== undefined ? updates.status : current.status;
@@ -144,10 +148,10 @@ export const clientsDb = {
     await db
       .prepare(
         `UPDATE clients
-         SET name = ?, slug = ?, domain = ?, logo_url = ?, billing_mode = ?, status = ?, updated_at = CURRENT_TIMESTAMP
+         SET name = ?, slug = ?, domain = ?, contact_email = ?, logo_url = ?, billing_mode = ?, status = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?`
       )
-      .bind(name, slug, domain, logoUrl, billingMode, status, id)
+      .bind(name, slug, domain, contactEmail, logoUrl, billingMode, status, id)
       .run();
 
     return this.getClientById(db, id);
@@ -155,15 +159,21 @@ export const clientsDb = {
 
   async deleteClient(db: D1Database, id: string): Promise<boolean> {
     try {
-      if (id === "default") return false;
       // 1. Delete child records first to satisfy Foreign Key constraints
-      await db.prepare("DELETE FROM auth WHERE client_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM client_secrets WHERE client_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM system_settings WHERE client_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM chunks WHERE client_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM files WHERE client_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM messages WHERE client_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM threads WHERE client_id = ?").bind(id).run();
+      await db.prepare("DELETE FROM api_key_requests WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM client_resources WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM auth WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM client_secrets WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM system_settings WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM chunks WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM files WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM messages WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM threads WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM logs WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM message_traces WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM ingest_events WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM ingest_jobs WHERE client_id = ?").bind(id).run().catch(() => {});
+      await db.prepare("DELETE FROM upload_progress WHERE client_id = ?").bind(id).run().catch(() => {});
 
       // 2. Delete parent client record last
       await db.prepare("DELETE FROM clients WHERE id = ?").bind(id).run();
@@ -181,10 +191,10 @@ export const clientsDb = {
       const byokClientsRow = await db.prepare("SELECT COUNT(*) AS count FROM clients WHERE billing_mode = 'byok'").first<{ count: number }>();
       const platformClientsRow = await db.prepare("SELECT COUNT(*) AS count FROM clients WHERE billing_mode = 'platform'").first<{ count: number }>();
 
-      const totalThreadsRow = await db.prepare("SELECT COUNT(*) AS count FROM threads").first<{ count: number }>();
-      const totalMessagesRow = await db.prepare("SELECT COUNT(*) AS count FROM messages").first<{ count: number }>();
-      const totalChunksRow = await db.prepare("SELECT COUNT(*) AS count FROM chunks").first<{ count: number }>();
-      const totalFilesRow = await db.prepare("SELECT COUNT(*) AS count FROM files WHERE is_deleted = 0").first<{ count: number }>();
+      const totalThreadsRow = await db.prepare("SELECT COUNT(*) AS count FROM threads").first<{ count: number }>().catch(() => ({ count: 0 }));
+      const totalMessagesRow = await db.prepare("SELECT COUNT(*) AS count FROM messages").first<{ count: number }>().catch(() => ({ count: 0 }));
+      const totalChunksRow = await db.prepare("SELECT COUNT(*) AS count FROM chunks").first<{ count: number }>().catch(() => ({ count: 0 }));
+      const totalFilesRow = await db.prepare("SELECT COUNT(*) AS count FROM files WHERE is_deleted = 0").first<{ count: number }>().catch(() => ({ count: 0 }));
 
       return {
         total_clients: totalClientsRow?.count || 0,
@@ -209,5 +219,5 @@ export const clientsDb = {
         total_files: 0,
       };
     }
-  }
+  },
 };

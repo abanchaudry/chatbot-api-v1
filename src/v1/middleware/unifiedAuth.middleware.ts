@@ -160,7 +160,7 @@ export const publicTenantContext: MiddlewareHandler<Env> = async (c: Context<Env
     if (!publicToken && c.req.method === "POST") {
       try {
         const cloned = c.req.raw.clone();
-        const body = await cloned.json().catch(() => ({}));
+        const body: any = await cloned.json().catch(() => ({}));
         if (body?.client_token || body?.public_token || body?.clientId) {
           publicToken = body.client_token || body.public_token || body.clientId;
         }

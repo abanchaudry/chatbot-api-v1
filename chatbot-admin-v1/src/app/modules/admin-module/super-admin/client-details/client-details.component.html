@@ -34,7 +34,7 @@
         <div class="card mb-4">
           <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
             <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
-              <i class="ri-settings-3-line text-primary me-2"></i> Business Settings & Infrastructure
+              <i class="ri-settings-3-line text-primary me-2"></i> Business Profile & AI Billing
             </h4>
             <span *ngIf="client.status === 'active'" class="badge" style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #bbf7d0;">Active</span>
             <span *ngIf="client.status === 'suspended'" class="badge" style="background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fecaca;">Suspended</span>
@@ -48,18 +48,25 @@
                 </div>
                 <div class="col-md-6 mb-3">
                   <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Website Domain</label>
-                  <input type="text" class="form-control custom-input w-100" name="domain" [(ngModel)]="editForm.domain" />
+                  <input type="text" class="form-control custom-input w-100" placeholder="e.g. apexhealth.com" name="domain" [(ngModel)]="editForm.domain" />
                 </div>
               </div>
 
               <div class="row">
                 <div class="col-md-6 mb-3">
+                  <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Contact / Admin Email</label>
+                  <input type="email" class="form-control custom-input w-100" placeholder="e.g. owner@apexhealth.com" name="contact_email" [(ngModel)]="editForm.contact_email" />
+                </div>
+                <div class="col-md-6 mb-3">
                   <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Billing Mode</label>
                   <select class="form-select custom-input w-100" name="billing_mode" [(ngModel)]="editForm.billing_mode">
-                    <option value="platform">Platform Billed (Managed)</option>
+                    <option value="platform">Platform Billed (Managed AI)</option>
                     <option value="byok">Bring Your Own Key (BYOK)</option>
                   </select>
                 </div>
+              </div>
+
+              <div class="row">
                 <div class="col-md-6 mb-3">
                   <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">Account Status</label>
                   <select class="form-select custom-input w-100" name="status" [(ngModel)]="editForm.status">
@@ -67,21 +74,27 @@
                     <option value="suspended">Suspended</option>
                   </select>
                 </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label" style="font-size: 13px; font-weight: 600; color: #334155;">System URL Slug</label>
+                  <input type="text" class="form-control custom-input w-100 bg-light" [value]="client.slug" readonly />
+                </div>
               </div>
 
               <!-- BYOK Secret Management -->
               <div *ngIf="editForm.billing_mode === 'byok'" class="p-3 rounded border mb-3" style="background: #f8fafc; border-color: #e2e8f0 !important;">
                 <div class="d-flex align-items-center justify-content-between mb-2">
                   <h6 class="fw-bold m-0" style="font-size: 13.5px; color: #1e293b;">
-                    <i class="ri-lock-2-line text-primary me-1"></i> Tenant BYOK Credentials
+                    <i class="ri-lock-2-line text-primary me-1"></i> Tenant OpenAI API Key
                   </h6>
                   <span class="badge" style="background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; font-size: 10.5px;">AES-GCM 256-bit</span>
                 </div>
 
-                <div class="form-group mb-3">
+                <div class="form-group mb-0">
                   <div class="d-flex justify-content-between align-items-center mb-1">
                     <label class="form-label mb-0" style="font-size: 12.5px; font-weight: 600; color: #475569;">OpenAI API Key</label>
-                    <span *ngIf="secrets.has_openai_key" class="text-success" style="font-size: 11.5px;"><i class="ri-check-line"></i> Key Configured</span>
+                    <span *ngIf="secrets.has_openai_key" class="text-success" style="font-size: 11.5px;">
+                      <i class="ri-check-line"></i> {{ secrets.openai_api_key_masked }}
+                    </span>
                   </div>
                   <div class="input-group">
                     <input [type]="showOpenAIKey ? 'text' : 'password'" class="form-control custom-input bg-white" [placeholder]="secrets.has_openai_key ? 'Enter new key to replace current key' : 'sk-proj-...'" name="openai_api_key" [(ngModel)]="editForm.openai_api_key" />
@@ -90,124 +103,189 @@
                     </button>
                   </div>
                 </div>
-
-                <div class="row">
-                  <div class="col-md-6 mb-2 mb-md-0">
-                    <label class="form-label" style="font-size: 12.5px; font-weight: 600; color: #475569;">Cloudflare Account ID</label>
-                    <input type="text" class="form-control custom-input bg-white w-100" placeholder="e.g. 4121119f..." name="cf_account_id" [(ngModel)]="editForm.cf_account_id" />
-                  </div>
-
-                  <div class="col-md-6">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                      <label class="form-label mb-0" style="font-size: 12.5px; font-weight: 600; color: #475569;">Cloudflare API Token</label>
-                      <span *ngIf="secrets.has_cf_token" class="text-success" style="font-size: 11.5px;"><i class="ri-check-line"></i> Token Configured</span>
-                    </div>
-                    <div class="input-group">
-                      <input [type]="showCfToken ? 'text' : 'password'" class="form-control custom-input bg-white" [placeholder]="secrets.has_cf_token ? 'Enter new token to replace' : 'Token'" name="cf_api_token" [(ngModel)]="editForm.cf_api_token" />
-                      <button type="button" class="btn btn-outline-secondary input-addon-btn" (click)="showCfToken = !showCfToken" title="Toggle token visibility">
-                        <i [class]="showCfToken ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
-                <button type="button" (click)="onDeleteClient()" class="btn btn-outline-danger btn-sm" style="border-radius: 6px; font-size: 13px;">
+              <div class="d-flex justify-content-between align-items-center pt-2">
+                <button (click)="onDeleteClient()" type="button" class="btn btn-outline-danger btn-sm" style="font-size: 12.5px; border-radius: 6px;" [disabled]="clientId === 'default'">
                   <i class="ri-delete-bin-line me-1"></i> Delete Business
                 </button>
                 <button type="submit" class="button-primary" [disabled]="isSaving">
-                  <i class="ri-save-line me-1"></i> Save Changes
+                  <i class="ri-save-line" [class.spin]="isSaving"></i>
+                  <span>{{ isSaving ? 'Saving...' : 'Save Changes' }}</span>
                 </button>
               </div>
             </form>
           </div>
         </div>
-      </div>
 
-      <!-- Right Column: Widget Integration & Login Credentials -->
-      <div class="col-md-5 mb-4">
-        <!-- Card 1: Chat Widget Embed Token -->
+        <!-- Dedicated Cloudflare Resources Card -->
         <div class="card mb-4">
-          <div class="card-header card-header-icon m-0" style="padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+          <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
             <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
-              <i class="ri-code-s-slash-line text-primary me-2"></i> Public Chat Widget Integration
+              <i class="ri-server-line text-primary me-2"></i> Dedicated Cloudflare Resources
             </h4>
+            <span *ngIf="resources?.provisioning_status === 'ready'" class="badge" style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+              <i class="ri-checkbox-circle-line me-1"></i> Provisioned
+            </span>
+            <span *ngIf="resources?.provisioning_status === 'provisioning'" class="badge" style="background-color: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 11px;">
+              <i class="ri-loader-4-line spin me-1"></i> Provisioning
+            </span>
           </div>
           <div class="card-body p-4">
-            <p class="text-muted mb-3" style="font-size: 12.5px;">
-              Provide this public token to the client to embed their dedicated chatbot on external sites.
-            </p>
-
-            <div class="form-group mb-3">
-              <label class="form-label" style="font-size: 12px; font-weight: 600; color: #475569;">Public Widget Token</label>
-              <div class="d-flex align-items-center gap-2">
-                <input type="text" class="form-control custom-input bg-light" [value]="client.public_token" readonly />
-                <button class="view-btn" type="button" (click)="copyToClipboard(client.public_token)" style="white-space: nowrap;">
-                  <i [class]="copiedToken ? 'ri-check-line me-1' : 'ri-file-copy-line me-1'"></i>
-                  {{ copiedToken ? 'Copied' : 'Copy' }}
-                </button>
-              </div>
-            </div>
-
-            <div class="mb-0">
-              <label class="form-label" style="font-size: 12px; font-weight: 600; color: #475569;">API Request Header</label>
-              <pre class="bg-dark text-light p-3 rounded" style="font-size: 11.5px; overflow-x: auto; margin-bottom: 0;"><code>x-client-token: {{ client.public_token }}</code></pre>
+            <div class="table-responsive">
+              <table class="table table-sm m-0" style="font-size: 13px;">
+                <thead>
+                  <tr class="text-muted">
+                    <th>Resource Type</th>
+                    <th>Identifier / Name</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><i class="ri-database-2-line text-primary me-1"></i> D1 Database</td>
+                    <td><code>{{ resources?.d1_database_name || ('chatbot-' + client.slug + '-db') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">Dedicated DB</span></td>
+                  </tr>
+                  <tr>
+                    <td><i class="ri-flashlight-line text-warning me-1"></i> KV Cache</td>
+                    <td><code>{{ resources?.kv_namespace_name || ('chatbot-' + client.slug + '-cache') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">Dedicated KV</span></td>
+                  </tr>
+                  <tr>
+                    <td><i class="ri-brain-line text-info me-1"></i> Vectorize Admin</td>
+                    <td><code>{{ resources?.vectorize_admin_index || ('chatbot-' + client.slug + '-admin') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">1536-dim</span></td>
+                  </tr>
+                  <tr>
+                    <td><i class="ri-file-pdf-line text-danger me-1"></i> Vectorize PDF</td>
+                    <td><code>{{ resources?.vectorize_pdf_index || ('chatbot-' + client.slug + '-pdf') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">1536-dim</span></td>
+                  </tr>
+                  <tr>
+                    <td><i class="ri-global-line text-success me-1"></i> Vectorize Web</td>
+                    <td><code>{{ resources?.vectorize_web_index || ('chatbot-' + client.slug + '-web') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">1536-dim</span></td>
+                  </tr>
+                  <tr>
+                    <td><i class="ri-search-eye-line text-purple me-1"></i> Vectorize Cache</td>
+                    <td><code>{{ resources?.vectorize_cache_index || ('chatbot-' + client.slug + '-qcache') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">L2 Cache</span></td>
+                  </tr>
+                  <tr>
+                    <td><i class="ri-archive-line text-warning me-1"></i> R2 Storage</td>
+                    <td><code>{{ resources?.r2_bucket_name || ('chatbot-' + client.slug + '-storage') }}</code></td>
+                    <td><span class="badge" style="background: #eff6ff; color: #1e40af;">S3 Bucket</span></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
 
-        <!-- Card 2: Client Login Accounts -->
+        <!-- Public Integration Token Card -->
         <div class="card">
-          <div class="card-header card-header-icon m-0" style="padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+          <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
             <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
-              <i class="ri-user-shared-line text-primary me-2"></i> Business Admin Accounts
+              <i class="ri-code-s-slash-line text-primary me-2"></i> Public Chat Widget Token
             </h4>
           </div>
           <div class="card-body p-4">
-            <div *ngIf="users.length === 0" class="text-muted mb-3" style="font-size: 12.5px;">
-              No admin logins configured yet.
+            <p class="text-muted mb-2" style="font-size: 13px;">
+              Embed this public token in customer websites to route widget chat messages directly to this business's isolated workspace.
+            </p>
+            <div class="input-group">
+              <input type="text" class="form-control custom-input bg-light" [value]="client.public_token" readonly />
+              <button (click)="copyToClipboard(client.public_token)" type="button" class="btn input-addon-btn">
+                <i [class]="copiedToken ? 'ri-check-line text-success' : 'ri-file-copy-line'"></i>
+                <span class="ms-1" style="font-size: 12px;">{{ copiedToken ? 'Copied!' : 'Copy' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Admin Logins & Users -->
+      <div class="col-md-5 mb-4">
+        <!-- Authorized Admin Users Card -->
+        <div class="card mb-4">
+          <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+            <h4 class="card-title m-0" style="font-size: 15px; font-weight: 600; color: #1e293b;">
+              <i class="ri-user-shared-line text-primary me-2"></i> Business Admin Users
+            </h4>
+            <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 11px;">{{ users.length }} Users</span>
+          </div>
+          <div class="card-body p-4">
+            <div *ngIf="users.length === 0" class="text-center py-4 text-muted" style="font-size: 13px;">
+              <i class="ri-user-unfollow-line fs-2 mb-2 d-block text-muted"></i>
+              No admin accounts assigned to this business.
             </div>
 
-            <div *ngIf="users.length > 0" class="mb-3">
-              <div class="table-container">
-                <table class="table table-light mb-0">
-                  <tbody>
-                    <tr *ngFor="let u of users">
-                      <td style="padding: 10px 8px;">
-                        <strong style="color: #1e293b; font-size: 13px;">{{ u.username }}</strong>
-                        <span class="badge ms-1" style="background-color: #f1f5f9; color: #475569; font-size: 10px; border: 1px solid #e2e8f0;">{{ u.role }}</span>
-                      </td>
-                      <td class="text-end td-actions" style="padding: 10px 8px;">
-                        <button type="button" class="view-btn py-1 px-2" style="background: #64748b; font-size: 11px;" (click)="onResetUserPassword(u)" title="Reset Password">
-                          <i class="ri-key-line"></i> Reset
-                        </button>
-                        <button type="button" class="view-btn ml-1 py-1 px-2" style="background: #ef4444; font-size: 11px;" (click)="onDeleteUser(u)" title="Delete User">
-                          <i class="ri-delete-bin-line"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div *ngIf="users.length > 0" class="table-container">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr style="border-bottom: 1px solid #edf2f7; font-size: 12px; color: #64748b;">
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th class="text-end">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let u of users" style="font-size: 13px;">
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <i class="ri-user-3-line text-primary"></i>
+                        <span class="fw-semibold" style="color: #1e293b;">{{ u.username }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="badge" [ngStyle]="{'background-color': u.role === 'super_admin' ? '#ede9fe' : '#e0f2fe', 'color': u.role === 'super_admin' ? '#6b21a8' : '#0369a1'}" style="font-size: 10.5px; border-radius: 4px; padding: 3px 6px;">
+                        {{ u.role === 'super_admin' ? 'Super Admin' : 'Client Admin' }}
+                      </span>
+                    </td>
+                    <td class="text-end">
+                      <button (click)="onResetUserPassword(u)" type="button" class="btn btn-sm btn-outline-secondary me-1" title="Reset Password" style="padding: 3px 8px; font-size: 11px;">
+                        <i class="ri-key-line"></i>
+                      </button>
+                      <button (click)="onDeleteUser(u)" type="button" class="btn btn-sm btn-outline-danger" title="Delete User" style="padding: 3px 8px; font-size: 11px;">
+                        <i class="ri-delete-bin-line"></i>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add New User Form Card -->
+        <div class="card">
+          <div class="card-header card-header-icon m-0" style="padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
+            <h4 class="card-title m-0" style="font-size: 14.5px; font-weight: 600; color: #1e293b;">
+              <i class="ri-user-add-line text-primary me-2"></i> Create Business Admin User
+            </h4>
+          </div>
+          <div class="card-body p-4">
+            <form (ngSubmit)="onCreateUser()">
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 12.5px; font-weight: 600; color: #475569;">New Username</label>
+                <input type="text" class="form-control custom-input w-100" placeholder="e.g. manager" name="new_username" [(ngModel)]="newUserForm.username" required />
               </div>
-            </div>
 
-            <!-- Create New User Form -->
-            <div class="p-3 bg-light rounded border">
-              <h6 class="fw-bold mb-2" style="font-size: 12.5px; color: #1e293b;">Add New Admin Login</h6>
-              <div class="mb-2">
-                <input type="text" class="form-control custom-input bg-white w-100 mb-2" placeholder="Username" [(ngModel)]="newUserForm.username" />
+              <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 12.5px; font-weight: 600; color: #475569;">Temporary Password</label>
                 <div class="input-group">
-                  <input [type]="showNewUserPwd ? 'text' : 'password'" class="form-control custom-input bg-white" placeholder="Password" [(ngModel)]="newUserForm.password" />
-                  <button type="button" class="btn btn-outline-secondary" (click)="showNewUserPwd = !showNewUserPwd" style="border-color: #d2d2d2;">
+                  <input [type]="showNewUserPwd ? 'text' : 'password'" class="form-control custom-input" placeholder="Password" name="new_password" [(ngModel)]="newUserForm.password" required />
+                  <button type="button" class="btn input-addon-btn" (click)="showNewUserPwd = !showNewUserPwd" title="Toggle password visibility">
                     <i [class]="showNewUserPwd ? 'ri-eye-off-line' : 'ri-eye-line'"></i>
                   </button>
                 </div>
               </div>
-              <button (click)="onCreateUser()" class="button-primary w-100 justify-content-center mt-2" style="font-size: 13px; padding: 7px 14px;">
-                <i class="ri-user-add-line me-1"></i> Add Account
+
+              <button type="submit" class="button-primary w-100 justify-content-center">
+                <i class="ri-user-add-line"></i> Add Admin User
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>

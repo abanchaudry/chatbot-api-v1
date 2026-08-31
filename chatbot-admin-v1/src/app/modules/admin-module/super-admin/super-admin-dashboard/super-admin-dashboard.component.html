@@ -1,13 +1,13 @@
 <div class="main-content">
   <div class="container-fluid">
 
-    <!-- Hero Banner Box (Matches All Other Admin Pages) -->
+    <!-- Hero Banner Box -->
     <div class="row mb-4">
       <div class="col-12">
         <div class="ai-knowledge-box">
           <div>
             <h1 class="ai-title">Super Admin Management</h1>
-            <p class="ai-subtitle">Manage client businesses, tenants, BYOK credentials, and workspaces</p>
+            <p class="ai-subtitle">Manage client businesses, dedicated Cloudflare infrastructure, AI billing modes, and key switch requests</p>
           </div>
           <div class="ai-stats">
             <div class="ai-stat-item">
@@ -21,7 +21,7 @@
       </div>
     </div>
 
-    <!-- 4 KPI Stat Cards (Matching Dashboard 1:1) -->
+    <!-- 4 KPI Stat Cards -->
     <div class="row justify-content-center mb-4" *ngIf="!isLoading">
       <div
         class="col-md-3 col-sm-6 mb-3 mb-md-0"
@@ -51,171 +51,279 @@
       </div>
     </div>
 
-    <!-- Registered Businesses List -->
+    <!-- Unified Main Management Card -->
     <div class="row">
       <div class="col-12">
-        <div class="card">
-          <div class="card-header card-header-icon m-0" style="display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom: 1px solid #edf2f7;">
-            <h4 class="card-title m-0" style="font-size: 16px; font-weight: 600; color: #1e293b;">
-              Registered Businesses
-            </h4>
-            <a routerLink="/dashboard/super-admin/add-client" class="button-primary d-flex align-items-center gap-1">
-              <i class="ri-add-line"></i> Register Business
-            </a>
+        <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
+          
+          <!-- Unified Card Header with Segmented Tabs and Action Buttons Together -->
+          <div class="card-header border-bottom p-3" style="background: #ffffff;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+              
+              <!-- Left: Segmented Switch Buttons (Registered Businesses vs API Key Requests) -->
+              <div class="d-flex align-items-center gap-2">
+                <div class="btn-group segmented-control p-1" role="group" style="background: #f1f5f9; border-radius: 8px;">
+                  <button
+                    type="button"
+                    class="btn segmented-btn"
+                    [class.active]="activeTab === 'businesses'"
+                    (click)="activeTab = 'businesses'"
+                  >
+                    <i class="ri-building-4-line me-1"></i> Registered Businesses ({{ clients.length }})
+                  </button>
+                  <button
+                    type="button"
+                    class="btn segmented-btn"
+                    [class.active]="activeTab === 'requests'"
+                    (click)="activeTab = 'requests'"
+                  >
+                    <i class="ri-key-2-line me-1"></i> API Key Switch Requests
+                    <span *ngIf="pendingRequestsCount > 0" class="badge bg-danger ms-1 pill-badge">{{ pendingRequestsCount }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Right: Search Input + Register Business Button Together -->
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <div *ngIf="activeTab === 'businesses'" class="position-relative search-wrapper" style="min-width: 240px;">
+                  <i class="ri-search-2-line search-icon"></i>
+                  <input
+                    type="text"
+                    class="form-control header-search"
+                    placeholder="Search businesses..."
+                    [(ngModel)]="searchText"
+                  />
+                </div>
+
+                <a routerLink="/dashboard/super-admin/add-client" class="button-primary d-inline-flex align-items-center gap-1">
+                  <i class="ri-add-line"></i> Register Business (Wizard)
+                </a>
+              </div>
+
+            </div>
           </div>
 
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-              <div>
+          <div class="card-body p-4">
+
+            <!-- TAB 1: Registered Businesses Table -->
+            <div *ngIf="activeTab === 'businesses'">
+              <div class="d-flex justify-content-between align-items-center mb-3">
                 <span class="text-muted" style="font-size: 13px;">Showing {{ filteredClients.length }} registered business accounts</span>
               </div>
 
-              <div class="form-group mb-0 position-relative search-wrapper">
-                <i class="ri-search-2-line search-icon"></i>
-                <input
-                  type="text"
-                  class="form-control pl-4"
-                  placeholder="Search businesses..."
-                  [(ngModel)]="searchText"
-                />
+              <div *ngIf="isLoading" class="text-center p-5">
+                <div class="spinner-border text-primary" role="status">
+                  <span class="sr-only">Loading...</span>
+                </div>
+                <p class="text-muted mt-2">Loading businesses...</p>
+              </div>
+
+              <div *ngIf="!isLoading && filteredClients.length === 0" class="text-center p-5">
+                <i class="ri-building-line fs-48 text-muted mb-2 d-block" style="font-size: 40px; color: #94a3b8;"></i>
+                <h5 style="color: #475569;">No Businesses Found</h5>
+                <p class="text-muted" style="font-size: 13px;">
+                  {{ searchText ? 'No businesses matched your search query.' : 'Register your first business using the 5-step wizard.' }}
+                </p>
+                <a *ngIf="!searchText" routerLink="/dashboard/super-admin/add-client" class="button-primary mt-2">
+                  <i class="ri-add-line"></i> Register Business
+                </a>
+              </div>
+
+              <div *ngIf="!isLoading && filteredClients.length > 0" class="table-responsive">
+                <table class="table table-hover align-middle m-0">
+                  <thead style="background-color: #f8fafc; border-bottom: 1px solid #edf2f7;">
+                    <tr style="font-size: 12.5px; color: #64748b; font-weight: 600;">
+                      <th># ID</th>
+                      <th>Business Name</th>
+                      <th>Slug</th>
+                      <th>Domain & Contact</th>
+                      <th>AI Billing</th>
+                      <th>Dedicated Cloud Infra</th>
+                      <th>Status</th>
+                      <th class="text-end">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      *ngFor="
+                        let client of filteredClients
+                          | paginate : { itemsPerPage: entries, currentPage: page };
+                        let i = index
+                      "
+                      style="font-size: 13.5px;"
+                    >
+                      <td>
+                        <span class="index-cell">{{ (page - 1) * entries + i + 1 }}</span>
+                      </td>
+                      <td>
+                        <strong style="color: #1e293b;">{{ client.name }}</strong>
+                      </td>
+                      <td>
+                        <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #475569;">{{ client.slug }}</code>
+                      </td>
+                      <td>
+                        <div>
+                          <span *ngIf="client.domain" style="color: #1e293b; font-weight: 500;">
+                            <i class="ri-global-line text-primary me-1"></i>{{ client.domain }}
+                          </span>
+                          <span *ngIf="!client.domain" class="text-muted" style="font-style: italic; font-size: 12px;">No domain</span>
+                          <span *ngIf="client.contact_email" class="d-block text-muted" style="font-size: 12px;">
+                            <i class="ri-mail-line text-muted me-1"></i>{{ client.contact_email }}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          *ngIf="client.billing_mode === 'byok'"
+                          class="badge"
+                          style="background-color: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fde68a;"
+                        >
+                          <i class="ri-key-2-line me-1"></i> BYOK (OpenAI Key)
+                        </span>
+                        <span
+                          *ngIf="client.billing_mode === 'platform' || !client.billing_mode"
+                          class="badge"
+                          style="background-color: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe;"
+                        >
+                          <i class="ri-cpu-line me-1"></i> Platform Managed
+                        </span>
+                      </td>
+                      <td>
+                        <span class="badge" style="background-color: #f0fdf4; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #bbf7d0;">
+                          <i class="ri-database-2-line me-1"></i> D1 + KV + Vectorize + R2
+                        </span>
+                      </td>
+                      <td>
+                        <span
+                          *ngIf="client.status === 'active'"
+                          class="badge"
+                          style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #bbf7d0;"
+                        >
+                          Active
+                        </span>
+                        <span
+                          *ngIf="client.status === 'suspended'"
+                          class="badge"
+                          style="background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fecaca;"
+                        >
+                          Suspended
+                        </span>
+                      </td>
+                      <td class="text-end">
+                        <div class="d-flex justify-content-end gap-1">
+                          <button
+                            (click)="manageClientWorkspace(client)"
+                            type="button"
+                            class="view-btn"
+                            title="Switch to this Business Workspace"
+                          >
+                            <i class="ri-login-box-line me-1"></i> Workspace
+                          </button>
+                          <a
+                            [routerLink]="['/dashboard/super-admin/clients', client.id]"
+                            class="btn btn-sm btn-outline-secondary"
+                            title="Settings & Resources"
+                            style="padding: 4px 8px; font-size: 12px; border-radius: 6px;"
+                          >
+                            <i class="ri-settings-3-line"></i>
+                          </a>
+                          <button
+                            *ngIf="client.id !== 'default'"
+                            (click)="onDeleteClient(client)"
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            title="Delete Business"
+                            style="padding: 4px 8px; font-size: 12px; border-radius: 6px;"
+                          >
+                            <i class="ri-delete-bin-line"></i>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Pagination -->
+              <div class="d-flex justify-content-between align-items-center mt-3" *ngIf="filteredClients.length > entries">
+                <div class="text-muted" style="font-size: 13px;">
+                  Page {{ page }} of {{ (filteredClients.length / entries) | number:'1.0-0' }}
+                </div>
+                <pagination-controls (pageChange)="page = $event"></pagination-controls>
               </div>
             </div>
 
-            <div *ngIf="isLoading" class="text-center p-5">
-              <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">Loading...</span>
+            <!-- TAB 2: API Key Switch Requests Table -->
+            <div *ngIf="activeTab === 'requests'">
+              <div *ngIf="apiKeyRequests.length === 0" class="text-center p-5 text-muted">
+                <i class="ri-checkbox-circle-line fs-48 text-success mb-2 d-block" style="font-size: 40px;"></i>
+                <h5 style="color: #1e293b;">No Pending Requests</h5>
+                <p class="text-muted" style="font-size: 13px;">All client AI billing requests have been reviewed.</p>
               </div>
-              <p class="text-muted mt-2">Loading businesses...</p>
-            </div>
 
-            <div *ngIf="!isLoading && filteredClients.length === 0" class="text-center p-5">
-              <i class="ri-building-line fs-48 text-muted mb-2 d-block" style="font-size: 40px; color: #94a3b8;"></i>
-              <h5 style="color: #475569;">No Businesses Found</h5>
-              <p class="text-muted" style="font-size: 13px;">
-                {{ searchText ? 'No businesses matched your search query.' : 'Register your first business to begin.' }}
-              </p>
-              <a *ngIf="!searchText" routerLink="/dashboard/super-admin/add-client" class="button-primary mt-2">
-                <i class="ri-add-line"></i> Register Business
-              </a>
-            </div>
-
-            <div *ngIf="!isLoading && filteredClients.length > 0" class="table-container">
-              <table class="table table-light">
-                <thead style="background-color: #f4f6f9; border-radius: 12px">
-                  <tr>
-                    <th># ID</th>
-                    <th>Business Name</th>
-                    <th>Slug</th>
-                    <th>Domain</th>
-                    <th>Billing Mode</th>
-                    <th>Public Token</th>
-                    <th>Knowledge</th>
-                    <th>Status</th>
-                    <th class="text-end">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    *ngFor="
-                      let client of filteredClients
-                        | paginate : { itemsPerPage: entries, currentPage: page };
-                      let i = index
-                    "
-                  >
-                    <td>
-                      <span class="index-cell">{{ (page - 1) * entries + i + 1 }}</span>
-                    </td>
-                    <td>
-                      <span style="font-weight: 600; color: #1e293b;">{{ client.name }}</span>
-                    </td>
-                    <td>
-                      <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #475569;">{{ client.slug }}</code>
-                    </td>
-                    <td>
-                      <span *ngIf="client.domain" style="color: #334155;">{{ client.domain }}</span>
-                      <span *ngIf="!client.domain" class="text-muted" style="font-style: italic; font-size: 12px;">Not set</span>
-                    </td>
-                    <td>
-                      <span
-                        *ngIf="client.billing_mode === 'byok'"
-                        class="badge d-inline-flex align-items-center gap-1"
-                        style="background-color: #fef3c7; color: #92400e; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #fde68a;"
-                      >
-                        <i class="ri-key-2-line"></i> BYOK
-                      </span>
-                      <span
-                        *ngIf="client.billing_mode === 'platform'"
-                        class="badge d-inline-flex align-items-center gap-1"
-                        style="background-color: #e0f2fe; color: #0369a1; padding: 5px 10px; border-radius: 6px; font-weight: 600; font-size: 11px; border: 1px solid #bae6fd;"
-                      >
-                        <i class="ri-cloud-line"></i> Platform
-                      </span>
-                    </td>
-                    <td>
-                      <code class="user-select-all" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 3px 8px; border-radius: 4px; font-size: 11.5px; color: #334155;">
-                        {{ client.public_token }}
-                      </code>
-                    </td>
-                    <td>
-                      <span class="badge" style="background-color: #f1f5f9; color: #475569; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #e2e8f0;">
-                        {{ client.total_chunks || 0 }} chunks
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        *ngIf="client.status === 'active'"
-                        class="badge"
-                        style="background-color: #dcfce7; color: #166534; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #bbf7d0;"
-                      >
-                        Active
-                      </span>
-                      <span
-                        *ngIf="client.status === 'suspended'"
-                        class="badge"
-                        style="background-color: #fee2e2; color: #991b1b; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fecaca;"
-                      >
-                        Suspended
-                      </span>
-                    </td>
-                    <td class="text-end td-actions">
-                      <button
-                        (click)="manageClientWorkspace(client)"
-                        type="button"
-                        class="view-btn"
-                        title="Switch to this Business Playground"
-                      >
-                        <i class="ri-login-box-line me-1"></i> Switch
-                      </button>
-                      <a
-                        [routerLink]="['/dashboard/super-admin/clients', client.id]"
-                        class="view-btn ml-1"
-                        style="background: #64748b;"
-                        title="Business Settings"
-                      >
-                        <i class="ri-settings-4-line"></i>
-                      </a>
-                      <button
-                        *ngIf="client.id !== 'default'"
-                        (click)="onDeleteClient(client)"
-                        type="button"
-                        class="view-btn ml-1"
-                        style="background: #ef4444;"
-                        title="Delete Business"
-                      >
-                        <i class="ri-delete-bin-line"></i>
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div class="pagination-block text-right mt-3" *ngIf="filteredClients.length > entries">
-                <pagination-controls
-                  class="custom-pagination"
-                  (pageChange)="page = $event"
-                ></pagination-controls>
+              <div *ngIf="apiKeyRequests.length > 0" class="table-responsive">
+                <table class="table table-hover align-middle m-0">
+                  <thead style="background-color: #f8fafc; border-bottom: 1px solid #edf2f7;">
+                    <tr style="font-size: 12.5px; color: #64748b; font-weight: 600;">
+                      <th>Business</th>
+                      <th>Requested Switch</th>
+                      <th>Date</th>
+                      <th>Notes</th>
+                      <th>Status</th>
+                      <th class="text-end">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let req of apiKeyRequests" style="font-size: 13.5px;">
+                      <td>
+                        <strong style="color: #1e293b;">{{ req.client_name || req.client_id }}</strong>
+                      </td>
+                      <td>
+                        <span *ngIf="req.request_type === 'switch_to_platform'" class="badge" style="background-color: #eff6ff; color: #1e40af; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #dbeafe;">
+                          Switch to Platform AI (Remove Own Key)
+                        </span>
+                        <span *ngIf="req.request_type === 'switch_to_own'" class="badge" style="background-color: #fef3c7; color: #92400e; padding: 4px 8px; border-radius: 4px; font-size: 11px; border: 1px solid #fde68a;">
+                          Switch to BYOK (Own Key)
+                        </span>
+                      </td>
+                      <td>
+                        <span class="text-muted" style="font-size: 12.5px;">{{ req.created_at | date:'short' }}</span>
+                      </td>
+                      <td>
+                        <span style="font-size: 12.5px; color: #475569;">{{ req.notes || 'No note provided' }}</span>
+                      </td>
+                      <td>
+                        <span *ngIf="req.status === 'pending'" class="badge bg-warning text-dark">Pending</span>
+                        <span *ngIf="req.status === 'approved'" class="badge bg-success">Approved</span>
+                        <span *ngIf="req.status === 'rejected'" class="badge bg-danger">Rejected</span>
+                      </td>
+                      <td class="text-end">
+                        <div *ngIf="req.status === 'pending'" class="d-flex justify-content-end gap-1">
+                          <button
+                            type="button"
+                            (click)="onApproveRequest(req)"
+                            class="btn btn-sm btn-success"
+                            style="font-size: 12px; padding: 4px 10px; border-radius: 6px;"
+                          >
+                            <i class="ri-check-line me-1"></i> Approve
+                          </button>
+                          <button
+                            type="button"
+                            (click)="onRejectRequest(req)"
+                            class="btn btn-sm btn-outline-danger"
+                            style="font-size: 12px; padding: 4px 10px; border-radius: 6px;"
+                          >
+                            <i class="ri-close-line me-1"></i> Reject
+                          </button>
+                        </div>
+                        <span *ngIf="req.status !== 'pending'" class="text-muted" style="font-size: 12px;">Reviewed</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
+
           </div>
         </div>
       </div>

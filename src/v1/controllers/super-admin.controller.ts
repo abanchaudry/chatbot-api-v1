@@ -4,8 +4,11 @@ import type { Env } from "../types/env";
 import bcrypt from "bcryptjs";
 import { clientsDb } from "../services/db/clients.db";
 import { clientSecretsDb } from "../services/db/client-secrets.db";
+import { clientResourcesDb } from "../services/db/client-resources.db";
+import { apiKeyRequestsDb } from "../services/db/api-key-requests.db";
 import { authdb } from "../services/db/auth.db";
 import { getJwtSecret } from "../utils/keys";
+import { cloudflareProvisionerService } from "../services/cloudflare-provisioner.service";
 
 export const superAdminController = {
   // GET /super-admin/clients
@@ -41,7 +44,7 @@ export const superAdminController = {
         if (existingUser) {
           return c.json({
             ok: false,
-            error: `The username '${adminUsername}' is already taken. Please choose a unique username for this business (e.g. ${slug || name.toLowerCase()}_admin).`
+            error: `The username '${adminUsername}' is already taken. Please choose a unique username for this business.`
           }, 400);
         }
       }
@@ -62,33 +65,91 @@ export const superAdminController = {
       const clientId = `client_${slug}`;
       const publicToken = `pk_live_${crypto.randomUUID().replace(/-/g, "")}`;
 
+      // 1. Create client record in central DB
       const newClient = await clientsDb.createClient(c.env.DB, {
         id: clientId,
         name,
         slug,
         domain,
+        contact_email: body.contact_email,
         logo_url: logoUrl,
         billing_mode: billingMode,
         public_token: publicToken,
         status: "active",
       });
 
-      // Save BYOK secrets if provided
+      // 2. Save client secrets (OpenAI API key) if provided
       const masterKey = getJwtSecret(c.env);
-      if (billingMode === "byok") {
+      if (billingMode === "byok" && body.openai_api_key) {
         await clientSecretsDb.saveSecrets(
           c.env.DB,
           clientId,
-          {
-            openai_api_key: body.openai_api_key,
-            cf_account_id: body.cf_account_id,
-            cf_api_token: body.cf_api_token,
-          },
+          { openai_api_key: body.openai_api_key },
           masterKey
         );
       }
 
-      // Create initial admin login credentials for the client
+      // 3. Provision dedicated Cloudflare resources (D1, KV, Vectorize, R2)
+      const cfAccountId = c.env.CF_ACCOUNT_ID;
+      const cfApiToken = (c.env as any).CF_PLATFORM_API_TOKEN || (c.env as any).CF_AI_SEARCH_TOKEN;
+
+      let provisionedResources = null;
+      if (cfAccountId && cfApiToken) {
+        try {
+          await clientResourcesDb.saveResources(c.env.DB, clientId, {
+            provisioning_status: "provisioning",
+            d1_database_name: `chatbot-${slug}-db`,
+            kv_namespace_name: `chatbot-${slug}-cache`,
+            vectorize_admin_index: `chatbot-${slug}-admin`,
+            vectorize_pdf_index: `chatbot-${slug}-pdf`,
+            vectorize_web_index: `chatbot-${slug}-web`,
+            vectorize_cache_index: `chatbot-${slug}-qcache`,
+            r2_bucket_name: `chatbot-${slug}-storage`,
+          });
+
+          const result = await cloudflareProvisionerService.provisionTenantResources(
+            cfAccountId,
+            cfApiToken,
+            slug
+          );
+
+          await clientResourcesDb.saveResources(c.env.DB, clientId, {
+            ...result,
+            provisioning_status: "ready",
+            provisioned_at: new Date().toISOString(),
+          });
+
+          provisionedResources = result;
+        } catch (provErr: any) {
+          console.error(`[Provisioning] Failed to provision Cloudflare resources for ${slug}:`, provErr?.message || provErr);
+          await clientResourcesDb.saveResources(c.env.DB, clientId, {
+            provisioning_status: "failed",
+            provisioning_error: provErr?.message || "Failed to provision Cloudflare resources",
+            d1_database_name: `chatbot-${slug}-db`,
+            kv_namespace_name: `chatbot-${slug}-cache`,
+            vectorize_admin_index: `chatbot-${slug}-admin`,
+            vectorize_pdf_index: `chatbot-${slug}-pdf`,
+            vectorize_web_index: `chatbot-${slug}-web`,
+            vectorize_cache_index: `chatbot-${slug}-qcache`,
+            r2_bucket_name: `chatbot-${slug}-storage`,
+          });
+        }
+      } else {
+        // Local dev or token not set: record pre-allocated resource names
+        await clientResourcesDb.saveResources(c.env.DB, clientId, {
+          provisioning_status: "ready",
+          d1_database_name: `chatbot-${slug}-db`,
+          kv_namespace_name: `chatbot-${slug}-cache`,
+          vectorize_admin_index: `chatbot-${slug}-admin`,
+          vectorize_pdf_index: `chatbot-${slug}-pdf`,
+          vectorize_web_index: `chatbot-${slug}-web`,
+          vectorize_cache_index: `chatbot-${slug}-qcache`,
+          r2_bucket_name: `chatbot-${slug}-storage`,
+          provisioned_at: new Date().toISOString(),
+        });
+      }
+
+      // 4. Create initial admin login credentials
       let createdUser = null;
       if (adminUsername && adminPassword) {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -106,6 +167,7 @@ export const superAdminController = {
         ok: true,
         client: newClient,
         created_user: createdUser,
+        resources: provisionedResources,
       }, 201);
     } catch (err: any) {
       console.error("superAdmin.createClient error:", err?.message || err);
@@ -125,6 +187,7 @@ export const superAdminController = {
       const masterKey = getJwtSecret(c.env);
       const secrets = await clientSecretsDb.getDecryptedSecrets(c.env.DB, clientId, masterKey);
       const users = await authdb.getUsersByClientId(c.env.DB, clientId);
+      const resources = await clientResourcesDb.getResources(c.env.DB, clientId);
 
       return c.json({
         ok: true,
@@ -132,16 +195,26 @@ export const superAdminController = {
         secrets: {
           has_openai_key: secrets.has_openai_key,
           openai_api_key_masked: secrets.openai_api_key_masked,
-          cf_account_id: secrets.cf_account_id,
-          has_cf_token: secrets.has_cf_token,
-          cf_api_token_masked: secrets.cf_api_token_masked,
           updated_at: secrets.updated_at,
         },
+        resources,
         users,
       });
     } catch (err: any) {
       console.error("superAdmin.getClientDetails error:", err?.message || err);
       return c.json({ ok: false, error: err?.message || "Failed to fetch client details" }, 500);
+    }
+  },
+
+  // GET /super-admin/clients/:id/resources
+  getClientResources: async (c: Context<Env>) => {
+    try {
+      const clientId = c.req.param("id");
+      const resources = await clientResourcesDb.getResources(c.env.DB, clientId);
+      return c.json({ ok: true, resources });
+    } catch (err: any) {
+      console.error("superAdmin.getClientResources error:", err?.message || err);
+      return c.json({ ok: false, error: err?.message || "Failed to fetch client resources" }, 500);
     }
   },
 
@@ -155,6 +228,7 @@ export const superAdminController = {
         name: body.name,
         slug: body.slug,
         domain: body.domain,
+        contact_email: body.contact_email,
         logo_url: body.logo_url,
         billing_mode: body.billing_mode,
         status: body.status,
@@ -166,15 +240,11 @@ export const superAdminController = {
 
       // Update secrets if provided
       const masterKey = getJwtSecret(c.env);
-      if (body.openai_api_key !== undefined || body.cf_api_token !== undefined || body.cf_account_id !== undefined) {
+      if (body.openai_api_key !== undefined) {
         await clientSecretsDb.saveSecrets(
           c.env.DB,
           clientId,
-          {
-            openai_api_key: body.openai_api_key,
-            cf_account_id: body.cf_account_id,
-            cf_api_token: body.cf_api_token,
-          },
+          { openai_api_key: body.openai_api_key },
           masterKey
         );
       }
@@ -194,7 +264,24 @@ export const superAdminController = {
         return c.json({ ok: false, error: "Cannot delete default system client" }, 400);
       }
 
+      // 1. Cleanup Cloudflare resources if provisioned
+      const resources = await clientResourcesDb.getResources(c.env.DB, clientId);
+      const cfAccountId = c.env.CF_ACCOUNT_ID;
+      const cfApiToken = (c.env as any).CF_PLATFORM_API_TOKEN || (c.env as any).CF_AI_SEARCH_TOKEN;
+
+      if (resources && cfAccountId && cfApiToken) {
+        try {
+          await cloudflareProvisionerService.deleteAllResources(cfAccountId, cfApiToken, resources);
+        } catch (delErr) {
+          console.warn(`[Provisioner] Cleanup warning for client ${clientId}:`, delErr);
+        }
+      }
+
+      // 2. Delete database records
+      await clientResourcesDb.deleteResources(c.env.DB, clientId);
+      await clientSecretsDb.deleteSecrets(c.env.DB, clientId);
       const success = await clientsDb.deleteClient(c.env.DB, clientId);
+
       return c.json({ ok: success });
     } catch (err: any) {
       console.error("superAdmin.deleteClient error:", err?.message || err);
@@ -272,6 +359,64 @@ export const superAdminController = {
     } catch (err: any) {
       console.error("superAdmin.listClientUsers error:", err?.message || err);
       return c.json({ ok: false, error: err?.message || "Failed to list client users" }, 500);
+    }
+  },
+
+  // GET /super-admin/api-key-requests
+  listApiKeyRequests: async (c: Context<Env>) => {
+    try {
+      const status = c.req.query("status");
+      const requests = await apiKeyRequestsDb.getAllRequests(c.env.DB, status);
+      return c.json({ ok: true, requests });
+    } catch (err: any) {
+      console.error("superAdmin.listApiKeyRequests error:", err?.message || err);
+      return c.json({ ok: false, error: err?.message || "Failed to list API key requests" }, 500);
+    }
+  },
+
+  // PUT /super-admin/api-key-requests/:id/review
+  reviewApiKeyRequest: async (c: Context<Env>) => {
+    try {
+      const requestId = c.req.param("id");
+      const body = await c.req.json();
+      const status = body.status as "approved" | "rejected";
+      const notes = body.notes;
+      const user = (c as any).get("user");
+
+      if (!status || (status !== "approved" && status !== "rejected")) {
+        return c.json({ ok: false, error: "Status must be 'approved' or 'rejected'" }, 400);
+      }
+
+      const req = await apiKeyRequestsDb.getRequestById(c.env.DB, requestId);
+      if (!req) {
+        return c.json({ ok: false, error: "Request not found" }, 404);
+      }
+
+      // If approved, update client billing_mode
+      if (status === "approved") {
+        if (req.request_type === "switch_to_platform") {
+          await clientsDb.updateClient(c.env.DB, req.client_id, { billing_mode: "platform" });
+          await clientSecretsDb.saveSecrets(
+            c.env.DB,
+            req.client_id,
+            { openai_api_key: "" },
+            getJwtSecret(c.env)
+          );
+        } else if (req.request_type === "switch_to_own") {
+          await clientsDb.updateClient(c.env.DB, req.client_id, { billing_mode: "byok" });
+        }
+      }
+
+      await apiKeyRequestsDb.reviewRequest(c.env.DB, requestId, {
+        status,
+        reviewed_by: user?.id,
+        notes,
+      });
+
+      return c.json({ ok: true, message: `Request has been ${status}` });
+    } catch (err: any) {
+      console.error("superAdmin.reviewApiKeyRequest error:", err?.message || err);
+      return c.json({ ok: false, error: err?.message || "Failed to review request" }, 500);
     }
   },
 

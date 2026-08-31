@@ -1,3 +1,6 @@
+/* ========================================================================== */
+/* Hero Header Banner                                                         */
+/* ========================================================================== */
 .ai-knowledge-box {
   background: linear-gradient(to right, #3167f3, #2a58cf);
   border-radius: 10px;
@@ -43,38 +46,159 @@
   border-color: rgba(255, 255, 255, 0.4) !important;
 }
 
-.card {
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+/* ========================================================================== */
+/* Modern Connected Stepper Navigation                                       */
+/* ========================================================================== */
+.stepper-container {
+  border-radius: 12px;
   background: #ffffff;
+  position: relative;
   overflow: hidden;
 }
 
-.card-header {
-  padding: 16px 22px !important;
-  background: #ffffff !important;
-  border-bottom: 1px solid #edf2f7 !important;
+.stepper-progress-track {
+  width: 100%;
+  height: 4px;
+  background: #e2e8f0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
 }
 
-.card-title {
-  font-size: 15px !important;
-  font-weight: 600 !important;
-  color: #1e293b !important;
+.stepper-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3167f3, #00d2ff);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.steps-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px 4px;
+}
+
+.step-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  flex: 1;
+  min-width: 150px;
+  user-select: none;
+}
+
+.step-block:hover {
+  background: #f8fafc;
+}
+
+.step-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.step-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.step-tag {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+.step-label {
+  font-size: 13.5px;
+  color: #475569;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Active Step */
+.step-block.active {
+  background: #f0f7ff;
+}
+
+.step-block.active .step-icon-circle {
+  background: #3167f3;
+  border-color: #3167f3;
+  color: #ffffff;
+  box-shadow: 0 4px 10px rgba(49, 103, 243, 0.35);
+  transform: scale(1.08);
+}
+
+.step-block.active .step-tag {
+  color: #3167f3;
+  font-weight: 700;
+}
+
+.step-block.active .step-label {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+/* Completed Step */
+.step-block.completed .step-icon-circle {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.step-block.completed .step-label {
+  color: #1e293b;
+}
+
+/* ========================================================================== */
+/* Step Content Cards                                                         */
+/* ========================================================================== */
+.step-card {
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.step-chip {
+  background: #eff6ff;
+  color: #3167f3;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 0.05em;
+  border: 1px solid #dbeafe;
+}
+
+/* Form Inputs */
 .form-label {
   font-size: 13px;
-  font-weight: 600;
   color: #334155;
   margin-bottom: 6px;
-  display: block;
 }
 
 .custom-input {
   border: 1px solid #cbd5e1 !important;
   border-radius: 8px !important;
-  padding: 8px 14px !important;
+  padding: 9px 14px !important;
   font-size: 13.5px !important;
   height: 42px !important;
   background-color: #ffffff !important;
@@ -85,13 +209,30 @@
 .custom-input:focus {
   border-color: #3167f3 !important;
   box-shadow: 0 0 0 3px rgba(49, 103, 243, 0.12) !important;
-  background-color: #ffffff !important;
   outline: none;
 }
 
-.input-group .custom-input {
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
+.input-icon-addon {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  border-right: none !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  color: #64748b !important;
+  padding: 0 12px !important;
+  font-size: 16px;
+}
+
+.input-prefix-addon {
+  background: #f8fafc !important;
+  border: 1px solid #cbd5e1 !important;
+  border-right: none !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  color: #64748b !important;
+  padding: 0 12px !important;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .input-addon-btn {
@@ -100,13 +241,8 @@
   background: #f8fafc !important;
   border-top-right-radius: 8px !important;
   border-bottom-right-radius: 8px !important;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
   color: #64748b !important;
   padding: 0 14px !important;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -116,67 +252,204 @@
   color: #1e293b !important;
 }
 
-.generate-pwd-btn {
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none !important;
+.bg-light-preview {
+  background: #f8fafc;
+  border-color: #e2e8f0 !important;
 }
 
-.generate-pwd-btn:hover {
-  text-decoration: underline !important;
-}
-
-.billing-mode-card {
-  border: 1.5px solid #e2e8f0;
+/* ========================================================================== */
+/* Step 2: Dedicated Infrastructure Cards                                    */
+/* ========================================================================== */
+.alert-info-sleek {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 10px;
-  padding: 18px;
+  padding: 14px 18px;
+  color: #1e40af;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.infra-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
   background: #ffffff;
-  cursor: pointer;
   transition: all 0.2s ease;
   height: 100%;
 }
 
-.billing-mode-card:hover {
+.infra-card:hover {
   border-color: #cbd5e1;
   background: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.05);
 }
 
-.billing-mode-card.selected {
+.infra-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.d1-theme { background: #e0f2fe; color: #0284c7; }
+.kv-theme { background: #fef3c7; color: #d97706; }
+.vec-theme { background: #ede9fe; color: #7c3aed; }
+.r2-theme { background: #ffedd5; color: #ea580c; }
+
+.infra-details {
+  flex: 1;
+}
+
+.infra-title {
+  font-size: 13.5px;
+  color: #1e293b;
+}
+
+.infra-tag {
+  display: inline-block;
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: monospace;
+  margin: 5px 0 3px 0;
+  border: 1px solid #e2e8f0;
+}
+
+.infra-desc {
+  font-size: 12px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Soft Badges */
+.bg-primary-soft { background-color: #eff6ff; color: #1e40af; border: 1px solid #dbeafe; }
+.bg-success-soft { background-color: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.bg-warning-soft { background-color: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+.bg-info-soft { background-color: #f5f3ff; color: #5b21b6; border: 1px solid #ddd6fe; }
+.bg-purple-soft { background-color: #faf5ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+
+/* ========================================================================== */
+/* Step 3: Choice Cards (AI Billing)                                          */
+/* ========================================================================== */
+.choice-card {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  height: 100%;
+}
+
+.choice-card:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  transform: translateY(-2px);
+}
+
+.choice-card.selected {
   border-color: #3167f3;
   background: #f0f7ff;
-  box-shadow: 0 0 0 1px #3167f3;
+  box-shadow: 0 4px 14px rgba(49, 103, 243, 0.15);
 }
 
-.byok-box {
+.choice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.choice-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.platform-icon { background: #e0f2fe; color: #0284c7; }
+.byok-icon { background: #fef3c7; color: #d97706; }
+
+.choice-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.choice-desc {
+  font-size: 12.8px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.byok-panel {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 20px;
 }
 
-.byok-info-box {
-  background: #eff6ff;
-  border: 1px solid #dbeafe;
+.policy-tip-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
   border-radius: 8px;
   padding: 12px 16px;
-  font-size: 12.5px;
-  color: #1e40af;
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  line-height: 1.5;
 }
 
-.badge-encryption {
-  background: #f1f5f9;
-  color: #475569;
+/* ========================================================================== */
+/* Step 4 & 5: Credentials and Manifest                                       */
+/* ========================================================================== */
+.security-info-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.manifest-card {
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 10px;
+  padding: 18px;
 }
 
+.manifest-header {
+  font-weight: 700;
+  font-size: 14px;
+  color: #1e293b;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.manifest-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+.manifest-table td {
+  padding: 5px 0;
+}
+
+/* ========================================================================== */
+/* Bottom Action Buttons                                                      */
+/* ========================================================================== */
 .button-primary {
   background-color: #3167f3;
   border: 1px solid #3167f3;
@@ -184,7 +457,7 @@
   box-shadow: 0 1px 2px rgba(49, 103, 243, 0.3);
   border-radius: 8px;
   font-size: 13.5px;
-  padding: 9px 20px;
+  padding: 9px 22px;
   font-weight: 600;
   cursor: pointer;
   text-decoration: none;
@@ -197,30 +470,44 @@
 .button-primary:hover {
   background-color: #254fd0;
   border-color: #254fd0;
-  box-shadow: 0 2px 4px rgba(49, 103, 243, 0.4);
+  box-shadow: 0 4px 10px rgba(49, 103, 243, 0.4);
 }
 
-.button-primary:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
+.btn-wizard-next {
+  padding: 10px 24px;
 }
 
-.btn-cancel {
+.btn-wizard-submit {
+  background: linear-gradient(135deg, #3167f3, #254fd0) !important;
+  box-shadow: 0 4px 14px rgba(49, 103, 243, 0.4) !important;
+  padding: 10px 26px;
+}
+
+.btn-wizard-back {
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   color: #475569;
-  font-weight: 500;
+  font-weight: 600;
   font-size: 13.5px;
-  padding: 8px 20px;
+  padding: 9px 20px;
   border-radius: 8px;
   text-decoration: none;
   transition: all 0.2s ease;
 }
 
-.btn-cancel:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+.btn-wizard-back:hover {
+  background: #f1f5f9;
   color: #1e293b;
+}
+
+/* Animations */
+.step-card-animate {
+  animation: stepIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes stepIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .spin {

@@ -30,6 +30,12 @@ export interface ByokVectorConfig {
   cfAccountId: string;
   cfApiToken: string;
   indexName?: string;
+  datasetIndexMap?: {
+    admin?: string;
+    pdf?: string;
+    web?: string;
+    cache?: string;
+  };
 }
 
 import { INGEST_CONFIG, RETRY_CONFIG } from "../constants";
@@ -83,11 +89,8 @@ function buildDoc(c: Chunk): Document {
 function normalizeScore01(raw: number): number {
   const v = Number(raw || 0);
   if (!Number.isFinite(v)) return 0;
-  // If it's already in [0,1], keep it.
   if (v >= 0 && v <= 1) return v;
-  // If it's in [0,100], scale down.
   if (v > 1 && v <= 100) return v / 100;
-  // Otherwise clamp very roughly.
   return clamp(v, 0, 1);
 }
 
@@ -96,7 +99,7 @@ export const vectorService = {
     chunks: Chunk[],
     apiKey: string,
     vectorIndex?: VectorizeIndex,
-    opts?: { batchSize?: number; embeddingModel?: string; byokConfig?: ByokVectorConfig }
+    opts?: { batchSize?: number; embeddingModel?: string; byokConfig?: ByokVectorConfig; dataset?: string }
   ): Promise<void> {
     if (!Array.isArray(chunks) || chunks.length === 0) return;
 
@@ -105,10 +108,16 @@ export const vectorService = {
       Math.min(opts?.batchSize ?? DEFAULT_UPSERT_BATCH_SIZE, MAX_UPSERT_BATCH_SIZE)
     );
 
-    // 1. Check if client is using their OWN Cloudflare Vectorize account (BYOK REST Mode)
+    // 1. Check if client has dedicated Cloudflare Vectorize (REST Mode)
     if (opts?.byokConfig?.cfAccountId && opts?.byokConfig?.cfApiToken) {
-      console.log(`[VectorService] Routing vector upsert to Client Cloudflare Account [${opts.byokConfig.cfAccountId}] via REST API.`);
-      const indexName = opts.byokConfig.indexName || "chatbot-vector-index";
+      let indexName = opts.byokConfig.indexName;
+      if (opts.byokConfig.datasetIndexMap && opts?.dataset) {
+        const dsKey = opts.dataset.toLowerCase() as "admin" | "pdf" | "web";
+        indexName = opts.byokConfig.datasetIndexMap[dsKey] || indexName;
+      }
+      if (!indexName) indexName = "chatbot-vector-index";
+
+      console.log(`[VectorService] Routing vector upsert to Cloudflare Index [${indexName}] via REST API.`);
 
       // Ensure all chunks have embeddings
       const haveAllVectors = chunks.every((b) => Array.isArray(b.values) && (b.values?.length || 0) > 0);
@@ -218,7 +227,7 @@ export const vectorService = {
       throw new Error("vectorService.searchChunks: invalid query embedding");
     }
 
-    // 1. Check if client is using their OWN Cloudflare Vectorize account (BYOK REST Mode)
+    // 1. Check if client has dedicated Cloudflare Vectorize (REST Mode)
     if (byokConfig?.cfAccountId && byokConfig?.cfApiToken) {
       const indexName = byokConfig.indexName || "chatbot-vector-index";
       const matches = await cloudflareVectorizeRestService.queryVectors(
@@ -279,10 +288,41 @@ export const vectorService = {
       return [];
     }
 
-    // 1. BYOK Mode: Query the client's own Cloudflare account directly
+    // 1. Dedicated / BYOK Mode: Query active dataset indexes via REST
     if (byokConfig?.cfAccountId && byokConfig?.cfApiToken) {
-      console.log(`[VectorService] Executing BYOK Vector search on Client Account [${byokConfig.cfAccountId}].`);
-      return await this.searchChunks(embedding, apiKey, undefined, topKPerIndex * 2, byokConfig);
+      const uniqueDatasets = Array.from(new Set(activeDatasets.filter(Boolean)));
+      if (uniqueDatasets.length === 0) return [];
+
+      const searchPromises = uniqueDatasets.map(async (ds) => {
+        let indexName = byokConfig.indexName || "chatbot-vector-index";
+        if (byokConfig.datasetIndexMap) {
+          const dsKey = ds.toLowerCase() as "admin" | "pdf" | "web";
+          if (byokConfig.datasetIndexMap[dsKey]) {
+            indexName = byokConfig.datasetIndexMap[dsKey]!;
+          }
+        }
+
+        try {
+          const hits = await this.searchChunks(embedding, apiKey, undefined, topKPerIndex, {
+            cfAccountId: byokConfig.cfAccountId,
+            cfApiToken: byokConfig.cfApiToken,
+            indexName,
+          });
+          return hits.map((h) => ({
+            ...h,
+            metadata: {
+              ...(h.metadata || {}),
+              dataset: ds,
+            },
+          }));
+        } catch (err: any) {
+          console.warn(`Vector search on index [${indexName}] for dataset [${ds}] warning:`, err?.message || err);
+          return [];
+        }
+      });
+
+      const resultsByDataset = await Promise.all(searchPromises);
+      return resultsByDataset.flat();
     }
 
     // 2. Platform Mode: Query active dataset indexes in parallel with Promise.all
@@ -318,7 +358,7 @@ export const vectorService = {
   ): Promise<{ processed: number; deleted: number }> {
     if (!Array.isArray(ids) || ids.length === 0) return { processed: 0, deleted: 0 };
 
-    // 1. BYOK Mode: Delete from client's Cloudflare Vectorize account via REST
+    // 1. Dedicated / BYOK Mode: Delete from Cloudflare Vectorize account via REST
     if (opts?.byokConfig?.cfAccountId && opts?.byokConfig?.cfApiToken) {
       const indexName = opts.byokConfig.indexName || "chatbot-vector-index";
       return await cloudflareVectorizeRestService.deleteVectors(
@@ -368,4 +408,3 @@ export const vectorService = {
     return { processed, deleted };
   },
 };
-

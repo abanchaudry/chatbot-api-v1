@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import { nanoid } from "nanoid";
 import { crawlWebPage, discoverLinks, DiscoveredPage } from "../services/crawler.service";
 import { fileDb } from "../services/db/files.db";
+import { chunkDb } from "../services/db/chunk.db";
 import { vectorService, getVectorIndexForDataset } from "../services/vector.service";
 import { EmbeddingService } from "../services/embedding.service";
 import { getOpenAIKey } from "../utils/keys";
@@ -119,24 +120,25 @@ async function crawlAndIndexUrl(
   });
 
   // 4. Save Chunks into D1 SQLite
-  await chunkDb.saveChunks(
-    env.DB,
+  await fileDb.saveChunksBatch(env.DB, {
     fileId,
-    formattedChunks.map(c => ({
-      chunk_id: c.chunk_id,
-      chunk_index: c.chunk_index,
-      section: c.section,
+    fileName: targetUrl,
+    version: "v1",
+    chunks: formattedChunks.map(c => ({
+      index: c.chunk_index,
       content: c.content,
+      section: c.section,
       topic: c.topic,
       tags: c.tags,
       tier: c.tier,
-      parent_id: c.parent_id,
-      char_count: c.char_count,
-      token_count: c.token_count,
+      parentId: c.parent_id,
     })),
-    "web",
-    clientId
-  );
+    embeddingModel: "text-embedding-3-small",
+    chunkMethod: "3-tier-hierarchical",
+    dataset: "web",
+    source: "wp",
+    clientId,
+  });
 
   // 5. Update File Status to Completed in D1
   await fileDb.updateFile(env.DB, fileId, {
