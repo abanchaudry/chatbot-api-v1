@@ -50,6 +50,9 @@ Follow-up vs Global Organization Query Rules (CRITICAL):
    - Action: DO NOT artificially bind it to the prior product or user specific context. Set isFollowUp=false AND rewrite as a clean standalone organization-wide question (e.g. "Who is on the team at {company}?", "Who is the UI designer at {company}?", "What portfolio projects has {company} worked on?").
 3. STANDALONE GENERAL QUERY (isFollowUp=false):
    - If the query does not depend on prior history, set isFollowUp=false AND rewrite cleanly as a clear question.
+4. BARE NOUN / ENTITY / KEYWORD QUERIES (isFollowUp=false):
+   - If the user sends a bare product name, project title, technology, acronym, or service name with no verb (e.g. "oro ai", "oroai", "flutter", "coin curiosity", "sports fanta", "digital marketing", "pricing", "website development", "case studies"):
+   - Action: Route to ANSWER_WITH_RAG, set isFollowUp=false, and rewrite as a direct inquiry: "What is [entity] and what are its details at {company}?" (e.g. "oro ai" -> "What is the OroAI project and platform details at {company}?").
 
 Output constraints:
 - If route is not ANSWER_WITH_RAG, rewrittenQuestion must be "".

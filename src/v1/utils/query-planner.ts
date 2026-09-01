@@ -110,7 +110,8 @@ function extractQuestionFocus(question: string): string[] {
   const text = normalize(question);
   const patterns = [
     /^(?:who is|who s|whos|whose|tell me about|about)\s+(.+)$/,
-    /^(?:what is|what s|whats|show me|tell me|give me|share|find|need|looking for)\s+(?:the\s+)?(.+)$/,
+    /^(?:what is|what s|whats|what are|what do|what does|show me|tell me|give me|share|find|need|looking for)\s+(?:the\s+)?(.+)$/,
+    /^(?:tools for|tools used for|technologies for|tech stack for|features of|services of)\s+(.+)$/,
     /^(?:how do i|how can i)\s+(.+)$/,
   ];
 
@@ -121,7 +122,8 @@ function extractQuestionFocus(question: string): string[] {
     if (!match) continue;
 
     const cleaned = match
-      .replace(/\b(?:at|of|for)\s+(?:the\s+)?(?:company|agency|firm|team|business|organization)\b/g, " ")
+      .replace(/\b(?:at|of|for|used in|used for|you use for)\s+(?:the\s+)?(?:company|agency|firm|team|business|organization)\b/g, " ")
+      .replace(/\b(?:tools are used for|tools do you use for|tools do u use for|tools for|technologies for)\s+/g, " ")
       .replace(/\b(?:please|thanks|thank you)\b/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -130,6 +132,29 @@ function extractQuestionFocus(question: string): string[] {
 
     const trimmed = cleaned.replace(/\b(?:of|for|about)\s+[a-z0-9\s]{2,40}$/g, "").trim();
     if (trimmed) phrases.add(trimmed);
+  }
+
+  // Also extract multi-word domain phrases directly if present in question
+  const domainPhrases = [
+    "website development",
+    "web development",
+    "mobile app development",
+    "mobile development",
+    "digital marketing",
+    "ai chatbot solutions",
+    "ai chatbot",
+    "ui ux design",
+    "ui ux",
+    "oro ai",
+    "oroai",
+    "sports fanta",
+    "coin curiosity",
+    "elite high school",
+  ];
+  for (const dp of domainPhrases) {
+    if (text.includes(dp)) {
+      phrases.add(dp);
+    }
   }
 
   return Array.from(phrases).filter((value) => value && value.split(/\s+/).length <= 8);

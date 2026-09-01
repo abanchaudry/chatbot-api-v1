@@ -90,6 +90,7 @@ function buildLocalDbPiece(
       tags,
       first_sentence: row.first_sentence || null,
       section_number: row.section_number || null,
+      parent_id: (row as any).parent_id || null,
       __origin: origin,
       __matchMode: row.matchMode || null,
       __exactEntityMatch: exactEntityMatch,
@@ -219,13 +220,32 @@ export async function expandParentChunks(
       .bind(...idsArray, ...idsArray)
       .all();
 
+    const parentMap = new Map<string, any>();
     if (results && results.length > 0) {
-      const parentMap = new Map<string, any>();
       for (const row of results as any[]) {
         if (row.id) parentMap.set(row.id, row);
         if (row.chunk_id) parentMap.set(row.chunk_id, row);
       }
+    }
 
+    // Also check chunks table for parents
+    const missingIds = idsArray.filter((id) => !parentMap.has(id));
+    if (missingIds.length > 0) {
+      const missingPlaceholders = missingIds.map(() => "?").join(",");
+      const chunksRes = await db
+        .prepare(
+          `SELECT chunk_id, content, section, tier FROM chunks WHERE chunk_id IN (${missingPlaceholders})`
+        )
+        .bind(...missingIds)
+        .all();
+      if (chunksRes.results && chunksRes.results.length > 0) {
+        for (const row of chunksRes.results as any[]) {
+          if (row.chunk_id) parentMap.set(row.chunk_id, row);
+        }
+      }
+    }
+
+    if (parentMap.size > 0) {
       return pieces.map((p) => {
         const parentId = p.meta?.parent_id || p.meta?.parentId;
         if (parentId && parentMap.has(parentId)) {

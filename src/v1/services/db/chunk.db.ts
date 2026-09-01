@@ -443,14 +443,16 @@ export const chunkDb = {
     ];
 
     const res = await db.prepare(
-      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, COALESCE(c.dataset, f.dataset, 'admin') AS dataset, c.tags
+      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.parent_id, f.file_name, COALESCE(c.dataset, f.dataset, 'admin') AS dataset, c.tags
        FROM chunks c
        LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereSql})
          ${datasetLikeClause}
          AND (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))
          AND LENGTH(c.content) <= 8000
-       ORDER BY LENGTH(c.content) ASC, c.chunk_id ASC
+       ORDER BY
+         CASE WHEN LOWER(c.section) LIKE '%tools%' OR LOWER(c.section) LIKE '%development%' OR LOWER(c.section) LIKE '%service%' THEN 3 ELSE 1 END DESC,
+         c.chunk_id ASC
        LIMIT ?`
     ).bind(...bindArgs).all();
 
@@ -550,7 +552,7 @@ export const chunkDb = {
     }
 
     const res = await db.prepare(
-      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, f.file_name, COALESCE(c.dataset, f.dataset, 'admin') AS dataset, c.tags
+      `SELECT c.chunk_id, c.content, c.topic, c.first_sentence, c.section_number, c.section, c.file_id, c.parent_id, f.file_name, COALESCE(c.dataset, f.dataset, 'admin') AS dataset, c.tags
        FROM chunks c
        LEFT JOIN files f ON f.file_id = c.file_id
        WHERE (${whereClauses.join(" OR ")})
