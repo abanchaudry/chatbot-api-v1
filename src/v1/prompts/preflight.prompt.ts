@@ -46,13 +46,16 @@ Follow-up vs Global Organization Query Rules (CRITICAL):
    - The user asks a continuation question that directly relies on an entity, service, or policy discussed immediately prior (e.g. "whats the fee?", "how much is it?", "how do I apply for that?", "tell me more about this").
    - Action: Set isFollowUp=true AND rewrite into a clear standalone question combining the specific subject from history.
 2. GLOBAL INQUIRY / TOPIC TRANSITION (isFollowUp=false):
-   - If the user asks a company-wide or general organizational question (e.g. "who is on your team?", "who is your UI designer?", "tell me about your projects", "what articles do you have?", "what is your contact info?", "what services do you provide?"):
-   - Action: DO NOT artificially bind it to the prior product or user specific context. Set isFollowUp=false AND rewrite as a clean standalone organization-wide question (e.g. "Who is on the team at {company}?", "Who is the UI designer at {company}?", "What portfolio projects has {company} worked on?").
-3. STANDALONE GENERAL QUERY (isFollowUp=false):
+   - If the user asks a company-wide or general organizational question about THIS company (e.g. "who is on your team?", "who is your UI designer?", "tell me about your projects", "what articles do you have?", "what is your contact info?", "what services do you provide?", "services?"):
+   - Action: DO NOT artificially bind it to the prior product or user specific context. Set isFollowUp=false AND rewrite as a clean standalone organization-wide question (e.g. "Who is on the team at {company}?", "What services are offered by {company}?").
+3. EXTERNAL / THIRD-PARTY ENTITY / COMPETITOR INQUIRIES (isFollowUp=false):
+   - If the user explicitly asks about a specific named third-party company, external brand, or entity other than {company} (e.g. "rdeens services?", "arpinax services?", "what does Google do?", "what services does Microsoft offer?"):
+   - Action: DO NOT replace the external entity name with {company} and DO NOT append {domainHint}. Rewrite the question preserving the EXACT external entity name (e.g. "What services does Rdeens offer?", "What services does Arpinax offer?").
+4. STANDALONE GENERAL QUERY (isFollowUp=false):
    - If the query does not depend on prior history, set isFollowUp=false AND rewrite cleanly as a clear question.
-4. BARE NOUN / ENTITY / KEYWORD QUERIES (isFollowUp=false):
-   - If the user sends a bare product name, project title, technology, acronym, or service name with no verb (e.g. "oro ai", "oroai", "flutter", "coin curiosity", "sports fanta", "digital marketing", "pricing", "website development", "case studies"):
-   - Action: Route to ANSWER_WITH_RAG, set isFollowUp=false, and rewrite as a direct inquiry: "What is [entity] and what are its details at {company}?" (e.g. "oro ai" -> "What is the OroAI project and platform details at {company}?").
+5. BARE NOUN / ENTITY / KEYWORD QUERIES (isFollowUp=false):
+   - If the user sends a bare product name, project title, technology, acronym, or service name with no verb (e.g. "pricing", "case studies", "analytics", "refund policy", "contact", or a specific product name):
+   - Action: Route to ANSWER_WITH_RAG, set isFollowUp=false, and rewrite as a direct inquiry: "What is [entity] and what are its details?" (e.g. "pricing" -> "What is the pricing and fee details?").
 
 Output constraints:
 - If route is not ANSWER_WITH_RAG, rewrittenQuestion must be "".

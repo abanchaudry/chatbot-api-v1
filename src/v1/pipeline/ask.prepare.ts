@@ -234,6 +234,7 @@ async function stageRunPreflight(
   language: "english" | "spanish",
   historyPreview: string,
   assistantName: string,
+  companyName: string,
   domainHint: string,
   trace: TraceShape
 ): Promise<PreflightOut> {
@@ -249,8 +250,8 @@ async function stageRunPreflight(
         history: historyPreview,
         assistantName,
         domainHint,
-        company: domainHint,
-        brand: assistantName,
+        company: companyName || assistantName || "our company",
+        brand: companyName || assistantName || "our brand",
         currentDate,
       } as any),
       6500,
@@ -567,6 +568,7 @@ export async function preparePipeline(
       language,
       historyPreview,
       assistantName,
+      companyName,
       domainHint,
       trace
     );

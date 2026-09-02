@@ -111,7 +111,7 @@ function extractQuestionFocus(question: string): string[] {
   const patterns = [
     /^(?:who is|who s|whos|whose|tell me about|about)\s+(.+)$/,
     /^(?:what is|what s|whats|what are|what do|what does|show me|tell me|give me|share|find|need|looking for)\s+(?:the\s+)?(.+)$/,
-    /^(?:tools for|tools used for|technologies for|tech stack for|features of|services of)\s+(.+)$/,
+    /^(?:tools for|tools used for|technologies for|tech stack for|features of|services of|faqs about|questions about|details about)\s+(.+)$/,
     /^(?:how do i|how can i)\s+(.+)$/,
   ];
 
@@ -134,26 +134,18 @@ function extractQuestionFocus(question: string): string[] {
     if (trimmed) phrases.add(trimmed);
   }
 
-  // Also extract multi-word domain phrases directly if present in question
-  const domainPhrases = [
-    "website development",
-    "web development",
-    "mobile app development",
-    "mobile development",
-    "digital marketing",
-    "ai chatbot solutions",
-    "ai chatbot",
-    "ui ux design",
-    "ui ux",
-    "oro ai",
-    "oroai",
-    "sports fanta",
-    "coin curiosity",
-    "elite high school",
-  ];
-  for (const dp of domainPhrases) {
-    if (text.includes(dp)) {
-      phrases.add(dp);
+  // Generic N-gram extraction: automatically extract 2-to-3 consecutive meaningful words from the query
+  const words = text.split(/\s+/).filter(Boolean);
+  for (let i = 0; i < words.length - 1; i++) {
+    const twoGram = `${words[i]} ${words[i + 1]}`;
+    if (!STOP_WORDS.has(words[i]) || !STOP_WORDS.has(words[i + 1])) {
+      phrases.add(twoGram);
+    }
+    if (i < words.length - 2) {
+      const threeGram = `${words[i]} ${words[i + 1]} ${words[i + 2]}`;
+      if (!STOP_WORDS.has(words[i]) || !STOP_WORDS.has(words[i + 2])) {
+        phrases.add(threeGram);
+      }
     }
   }
 
@@ -186,13 +178,49 @@ function extractEntities(question: string, exactPhrases: string[], intent: Query
 }
 
 function extractKeywords(question: string, exactPhrases: string[], entities: string[]): string[] {
-  const words = normalize(question).match(/[a-z0-9.]{3,}/g) || [];
+  const norm = normalize(question);
+  const words = norm.match(/[a-z0-9.]{3,}/g) || [];
   const fromWords = words.filter((word) => !STOP_WORDS.has(word));
   const fromPhrases = [...exactPhrases, ...entities].flatMap((phrase) =>
     normalize(phrase).match(/[a-z0-9.]{3,}/g) || []
   );
 
-  return Array.from(new Set([...fromWords, ...fromPhrases])).slice(0, 12);
+  const keywords = new Set([...fromWords, ...fromPhrases]);
+
+  // Generic, domain-agnostic intent synonym expansions
+  if (/\bfaqs?\b|\bfrequently asked\b|\bquestions\b/.test(norm)) {
+    keywords.add("faq");
+    keywords.add("faqs");
+    keywords.add("questions");
+    keywords.add("frequently");
+    keywords.add("asked");
+  }
+
+  if (/\bprojects?\b|\bportfolio\b|\bcase stud\b|\bwork\b|\bclients?\b/.test(norm)) {
+    keywords.add("project");
+    keywords.add("projects");
+    keywords.add("portfolio");
+    keywords.add("case");
+    keywords.add("study");
+    keywords.add("studies");
+  }
+
+  if (/\bservices?\b|\bofferings?\b|\bsolutions?\b|\bcapabilities\b/.test(norm)) {
+    keywords.add("service");
+    keywords.add("services");
+    keywords.add("solutions");
+    keywords.add("offerings");
+  }
+
+  if (/\bpric(?:ing|e|es)?\b|\bcosts?\b|\bfees?\b|\brates?\b/.test(norm)) {
+    keywords.add("pricing");
+    keywords.add("price");
+    keywords.add("cost");
+    keywords.add("fee");
+    keywords.add("fees");
+  }
+
+  return Array.from(keywords).slice(0, 16);
 }
 
 function detectIntent(question: string, sectionRef: string | null, usesHistory: boolean): QueryIntent {

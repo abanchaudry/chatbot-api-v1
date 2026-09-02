@@ -451,7 +451,12 @@ export const chunkDb = {
          AND (c.client_id = ? OR (c.client_id IS NULL AND ? = 'default'))
          AND LENGTH(c.content) <= 8000
        ORDER BY
-         CASE WHEN LOWER(c.section) LIKE '%tools%' OR LOWER(c.section) LIKE '%development%' OR LOWER(c.section) LIKE '%service%' THEN 3 ELSE 1 END DESC,
+         CASE
+           WHEN (LOWER(c.section) LIKE '%faq%' OR LOWER(c.content) LIKE '%faqs:%' OR LOWER(c.content) LIKE '%q:%') AND LOWER(c.section) NOT LIKE '%terms%' AND LOWER(c.section) NOT LIKE '%privacy%' THEN 5
+           WHEN (LOWER(c.section) LIKE '%project%' OR LOWER(c.section) LIKE '%portfolio%' OR LOWER(c.section) LIKE '%case stud%' OR LOWER(c.content) LIKE '%case study%' OR LOWER(c.content) LIKE '%portfolio%') AND LOWER(c.section) NOT LIKE '%terms%' AND LOWER(c.section) NOT LIKE '%privacy%' AND LOWER(c.section) NOT LIKE '%disclaimer%' THEN 4
+           WHEN LOWER(c.section) LIKE '%service%' OR LOWER(c.section) LIKE '%solution%' OR LOWER(c.section) LIKE '%offering%' OR LOWER(c.section) LIKE '%tool%' OR LOWER(c.section) LIKE '%development%' THEN 3
+           ELSE 1
+         END DESC,
          c.chunk_id ASC
        LIMIT ?`
     ).bind(...bindArgs).all();
