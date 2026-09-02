@@ -452,9 +452,9 @@ export const chunkDb = {
          AND LENGTH(c.content) <= 8000
        ORDER BY
          CASE
-           WHEN (LOWER(c.section) LIKE '%faq%' OR LOWER(c.content) LIKE '%faqs:%' OR LOWER(c.content) LIKE '%q:%') AND LOWER(c.section) NOT LIKE '%terms%' AND LOWER(c.section) NOT LIKE '%privacy%' THEN 5
-           WHEN (LOWER(c.section) LIKE '%project%' OR LOWER(c.section) LIKE '%portfolio%' OR LOWER(c.section) LIKE '%case stud%' OR LOWER(c.content) LIKE '%case study%' OR LOWER(c.content) LIKE '%portfolio%') AND LOWER(c.section) NOT LIKE '%terms%' AND LOWER(c.section) NOT LIKE '%privacy%' AND LOWER(c.section) NOT LIKE '%disclaimer%' THEN 4
-           WHEN LOWER(c.section) LIKE '%service%' OR LOWER(c.section) LIKE '%solution%' OR LOWER(c.section) LIKE '%offering%' OR LOWER(c.section) LIKE '%tool%' OR LOWER(c.section) LIKE '%development%' THEN 3
+           WHEN (LOWER(c.section) LIKE '%faq%' OR LOWER(c.content) LIKE '%faqs:%' OR LOWER(c.content) LIKE '%q:%') AND LOWER(c.section) NOT LIKE '%terms%' AND LOWER(c.section) NOT LIKE '%privacy%' AND LOWER(c.content) NOT LIKE '%(id: %' AND LOWER(c.content) NOT LIKE '%privacy policy%' AND LOWER(c.content) NOT LIKE '%terms & conditions%' AND LOWER(c.content) NOT LIKE '%terms and conditions%' THEN 5
+           WHEN (LOWER(c.section) LIKE '%project%' OR LOWER(c.section) LIKE '%portfolio%' OR LOWER(c.section) LIKE '%case stud%' OR LOWER(c.content) LIKE '%project 1%' OR LOWER(c.content) LIKE '%project summary%' OR LOWER(c.content) LIKE '%portfolio details%' OR LOWER(c.content) LIKE '%case study%' OR LOWER(c.content) LIKE '%portfolio%') AND LOWER(c.section) NOT LIKE '%terms%' AND LOWER(c.section) NOT LIKE '%privacy%' AND LOWER(c.content) NOT LIKE '%(id: %' AND LOWER(c.content) NOT LIKE '%privacy policy%' AND LOWER(c.content) NOT LIKE '%terms & conditions%' AND LOWER(c.content) NOT LIKE '%terms and conditions%' AND LOWER(c.section) NOT LIKE '%disclaimer%' THEN 4
+           WHEN (LOWER(c.section) LIKE '%service%' OR LOWER(c.section) LIKE '%solution%' OR LOWER(c.section) LIKE '%offering%' OR LOWER(c.section) LIKE '%tool%' OR LOWER(c.section) LIKE '%development%') AND LOWER(c.content) NOT LIKE '%(id: %' AND LOWER(c.content) NOT LIKE '%privacy policy%' AND LOWER(c.content) NOT LIKE '%terms & conditions%' AND LOWER(c.content) NOT LIKE '%terms and conditions%' THEN 3
            ELSE 1
          END DESC,
          c.chunk_id ASC
