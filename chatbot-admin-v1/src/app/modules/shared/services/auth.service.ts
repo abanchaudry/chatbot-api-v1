@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { catchError, map } from "rxjs/operators";
+import { throwError } from "rxjs";
 import { ApiService } from '../../core/services';
 
 @Injectable({
@@ -14,7 +15,7 @@ export class AuthService {
     return this._api.post(`${"auth/login"}`, data)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 
@@ -22,7 +23,7 @@ export class AuthService {
     return this._api.get(`${"auth/user/" + id}`,)
       .pipe(
         map((res: any) => res),
-        catchError((error: any) => error)
+        catchError((error: any) => throwError(() => error))
       );
   }
 }
